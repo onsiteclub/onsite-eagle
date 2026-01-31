@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@onsite/shared": "workspace:*",
+    "@onsite/ui": "workspace:*",
+    "@onsite/auth": "workspace:*",
     "@supabase/supabase-js": "^2.93.3",
     "expo": "~52.0.0",
     "expo-camera": "~16.0.0",

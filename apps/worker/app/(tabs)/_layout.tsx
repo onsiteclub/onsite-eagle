@@ -4,6 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const icons: Record<string, string> = {
     agenda: '📋',
+    scan: '📱',
     submit: '📷',
   };
 
@@ -22,23 +23,39 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#1F2937',
           borderTopColor: '#374151',
-          height: 60,
-          paddingBottom: 8,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 5,
         },
         tabBarActiveTintColor: '#10B981',
         tabBarInactiveTintColor: '#9CA3AF',
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+        },
         headerStyle: {
           backgroundColor: '#059669',
         },
         headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: '600',
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Minhas Casas',
-          tabBarLabel: 'Agenda',
+          tabBarLabel: 'Casas',
           tabBarIcon: ({ focused }) => <TabIcon name="agenda" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="scan"
+        options={{
+          title: 'Escanear QR',
+          tabBarLabel: 'Escanear',
+          tabBarIcon: ({ focused }) => <TabIcon name="scan" focused={focused} />,
         }}
       />
       <Tabs.Screen

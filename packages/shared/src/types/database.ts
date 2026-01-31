@@ -17,11 +17,12 @@ export interface House {
   current_phase: number
   progress_percentage: number
   coordinates: { x: number; y: number } | null
+  qr_code_data: string | null
   created_at: string
   updated_at: string
 }
 
-export type HouseStatus = 'not_started' | 'in_progress' | 'delayed' | 'completed'
+export type HouseStatus = 'not_started' | 'in_progress' | 'delayed' | 'completed' | 'on_hold'
 
 export interface Phase {
   id: string
@@ -62,10 +63,22 @@ export interface PhasePhoto {
   ai_validation_status: ValidationStatus
   ai_validation_notes: string | null
   ai_detected_items: string[] | null
+  signature: PhotoSignature | null
   created_at: string
 }
 
 export type ValidationStatus = 'pending' | 'approved' | 'rejected' | 'needs_review'
+
+// Electronic signature for photos
+export interface PhotoSignature {
+  user_id: string
+  user_name: string
+  user_role: 'worker' | 'foreman' | 'manager'
+  signed_at: string
+  device_id?: string
+  location?: { latitude: number; longitude: number }
+  hash: string
+}
 
 export interface TimelineEvent {
   id: string
@@ -77,10 +90,19 @@ export interface TimelineEvent {
   source_link: string | null
   metadata: Record<string, unknown> | null
   created_by: string | null
+  author?: TimelineAuthor | null
+  signature?: PhotoSignature | null
   created_at: string
 }
 
-export type EventType = 'photo' | 'email' | 'calendar' | 'note' | 'alert' | 'ai_validation' | 'status_change' | 'issue' | 'inspection'
+export interface TimelineAuthor {
+  id: string
+  name: string
+  role: 'worker' | 'foreman' | 'manager' | 'system'
+  avatar?: string
+}
+
+export type EventType = 'photo' | 'email' | 'calendar' | 'note' | 'alert' | 'ai_validation' | 'status_change' | 'issue' | 'inspection' | 'assignment' | 'milestone' | 'document'
 
 export interface Issue {
   id: string
@@ -100,7 +122,93 @@ export interface Issue {
 export type IssueSeverity = 'low' | 'medium' | 'high' | 'critical'
 export type IssueStatus = 'open' | 'in_progress' | 'resolved'
 
+// ==========================================
+// QR Code Assignment Types
+// ==========================================
+
+export interface HouseAssignment {
+  id: string
+  house_id: string
+  worker_id: string
+  assigned_by: string // Foreman ID
+  assigned_at: string
+  expected_start_date: string
+  expected_end_date: string
+  actual_start_date: string | null
+  actual_end_date: string | null
+  status: AssignmentStatus
+  plan_urls: string[]
+  notes: string | null
+  signature: AssignmentSignature | null
+}
+
+export type AssignmentStatus = 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled'
+
+export interface AssignmentSignature {
+  worker_signed_at: string | null
+  worker_signature_hash: string | null
+  foreman_signed_at: string
+  foreman_signature_hash: string
+}
+
+// QR Code data structure
+export interface QRAssignmentData {
+  type: 'house_assignment'
+  version: 1
+  house_id: string
+  site_id: string
+  lot_number: string
+  assigned_by: string
+  assigned_at: string
+  expected_start_date: string
+  expected_end_date: string
+  plan_urls: string[]
+  checksum: string
+}
+
+// ==========================================
+// Lot Map Types (Icons instead of colors)
+// ==========================================
+
+export interface LotMapIcon {
+  type: LotIconType
+  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center'
+  tooltip?: string
+}
+
+export type LotIconType =
+  | 'worker_assigned'
+  | 'worker_active'
+  | 'photo_pending'
+  | 'photo_approved'
+  | 'issue_open'
+  | 'issue_resolved'
+  | 'inspection_due'
+  | 'inspection_passed'
+  | 'deadline_near'
+  | 'deadline_overdue'
+  | 'milestone'
+
+export interface LotMapData {
+  house_id: string
+  lot_number: string
+  coordinates: { x: number; y: number; width: number; height: number }
+  status: HouseStatus
+  progress: number
+  icons: LotMapIcon[]
+  worker?: {
+    id: string
+    name: string
+    avatar?: string
+  }
+  deadline?: string
+  current_phase?: string
+}
+
+// ==========================================
 // AI Analysis types
+// ==========================================
+
 export interface PlanAnalysisResult {
   lots: {
     lot_number: string
