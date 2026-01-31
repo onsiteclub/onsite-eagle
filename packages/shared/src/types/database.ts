@@ -4,8 +4,50 @@ export interface Site {
   address: string
   city: string
   svg_data: string | null
+  total_lots: number
+  completed_lots: number
+  start_date: string | null
+  expected_end_date: string | null
   created_at: string
   updated_at: string
+}
+
+export interface SiteContact {
+  id: string
+  site_id: string
+  name: string
+  role: string
+  phone: string | null
+  email: string | null
+  company: string | null
+  is_primary: boolean
+}
+
+export interface SiteDocument {
+  id: string
+  site_id: string
+  name: string
+  type: 'contract' | 'permit' | 'plan' | 'insurance' | 'other'
+  url: string
+  uploaded_by: string
+  created_at: string
+}
+
+export interface SiteRule {
+  id: string
+  site_id: string
+  title: string
+  description: string
+  category: 'safety' | 'schedule' | 'quality' | 'general'
+}
+
+export interface SiteDate {
+  id: string
+  site_id: string
+  title: string
+  date: string
+  type: 'milestone' | 'deadline' | 'inspection' | 'meeting'
+  notes: string | null
 }
 
 export interface House {

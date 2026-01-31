@@ -35,6 +35,19 @@ export default function RootLayout() {
             title: 'House Details',
           }}
         />
+        <Stack.Screen
+          name="site/[id]"
+          options={{
+            title: 'Jobsite',
+          }}
+        />
+        <Stack.Screen
+          name="site/new"
+          options={{
+            title: 'Novo Jobsite',
+            presentation: 'modal',
+          }}
+        />
       </Stack>
     </>
   );
