@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 })
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
-    
+
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
@@ -18,23 +18,21 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     const base64 = buffer.toString('base64')
-    
-    // Determine media type
-    const mediaType = file.type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    // Determine media type
+    const mediaType = file.type
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 4096,
       messages: [
         {
           role: 'user',
           content: [
             {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: base64,
+              type: 'image_url',
+              image_url: {
+                url: `data:${mediaType};base64,${base64}`,
               },
             },
             {
@@ -80,13 +78,13 @@ Be thorough - identify every lot you can see, even if the number isn't fully vis
     })
 
     // Extract text content from response
-    const textContent = response.content.find(c => c.type === 'text')
-    if (!textContent || textContent.type !== 'text') {
+    const textContent = response.choices[0]?.message?.content
+    if (!textContent) {
       throw new Error('No text response from AI')
     }
 
     // Parse JSON from response
-    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/)
+    const jsonMatch = textContent.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       throw new Error('Could not parse JSON from AI response')
     }
@@ -96,7 +94,7 @@ Be thorough - identify every lot you can see, even if the number isn't fully vis
     return NextResponse.json({
       success: true,
       analysis,
-      raw_response: textContent.text
+      raw_response: textContent
     })
 
   } catch (error) {

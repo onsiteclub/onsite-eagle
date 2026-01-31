@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 })
 
 // Checklist items per phase
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const phase = formData.get('phase') as string
-    
+
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
@@ -92,22 +92,20 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     const base64 = buffer.toString('base64')
-    
-    const mediaType = file.type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const mediaType = file.type
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 4096,
       messages: [
         {
           role: 'user',
           content: [
             {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: base64,
+              type: 'image_url',
+              image_url: {
+                url: `data:${mediaType};base64,${base64}`,
               },
             },
             {
@@ -150,12 +148,12 @@ Non-critical items: can be missing if other photos might capture them.`
       ],
     })
 
-    const textContent = response.content.find(c => c.type === 'text')
-    if (!textContent || textContent.type !== 'text') {
+    const textContent = response.choices[0]?.message?.content
+    if (!textContent) {
       throw new Error('No text response from AI')
     }
 
-    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/)
+    const jsonMatch = textContent.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       throw new Error('Could not parse JSON from AI response')
     }
@@ -167,7 +165,7 @@ Non-critical items: can be missing if other photos might capture them.`
       phase,
       validation,
       checklist_used: checklist,
-      raw_response: textContent.text
+      raw_response: textContent
     })
 
   } catch (error) {
