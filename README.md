@@ -1,4 +1,4 @@
-# OnSite Eagle 🦅
+# OnSite Eagle
 
 AI-powered construction site monitoring and progress tracking system.
 
@@ -8,14 +8,43 @@ AI-powered construction site monitoring and progress tracking system.
 - **Photo Validator**: AI validates construction phase photos against checklists
 - **Interactive Site Map**: SVG-based map with color-coded house statuses
 - **Timeline**: Chronological activity log for each house
+- **Mobile App**: Native app for field workers to capture and submit photos
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React, Tailwind CSS
-- **Backend**: Next.js API Routes
+- **Monorepo**: Turborepo
+- **Web**: Next.js 16, React 19, Tailwind CSS 4
+- **Mobile**: Expo (React Native)
 - **Database**: Supabase (PostgreSQL)
-- **AI**: Claude API (Anthropic)
-- **Icons**: Lucide React
+- **AI**: OpenAI GPT-4o Vision
+- **Shared**: TypeScript types and utilities
+
+## Project Structure
+
+```
+onsite-eagle/
+├── apps/
+│   ├── web/                    # Next.js web application
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── api/        # AI endpoints
+│   │   │   │   └── page.tsx    # Dashboard
+│   │   │   └── components/     # React components
+│   │   └── package.json
+│   └── mobile/                 # Expo mobile app
+│       ├── app/                # Expo Router screens
+│       ├── src/
+│       └── package.json
+├── packages/
+│   └── shared/                 # Shared types & utilities
+│       └── src/
+│           ├── types/          # Database types
+│           ├── constants/      # Phase definitions
+│           └── utils/          # Status helpers
+├── package.json                # Workspace root
+├── turbo.json                  # Turborepo config
+└── supabase-schema.sql         # Database schema
+```
 
 ## Getting Started
 
@@ -27,52 +56,41 @@ npm install
 
 ### 2. Setup Environment Variables
 
-Edit `.env.local` and add your Anthropic API key:
+Create `.env.local` in `apps/web/`:
 
 ```env
-ANTHROPIC_API_KEY=your_anthropic_api_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_key
+OPENAI_API_KEY=your_openai_api_key
+```
+
+Create `.env.local` in `apps/mobile/`:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ```
 
 ### 3. Setup Database
 
-Run the SQL in `supabase-schema.sql` in your Supabase SQL Editor to create all tables.
+Run the SQL in `supabase-schema.sql` in your Supabase SQL Editor.
 
-### 4. Create Storage Bucket
-
-In Supabase Dashboard > Storage, create a bucket called `eagle-files` (private).
-
-### 5. Run Development Server
+### 4. Run Development
 
 ```bash
+# Run all apps
 npm run dev
+
+# Run only web
+npm run dev:web
+
+# Run only mobile
+npm run dev:mobile
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
-
-## Project Structure
-
-```
-onsite-eagle/
-├── src/
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── analyze-plan/     # AI plan analysis endpoint
-│   │   │   ├── validate-photo/   # AI photo validation endpoint
-│   │   │   └── generate-svg/     # SVG generation endpoint
-│   │   ├── page.tsx              # Main dashboard
-│   │   └── layout.tsx
-│   ├── components/
-│   │   ├── PlanScanner.tsx       # Plan upload & analysis
-│   │   ├── PhotoValidator.tsx    # Photo validation UI
-│   │   ├── SiteMap.tsx           # Interactive SVG map
-│   │   └── Timeline.tsx          # Activity timeline
-│   ├── lib/
-│   │   └── supabase.ts           # Supabase client
-│   └── types/
-│       └── database.ts           # TypeScript types
-├── supabase-schema.sql           # Database schema
-└── .env.local                    # Environment variables
-```
+- Web: [http://localhost:3000](http://localhost:3000)
+- Mobile: Expo DevTools
 
 ## Construction Phases
 
@@ -106,7 +124,3 @@ OnSite Eagle connects with:
 - **SheetChat** - Issue reporting
 - **Calculator** - Material calculations
 - **Dashboard** - Central authentication
-
----
-
-Built with ❤️ for the construction industry.

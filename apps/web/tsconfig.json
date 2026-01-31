@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@onsite/shared": ["../../packages/shared/src"]
     }
   },
   "include": [

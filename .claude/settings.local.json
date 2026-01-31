@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nSwitch from Anthropic Claude to OpenAI GPT-4o\n\n- Replace @anthropic-ai/sdk with openai package\n- Update analyze-plan API to use OpenAI vision\n- Update validate-photo API to use OpenAI vision\n- Use gpt-4o model for image analysis\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git mv:*)"
     ]
   }
 }
