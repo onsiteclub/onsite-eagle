@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured')
+  }
+  return new OpenAI({ apiKey })
+}
 
 // Checklist items per phase
 const PHASE_CHECKLISTS: Record<string, string[]> = {
@@ -74,6 +78,7 @@ const PHASE_CHECKLISTS: Record<string, string[]> = {
 
 export async function POST(request: NextRequest) {
   try {
+    const openai = getOpenAIClient()
     const formData = await request.formData()
     const file = formData.get('file') as File
     const phase = formData.get('phase') as string
