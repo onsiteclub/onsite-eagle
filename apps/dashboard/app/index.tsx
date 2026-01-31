@@ -1,13 +1,16 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from 'react-native';
 import { Link } from 'expo-router';
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../src/lib/supabase';
 import type { Site } from '@onsite/shared';
 
+type TabType = 'cards' | 'mapa' | 'settings';
+
 export default function HomeScreen() {
   const [sites, setSites] = useState<Site[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('cards');
 
   useEffect(() => {
     loadSites();
@@ -55,23 +58,94 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Overview</Text>
+        <Text style={styles.headerSubtitle}>{sites.length} obra{sites.length !== 1 ? 's' : ''} cadastrada{sites.length !== 1 ? 's' : ''}</Text>
+      </View>
+
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'cards' && styles.tabActive]}
+          onPress={() => setActiveTab('cards')}
+        >
+          <Text style={[styles.tabText, activeTab === 'cards' && styles.tabTextActive]}>
+            Cards
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'mapa' && styles.tabActive]}
+          onPress={() => setActiveTab('mapa')}
+        >
+          <Text style={[styles.tabText, activeTab === 'mapa' && styles.tabTextActive]}>
+            Mapa
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'settings' && styles.tabActive]}
+          onPress={() => setActiveTab('settings')}
+        >
+          <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
+            Settings
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab Content */}
+      <View style={styles.tabContent}>
+        {activeTab === 'cards' && (
+          <CardsTab
+            sites={filteredSites}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+        )}
+        {activeTab === 'mapa' && <MapaTab sites={sites} />}
+        {activeTab === 'settings' && <SettingsTab />}
+      </View>
+
+      {/* FAB to add new jobsite */}
+      {activeTab === 'cards' && (
+        <Link href="/site/new" asChild>
+          <TouchableOpacity style={styles.fab}>
+            <Text style={styles.fabText}>+</Text>
+          </TouchableOpacity>
+        </Link>
+      )}
+    </View>
+  );
+}
+
+// Cards Tab Component
+function CardsTab({
+  sites,
+  searchQuery,
+  onSearchChange
+}: {
+  sites: Site[];
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+}) {
+  return (
+    <View style={{ flex: 1 }}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar jobsite (nome, endereço, cidade...)"
+          placeholder="Buscar obra (nome, endereco, cidade...)"
           placeholderTextColor="#6B7280"
           value={searchQuery}
-          onChangeText={setSearchQuery}
+          onChangeText={onSearchChange}
           autoCapitalize="none"
           autoCorrect={false}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity
             style={styles.clearButton}
-            onPress={() => setSearchQuery('')}
+            onPress={() => onSearchChange('')}
           >
-            <Text style={styles.clearButtonText}>✕</Text>
+            <Text style={styles.clearButtonText}>x</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -79,14 +153,14 @@ export default function HomeScreen() {
       {/* Results count */}
       <View style={styles.resultsHeader}>
         <Text style={styles.resultsCount}>
-          {filteredSites.length} jobsite{filteredSites.length !== 1 ? 's' : ''}
-          {searchQuery ? ` encontrado${filteredSites.length !== 1 ? 's' : ''}` : ''}
+          {sites.length} obra{sites.length !== 1 ? 's' : ''}
+          {searchQuery ? ` encontrada${sites.length !== 1 ? 's' : ''}` : ''}
         </Text>
       </View>
 
-      {/* Jobsite Cards */}
+      {/* Site Cards */}
       <FlatList
-        data={filteredSites}
+        data={sites}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
@@ -110,7 +184,7 @@ export default function HomeScreen() {
                   style={[
                     styles.progressBarFill,
                     {
-                      width: `${item.total_lots ? (item.completed_lots / item.total_lots) * 100 : 0}%`
+                      width: `${item.total_lots ? ((item.completed_lots || 0) / item.total_lots) * 100 : 0}%`
                     }
                   ]}
                 />
@@ -119,13 +193,13 @@ export default function HomeScreen() {
               <View style={styles.siteFooter}>
                 <Text style={styles.siteDates}>
                   {item.start_date
-                    ? `Início: ${new Date(item.start_date).toLocaleDateString('pt-BR')}`
-                    : 'Sem data de início'
+                    ? `Inicio: ${new Date(item.start_date).toLocaleDateString('pt-BR')}`
+                    : 'Sem data de inicio'
                   }
                 </Text>
                 {item.expected_end_date && (
                   <Text style={styles.siteDates}>
-                    Previsão: {new Date(item.expected_end_date).toLocaleDateString('pt-BR')}
+                    Previsao: {new Date(item.expected_end_date).toLocaleDateString('pt-BR')}
                   </Text>
                 )}
               </View>
@@ -136,24 +210,97 @@ export default function HomeScreen() {
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>🏗️</Text>
             <Text style={styles.emptyText}>
-              {searchQuery ? 'Nenhum jobsite encontrado' : 'Nenhum jobsite cadastrado'}
+              {searchQuery ? 'Nenhuma obra encontrada' : 'Nenhuma obra cadastrada'}
             </Text>
             <Text style={styles.emptySubtext}>
               {searchQuery
                 ? 'Tente buscar com outros termos'
-                : 'Adicione um novo jobsite para começar'}
+                : 'Adicione uma nova obra para comecar'}
             </Text>
           </View>
         }
       />
-
-      {/* FAB to add new jobsite */}
-      <Link href="/site/new" asChild>
-        <TouchableOpacity style={styles.fab}>
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
-      </Link>
     </View>
+  );
+}
+
+// Mapa Tab Component - Overview map of all sites
+function MapaTab({ sites }: { sites: Site[] }) {
+  return (
+    <ScrollView style={styles.mapContainer}>
+      <View style={styles.mapPlaceholder}>
+        <Text style={styles.mapPlaceholderIcon}>🗺️</Text>
+        <Text style={styles.mapPlaceholderText}>Mapa Geral</Text>
+        <Text style={styles.mapPlaceholderSubtext}>
+          {sites.length} obra{sites.length !== 1 ? 's' : ''} no mapa
+        </Text>
+      </View>
+
+      {/* Sites list as map legend */}
+      <View style={styles.mapLegend}>
+        <Text style={styles.legendTitle}>Obras</Text>
+        {sites.map((site) => (
+          <Link key={site.id} href={`/site/${site.id}`} asChild>
+            <TouchableOpacity style={styles.legendSiteItem}>
+              <View style={styles.legendSiteInfo}>
+                <Text style={styles.legendSiteName}>{site.name}</Text>
+                <Text style={styles.legendSiteAddress}>{site.city}</Text>
+              </View>
+              <View style={styles.legendSiteProgress}>
+                <Text style={styles.legendProgressText}>
+                  {site.completed_lots || 0}/{site.total_lots || 0}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </Link>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+// Settings Tab Component - General app settings
+function SettingsTab() {
+  return (
+    <ScrollView style={styles.settingsContainer}>
+      {/* User Profile */}
+      <View style={styles.settingsSection}>
+        <Text style={styles.sectionTitle}>Perfil</Text>
+        <TouchableOpacity style={styles.settingsCard}>
+          <Text style={styles.settingsCardText}>Gerenciar conta</Text>
+          <Text style={styles.settingsCardArrow}>→</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Notifications */}
+      <View style={styles.settingsSection}>
+        <Text style={styles.sectionTitle}>Notificacoes</Text>
+        <TouchableOpacity style={styles.settingsCard}>
+          <Text style={styles.settingsCardText}>Configurar alertas e lembretes</Text>
+          <Text style={styles.settingsCardArrow}>→</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Data Sync */}
+      <View style={styles.settingsSection}>
+        <Text style={styles.sectionTitle}>Sincronizacao</Text>
+        <TouchableOpacity style={styles.settingsCard}>
+          <Text style={styles.settingsCardText}>Gerenciar dados offline</Text>
+          <Text style={styles.settingsCardArrow}>→</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* About */}
+      <View style={styles.settingsSection}>
+        <Text style={styles.sectionTitle}>Sobre</Text>
+        <View style={styles.settingsCard}>
+          <Text style={styles.settingsCardText}>OnSite Dashboard</Text>
+          <Text style={styles.settingsVersion}>v1.0.0</Text>
+        </View>
+      </View>
+
+      <View style={{ height: 40 }} />
+    </ScrollView>
   );
 }
 
@@ -173,6 +320,52 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
   },
+  // Header styles
+  header: {
+    padding: 16,
+    backgroundColor: '#1F2937',
+    borderBottomWidth: 1,
+    borderBottomColor: '#374151',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  // Tab bar styles
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#1F2937',
+    borderBottomWidth: 1,
+    borderBottomColor: '#374151',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#059669',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  tabTextActive: {
+    color: '#10B981',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  // Search styles
   searchContainer: {
     padding: 16,
     paddingBottom: 8,
@@ -207,6 +400,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontSize: 13,
   },
+  // List styles
   list: {
     padding: 16,
     paddingTop: 8,
@@ -292,6 +486,119 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
+  // Map tab styles
+  mapContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  mapPlaceholder: {
+    aspectRatio: 1.5,
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#374151',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapPlaceholderIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  mapPlaceholderText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  mapPlaceholderSubtext: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginTop: 8,
+  },
+  mapLegend: {
+    marginTop: 16,
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  legendTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  legendSiteItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#374151',
+  },
+  legendSiteInfo: {
+    flex: 1,
+  },
+  legendSiteName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#fff',
+  },
+  legendSiteAddress: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  legendSiteProgress: {
+    backgroundColor: '#059669',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  legendProgressText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // Settings tab styles
+  settingsContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  settingsSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  settingsCard: {
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  settingsCardText: {
+    fontSize: 14,
+    color: '#D1D5DB',
+  },
+  settingsCardArrow: {
+    fontSize: 18,
+    color: '#6B7280',
+  },
+  settingsVersion: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  // FAB styles
   fab: {
     position: 'absolute',
     right: 20,
