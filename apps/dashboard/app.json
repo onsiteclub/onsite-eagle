@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "OnSite Eagle",
-    "slug": "onsite-eagle",
+    "name": "OnSite Dashboard",
+    "slug": "onsite-dashboard",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "onsite-eagle",
+    "scheme": "onsite-dashboard",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.onsiteclub.eagle"
+      "bundleIdentifier": "com.onsiteclub.dashboard"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1F2937"
       },
-      "package": "com.onsiteclub.eagle"
+      "package": "com.onsiteclub.dashboard"
     },
     "web": {
       "bundler": "metro",
@@ -34,13 +34,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow OnSite Eagle to access your camera for taking construction photos."
+          "cameraPermission": "Allow OnSite Dashboard to access your camera."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow OnSite Eagle to access your photos for uploading construction images."
+          "photosPermission": "Allow OnSite Dashboard to access your photos."
         }
       ]
     ],

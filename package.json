@@ -11,7 +11,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "dev:web": "turbo dev --filter=@onsite/web",
-    "dev:mobile": "turbo dev --filter=@onsite/mobile",
+    "dev:dashboard": "turbo dev --filter=@onsite/dashboard",
+    "dev:worker": "turbo dev --filter=@onsite/worker",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {

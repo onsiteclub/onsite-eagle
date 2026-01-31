@@ -2,19 +2,27 @@
 
 AI-powered construction site monitoring and progress tracking system.
 
+## Apps
+
+| App | Description | Target Users |
+|-----|-------------|--------------|
+| **Web** | Full dashboard with plan scanner, site map, analytics | Managers, Supervisors |
+| **Dashboard** | Mobile version of the dashboard | Managers on-site |
+| **Worker** | Photo submission and task tracking | Field workers |
+
 ## Features
 
 - **Plan Scanner**: Upload subdivision plans, AI extracts lot information and generates interactive SVG maps
-- **Photo Validator**: AI validates construction phase photos against checklists
+- **Photo Validator**: AI validates construction phase photos against 66 checklist items
 - **Interactive Site Map**: SVG-based map with color-coded house statuses
 - **Timeline**: Chronological activity log for each house
-- **Mobile App**: Native app for field workers to capture and submit photos
+- **Worker App**: Native app for field workers to capture and submit photos
 
 ## Tech Stack
 
 - **Monorepo**: Turborepo
 - **Web**: Next.js 16, React 19, Tailwind CSS 4
-- **Mobile**: Expo (React Native)
+- **Mobile**: Expo (React Native) - 2 apps
 - **Database**: Supabase (PostgreSQL)
 - **AI**: OpenAI GPT-4o Vision
 - **Shared**: TypeScript types and utilities
@@ -24,26 +32,27 @@ AI-powered construction site monitoring and progress tracking system.
 ```
 onsite-eagle/
 ├── apps/
-│   ├── web/                    # Next.js web application
-│   │   ├── src/
-│   │   │   ├── app/
-│   │   │   │   ├── api/        # AI endpoints
-│   │   │   │   └── page.tsx    # Dashboard
-│   │   │   └── components/     # React components
-│   │   └── package.json
-│   └── mobile/                 # Expo mobile app
-│       ├── app/                # Expo Router screens
-│       ├── src/
-│       └── package.json
+│   ├── web/                    # Next.js web dashboard
+│   │   └── src/
+│   │       ├── app/api/        # AI endpoints
+│   │       └── components/     # React components
+│   ├── dashboard/              # Manager mobile app (Expo)
+│   │   └── app/                # Screens with Expo Router
+│   └── worker/                 # Worker mobile app (Expo)
+│       └── app/
+│           ├── (tabs)/         # Tab navigation
+│           │   ├── index.tsx   # House cards/agenda
+│           │   └── submit.tsx  # Photo submission
+│           └── house/[id].tsx  # House details + timeline
 ├── packages/
-│   └── shared/                 # Shared types & utilities
+│   └── shared/                 # Shared code
 │       └── src/
 │           ├── types/          # Database types
-│           ├── constants/      # Phase definitions
+│           ├── constants/      # 66 phase items
 │           └── utils/          # Status helpers
-├── package.json                # Workspace root
-├── turbo.json                  # Turborepo config
-└── supabase-schema.sql         # Database schema
+├── package.json
+├── turbo.json
+└── supabase-schema.sql
 ```
 
 ## Getting Started
@@ -65,7 +74,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_key
 OPENAI_API_KEY=your_openai_api_key
 ```
 
-Create `.env.local` in `apps/mobile/`:
+Create `.env.local` in `apps/dashboard/` and `apps/worker/`:
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -85,41 +94,43 @@ npm run dev
 # Run only web
 npm run dev:web
 
-# Run only mobile
-npm run dev:mobile
+# Run only dashboard mobile app
+npm run dev:dashboard
+
+# Run only worker mobile app
+npm run dev:worker
 ```
 
 - Web: [http://localhost:3000](http://localhost:3000)
-- Mobile: Expo DevTools
+- Mobile: Use Expo Go app to scan QR code
 
-## Construction Phases
+## Construction Phases & Items
 
-The system tracks 7 construction phases:
+The system tracks **7 phases** with **66 total items**:
 
-1. **First Floor** - Joists, subfloor, blocking
-2. **First Floor Walls** - Studs, headers, corners
-3. **Second Floor** - Joists, subfloor, stairwell
-4. **Second Floor Walls** - Studs, headers
-5. **Roof** - Trusses, sheathing, fascia
-6. **Stairs Landing** - Stringers, landing framing
-7. **Backing Frame** - Blocking for fixtures
+| Phase | Items | Required Photos |
+|-------|-------|-----------------|
+| 1. First Floor | 10 | 3 |
+| 2. 1st Floor Walls | 12 | 4 |
+| 3. Second Floor | 8 | 3 |
+| 4. 2nd Floor Walls | 9 | 2 |
+| 5. Roof | 10 | 3 |
+| 6. Stairs Landing | 7 | 2 |
+| 7. Backing Frame | 10 | 2 |
 
-## AI Capabilities
+**AI can identify multiple items from a single photo**, reducing the total photos needed to ~15.
 
-### Plan Analysis
-- Detects lot boundaries and numbers
-- Identifies streets and orientation
-- Generates interactive SVG map
+## Worker App Features
 
-### Photo Validation
-- Checks for required construction elements
-- Identifies missing or incomplete work
-- Flags safety concerns
-- Provides worker feedback
+- **Agenda**: Cards of assigned houses with progress
+- **Timeline**: Chronological history of each house
+- **Files**: All photos and documents per house
+- **Phases**: Current phase with checklist items
+- **Camera**: Phase-aware photo capture
+- **AI Validation**: Automatic checklist verification
 
 ## Part of OnSite Ecosystem
 
-OnSite Eagle connects with:
 - **Timekeeper** - Worker hours per house
 - **SheetChat** - Issue reporting
 - **Calculator** - Material calculations
