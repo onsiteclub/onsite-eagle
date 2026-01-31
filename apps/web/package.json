@@ -9,9 +9,9 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@onsite/shared": "workspace:*",
-    "@onsite/ui": "workspace:*",
-    "@onsite/auth": "workspace:*",
+    "@onsite/shared": "*",
+    "@onsite/ui": "*",
+    "@onsite/auth": "*",
     "@supabase/supabase-js": "^2.93.3",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.563.0",
