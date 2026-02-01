@@ -10,9 +10,9 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "dev:web": "turbo dev --filter=@onsite/web",
-    "dev:dashboard": "turbo dev --filter=@onsite/dashboard",
-    "dev:worker": "turbo dev --filter=@onsite/worker",
+    "dev:monitor": "turbo dev --filter=@onsite/monitor",
+    "dev:field": "turbo dev --filter=@onsite/field",
+    "dev:inspect": "turbo dev --filter=@onsite/inspect",
     "clean": "turbo clean && rm -rf node_modules",
     "android": "expo run:android",
     "ios": "expo run:ios"
