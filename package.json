@@ -24,9 +24,13 @@
   "engines": {
     "node": "20.x"
   },
-  "dependencies": {
-    "expo": "~54.0.32",
-    "react": "19.1.0",
-    "react-native": "0.81.5"
+  "overrides": {
+    "metro": "0.80.12",
+    "metro-cache": "0.80.12",
+    "metro-core": "0.80.12",
+    "metro-transform-worker": "0.80.12",
+    "metro-resolver": "0.80.12",
+    "metro-runtime": "0.80.12",
+    "metro-config": "0.80.12"
   }
 }
