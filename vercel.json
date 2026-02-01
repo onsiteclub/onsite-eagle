@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd apps/dashboard && node scripts/patch-expo-router.js && node node_modules/expo/bin/cli export --platform web",
-  "outputDirectory": "apps/dashboard/dist",
+  "buildCommand": "npm run build --workspace=@onsite/web",
+  "outputDirectory": "apps/web/.next",
   "installCommand": "npm install",
-  "framework": null
+  "framework": "nextjs"
 }
