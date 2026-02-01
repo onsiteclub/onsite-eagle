@@ -6,7 +6,10 @@ module.exports = function (api) {
       [
         'transform-inline-environment-variables',
         {
-          include: ['EXPO_ROUTER_APP_ROOT'],
+          include: [
+            'EXPO_ROUTER_APP_ROOT',
+            'EXPO_ROUTER_IMPORT_MODE',
+          ],
         },
       ],
     ],
