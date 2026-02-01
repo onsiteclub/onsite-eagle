@@ -18,15 +18,11 @@
     "ios": "expo run:ios"
   },
   "devDependencies": {
-    "@react-native/metro-config": "^0.83.1",
-    "metro": "^0.81.0",
-    "metro-cache": "^0.81.0",
-    "metro-core": "^0.81.0",
     "turbo": "^2.3.0"
   },
   "packageManager": "npm@10.0.0",
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "dependencies": {
     "expo": "~54.0.32",
