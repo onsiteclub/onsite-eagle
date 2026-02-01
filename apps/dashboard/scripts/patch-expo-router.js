@@ -1,14 +1,21 @@
 const fs = require('fs');
 const path = require('path');
 
-const ctxPath = path.join(__dirname, '../node_modules/expo-router/_ctx.web.js');
+const filesToPatch = [
+  '_ctx.web.js',
+  '_ctx-html.js',
+];
 
-if (fs.existsSync(ctxPath)) {
-  let content = fs.readFileSync(ctxPath, 'utf8');
-  content = content.replace(/process\.env\.EXPO_ROUTER_APP_ROOT/g, "'../../app'");
-  content = content.replace(/process\.env\.EXPO_ROUTER_IMPORT_MODE/g, "'sync'");
-  fs.writeFileSync(ctxPath, content);
-  console.log('Patched expo-router _ctx.web.js');
-} else {
-  console.log('_ctx.web.js not found at:', ctxPath);
-}
+filesToPatch.forEach(filename => {
+  const filePath = path.join(__dirname, '../node_modules/expo-router/', filename);
+
+  if (fs.existsSync(filePath)) {
+    let content = fs.readFileSync(filePath, 'utf8');
+    content = content.replace(/process\.env\.EXPO_ROUTER_APP_ROOT/g, "'../../app'");
+    content = content.replace(/process\.env\.EXPO_ROUTER_IMPORT_MODE/g, "'sync'");
+    fs.writeFileSync(filePath, content);
+    console.log('Patched expo-router', filename);
+  } else {
+    console.log(filename, 'not found at:', filePath);
+  }
+});
