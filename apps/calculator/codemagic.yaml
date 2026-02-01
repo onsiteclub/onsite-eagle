@@ -1,0 +1,135 @@
+# codemagic.yaml
+# Configuração para build iOS do OnSite Calculator
+# Documentação: https://docs.codemagic.io/yaml/yaml-getting-started/
+
+workflows:
+  ios-testflight:
+    name: iOS TestFlight Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+
+    integrations:
+      app_store_connect: OnSite Calculator
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: ca.onsiteclub.calculator
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 18
+      xcode: latest
+      cocoapods: default
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+
+    scripts:
+      # 1. Instalar dependências Node
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      # 2. Build do projeto web
+      - name: Build web app
+        script: |
+          npm run build
+
+      # 3. Sincronizar com Capacitor
+      - name: Sync Capacitor iOS
+        script: |
+          npx cap sync ios
+
+      # 4. Instalar CocoaPods
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios/App && pod install
+
+      # 5. Configurar assinatura iOS
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+
+      # 6. Incrementar build number
+      - name: Increment build number
+        script: |
+          cd ios/App
+          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" || echo 0)
+          agvtool new-version -all $((LATEST_BUILD + 1))
+
+      # 7. Build do app iOS
+      - name: Build iOS app
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --config Release
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+
+  # Build apenas para teste (sem publicar)
+  ios-debug:
+    name: iOS Debug Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+
+    environment:
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 18
+      xcode: latest
+      cocoapods: default
+
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Build web app
+        script: |
+          npm run build
+
+      - name: Sync Capacitor iOS
+        script: |
+          npx cap sync ios
+
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios/App && pod install
+
+      - name: Build iOS (Debug)
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --config Debug \
+            --archive-flags="-destination 'generic/platform=iOS Simulator'"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log

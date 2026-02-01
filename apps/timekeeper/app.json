@@ -1,0 +1,106 @@
+{
+  "expo": {
+    "name": "OnSite Timekeeper",
+    "slug": "onsite-timekeeper",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "onsite-timekeeper",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0D10",
+    "newArchEnabled": false,
+   
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.onsiteclub.timekeeper",
+      "config": {
+        "googleMapsApiKey": "AIzaSyBdITLu3Kr5OYPr8ZnhxIGVNFHIGEgvfKY"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "OnSite Timekeeper needs your location to show where you are on the map.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "OnSite Timekeeper needs background location access to automatically detect when you arrive at or leave work.",
+        "NSLocationAlwaysUsageDescription": "OnSite Timekeeper needs background location access to automatically track your work hours.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification",
+          "audio"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0D10"
+      },
+      "package": "com.onsiteclub.timekeeper",
+      "allowBackup": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBdITLu3Kr5OYPr8ZnhxIGVNFHIGEgvfKY"
+        }
+      },
+      "permissions": [
+        "ACCESS_NETWORK_STATE",
+        "INTERNET",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "OnSite Timekeeper needs your location to automatically track when you arrive at or leave work.",
+          "locationAlwaysPermission": "OnSite Timekeeper needs background location access to work properly even when the app is closed.",
+          "locationWhenInUsePermission": "OnSite Timekeeper needs your location to show your position on the map.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25",
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 34,
+            "minSdkVersion": 24
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "17ddb1e1-cbcf-43d1-91e8-2f8ee96f036b"
+      },
+      "EXPO_PUBLIC_SUPABASE_URL": "https://bjkhofdrzpczgnwxoauk.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqa2hvZmRyenBjemdud3hvYXVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2ODc4NzYsImV4cCI6MjA4NDI2Mzg3Nn0.lKbH-SaqPmuvsiG4mcUyHH3TROmw6Aqb-UjstyRb4f4"
+    }
+  }
+}

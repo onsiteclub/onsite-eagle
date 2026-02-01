@@ -1,0 +1,21 @@
+{
+  "name": "@onsite/utils",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cn": "./src/cn.ts",
+    "./format": "./src/format.ts",
+    "./auth": "./src/auth.ts",
+    "./export": "./src/export.ts"
+  },
+  "dependencies": {
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

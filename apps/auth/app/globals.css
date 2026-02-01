@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* OnSite Auth Hub - Global Styles */
+
+@layer base {
+  :root {
+    --onsite-dark: #1B2B27;
+    --onsite-darker: #0F1A17;
+    --onsite-light: #FBFAFC;
+    --onsite-accent: #F6C343;
+  }
+  
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-onsite-light text-onsite-text-primary antialiased;
+  }
+}
+
+@layer components {
+  /* Primary Button */
+  .btn-primary {
+    @apply bg-onsite-dark text-white px-6 py-3 rounded-onsite font-medium 
+           transition-all duration-200 hover:bg-onsite-darker 
+           focus:outline-none focus:ring-2 focus:ring-onsite-dark focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  /* Secondary Button */
+  .btn-secondary {
+    @apply bg-white text-onsite-dark px-6 py-3 rounded-onsite font-medium 
+           border border-gray-200 transition-all duration-200 
+           hover:bg-gray-50 hover:border-gray-300
+           focus:outline-none focus:ring-2 focus:ring-onsite-dark focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  /* Accent Button (Yellow) */
+  .btn-accent {
+    @apply bg-onsite-accent text-onsite-dark px-6 py-3 rounded-onsite font-medium 
+           transition-all duration-200 hover:bg-onsite-accent-hover 
+           focus:outline-none focus:ring-2 focus:ring-onsite-accent focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  /* Input Field */
+  .input-field {
+    @apply w-full px-4 py-3 rounded-onsite border border-gray-200 
+           bg-white text-onsite-text-primary placeholder-onsite-text-muted
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-onsite-dark focus:border-transparent;
+  }
+  
+  /* Card */
+  .card {
+    @apply bg-white rounded-onsite-lg shadow-onsite p-6;
+  }
+  
+  /* Error Text */
+  .error-text {
+    @apply text-red-600 text-sm mt-1;
+  }
+  
+  /* Label */
+  .label {
+    @apply block text-sm font-medium text-onsite-text-primary mb-2;
+  }
+}
+
+/* Loading Spinner Animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  @apply w-5 h-5 border-2 border-white border-t-transparent rounded-full;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Focus Visible for Accessibility */
+:focus-visible {
+  @apply outline-none ring-2 ring-onsite-dark ring-offset-2;
+}

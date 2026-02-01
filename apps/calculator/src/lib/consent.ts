@@ -1,0 +1,172 @@
+// src/lib/consent.ts
+// Verificação de consentimento do usuário
+// Necessário para coleta de dados de voz (voice_training)
+
+import { supabase, isSupabaseEnabled } from './supabase';
+
+export type ConsentType =
+  | 'microphone_usage'  // Required for using voice feature (App Store compliance)
+  | 'voice_training'    // Optional: allow recordings to improve service
+  | 'data_analytics'
+  | 'marketing'
+  | 'terms_of_service'
+  | 'privacy_policy';
+
+// Local storage key for anonymous user consent
+const LOCAL_CONSENT_KEY = 'onsite_consent_';
+
+/**
+ * Get consent status from local storage (for anonymous users)
+ */
+export function getLocalConsentStatus(consentType: ConsentType): boolean | null {
+  try {
+    const value = localStorage.getItem(LOCAL_CONSENT_KEY + consentType);
+    if (value === null) return null;
+    return value === 'true';
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Set consent in local storage (for anonymous users)
+ */
+export function setLocalConsent(consentType: ConsentType, granted: boolean): void {
+  try {
+    localStorage.setItem(LOCAL_CONSENT_KEY + consentType, String(granted));
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
+/**
+ * Verifica se o usuário tem consentimento ativo para um tipo específico
+ * Usado principalmente para verificar voice_training antes de salvar voice_logs
+ */
+export async function hasConsent(
+  userId: string,
+  consentType: ConsentType
+): Promise<boolean> {
+  if (!isSupabaseEnabled() || !supabase) {
+    return false;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('core_consents')
+      .select('granted')
+      .eq('user_id', userId)
+      .eq('consent_type', consentType)
+      .eq('granted', true)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.warn('[Consent] Error checking consent:', error.message);
+      return false;
+    }
+
+    return data && data.length > 0;
+  } catch (err) {
+    console.error('[Consent] Exception checking consent:', err);
+    return false;
+  }
+}
+
+/**
+ * Verifica o status de consentimento do usuário
+ * Retorna: true (concedeu), false (recusou), null (nunca perguntou)
+ */
+export async function getConsentStatus(
+  userId: string,
+  consentType: ConsentType
+): Promise<boolean | null> {
+  if (!isSupabaseEnabled() || !supabase) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('core_consents')
+      .select('granted')
+      .eq('user_id', userId)
+      .eq('consent_type', consentType)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.warn('[Consent] Error checking consent status:', error.message);
+      return null;
+    }
+
+    // Se não existe registro, retorna null (nunca perguntou)
+    if (!data || data.length === 0) {
+      return null;
+    }
+
+    // Retorna o valor de granted (true ou false)
+    return data[0].granted;
+  } catch (err) {
+    console.error('[Consent] Exception checking consent status:', err);
+    return null;
+  }
+}
+
+/**
+ * Verifica se pode coletar dados de voz do usuário
+ * Conforme definido no [LOCKED] VERIFICAÇÃO DE CONSENTIMENTO
+ */
+export async function canCollectVoice(userId: string): Promise<boolean> {
+  return hasConsent(userId, 'voice_training');
+}
+
+/**
+ * Registra ou atualiza consentimento do usuário
+ */
+export async function setConsent(
+  userId: string,
+  consentType: ConsentType,
+  granted: boolean,
+  options?: {
+    documentVersion?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    appVersion?: string;
+  }
+): Promise<boolean> {
+  if (!isSupabaseEnabled() || !supabase) {
+    return false;
+  }
+
+  try {
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('core_consents')
+      .upsert({
+        user_id: userId,
+        consent_type: consentType,
+        granted,
+        granted_at: granted ? now : null,
+        revoked_at: granted ? null : now,
+        document_version: options?.documentVersion,
+        ip_address: options?.ipAddress,
+        user_agent: options?.userAgent,
+        app_version: options?.appVersion,
+        updated_at: now,
+      }, {
+        onConflict: 'user_id,consent_type'
+      });
+
+    if (error) {
+      console.error('[Consent] Error setting consent:', error.message);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('[Consent] Exception setting consent:', err);
+    return false;
+  }
+}
+

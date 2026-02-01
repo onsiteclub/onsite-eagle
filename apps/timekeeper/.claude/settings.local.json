@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo start:*)",
+      "Bash(curl:*)",
+      "Bash(tail:*)",
+      "Bash(node --print:*)",
+      "Bash(npx expo run:android)",
+      "Bash(npx expo install:*)",
+      "Bash(git remote:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx expo lint:*)",
+      "Bash(npx expo:*)",
+      "Bash(node -e:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
