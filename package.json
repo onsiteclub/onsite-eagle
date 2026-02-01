@@ -13,10 +13,24 @@
     "dev:web": "turbo dev --filter=@onsite/web",
     "dev:dashboard": "turbo dev --filter=@onsite/dashboard",
     "dev:worker": "turbo dev --filter=@onsite/worker",
-    "clean": "turbo clean && rm -rf node_modules"
+    "clean": "turbo clean && rm -rf node_modules",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "devDependencies": {
+    "@react-native/metro-config": "^0.83.1",
+    "metro": "^0.81.0",
+    "metro-cache": "^0.81.0",
+    "metro-core": "^0.81.0",
     "turbo": "^2.3.0"
   },
-  "packageManager": "npm@10.0.0"
+  "packageManager": "npm@10.0.0",
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "expo": "~54.0.32",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
+  }
 }
