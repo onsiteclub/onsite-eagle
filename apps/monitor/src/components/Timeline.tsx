@@ -8,7 +8,7 @@ import {
   CheckCircle, RefreshCw, MessageSquare, ExternalLink,
   Clock, User
 } from 'lucide-react'
-import type { TimelineEvent } from '@/types/database'
+import type { TimelineEvent } from '@onsite/shared'
 
 interface TimelineProps {
   events: TimelineEvent[]

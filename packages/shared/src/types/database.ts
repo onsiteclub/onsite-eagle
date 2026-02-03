@@ -1,5 +1,6 @@
 export interface Site {
   id: string
+  organization_id: string | null // Multi-tenancy
   name: string
   address: string
   city: string
@@ -52,16 +53,52 @@ export interface SiteDate {
 
 export interface House {
   id: string
+  organization_id: string | null // Multi-tenancy
   site_id: string
   lot_number: string
   address: string | null
   status: HouseStatus
   current_phase: number
   progress_percentage: number
-  coordinates: { x: number; y: number } | null
+  coordinates: { x: number; y: number; width?: number; height?: number } | null
   qr_code_data: string | null
+  // Square footage (for billing)
+  sqft_main_floors: number
+  sqft_roof: number
+  sqft_basement: number
+  sqft_total: number // Computed
+  // Schedule fields
+  priority_score: number | null
+  target_date: string | null
+  closing_date: string | null
+  buyer_name: string | null
+  buyer_contact: string | null
+  schedule_notes: string | null
+  is_sold: boolean | null
+  // Lot issuance (worker assignment)
+  is_issued: boolean
+  issued_at: string | null
+  issued_to_worker_id: string | null
+  issued_to_worker_name: string | null
+  issued_by: string | null
   created_at: string
   updated_at: string
+}
+
+// Site worker (linked to jobsite, can work multiple lots)
+export interface SiteWorker {
+  id: string
+  site_id: string
+  worker_id: string | null // Optional: references core_profiles if worker has account
+  worker_name: string
+  worker_phone: string | null
+  worker_email: string | null
+  trade: string | null
+  company_name: string | null
+  is_active: boolean
+  linked_at: string
+  linked_by: string | null
+  created_at: string
 }
 
 export type HouseStatus = 'not_started' | 'in_progress' | 'delayed' | 'completed' | 'on_hold'
@@ -97,6 +134,7 @@ export type ProgressStatus = 'pending' | 'in_progress' | 'ai_review' | 'approved
 
 export interface PhasePhoto {
   id: string
+  organization_id: string | null // Multi-tenancy
   house_id: string
   phase_id: string
   uploaded_by: string
@@ -105,8 +143,29 @@ export interface PhasePhoto {
   ai_validation_status: ValidationStatus
   ai_validation_notes: string | null
   ai_detected_items: string[] | null
+  ai_confidence: number | null
   signature: PhotoSignature | null
+  // Prumo training metadata
+  metadata: PhotoMetadata
+  schema_version: number
+  quality_score: number | null
+  is_training_eligible: boolean
+  photo_type: PhotoType
   created_at: string
+}
+
+export type PhotoType = 'progress' | 'detail' | 'issue' | 'overview' | 'completion'
+
+export interface PhotoMetadata {
+  device_model?: string
+  gps_accuracy?: number // meters
+  capture_conditions?: {
+    lighting?: 'natural' | 'artificial' | 'mixed' | 'low'
+    weather?: 'clear' | 'cloudy' | 'rain' | 'snow'
+  }
+  compass_heading?: number
+  altitude?: number
+  [key: string]: unknown
 }
 
 export type ValidationStatus = 'pending' | 'approved' | 'rejected' | 'needs_review'

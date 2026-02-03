@@ -14,11 +14,14 @@
     "@onsite/auth": "*",
     "@supabase/supabase-js": "^2.93.3",
     "date-fns": "^4.1.0",
+    "konva": "^9.3.18",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "openai": "^4.77.0",
+    "pdfjs-dist": "^4.0.379",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-konva": "^18.2.10",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

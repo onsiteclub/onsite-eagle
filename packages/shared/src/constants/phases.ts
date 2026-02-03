@@ -38,7 +38,8 @@ export const CONSTRUCTION_PHASES = [
 
 export type PhaseName = typeof CONSTRUCTION_PHASES[number]['name']
 
-export interface PhaseItem {
+// Checklist item for AI-detected construction phases
+export interface ConstructionPhaseItem {
   id: string
   name: string
   description: string
@@ -48,7 +49,7 @@ export interface PhaseItem {
 
 // Phase items - approximately 66 items total
 // AI can detect multiple items from a single photo
-export const PHASE_ITEMS: PhaseItem[][] = [
+export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
   // Phase 1: First Floor (10 items)
   [
     { id: 'ff-1', name: 'Floor Joists', description: 'Floor joists installed at proper spacing (16" or 24" OC)', isCritical: true, requiresPhoto: true },
@@ -151,7 +152,7 @@ export const REQUIRED_PHOTO_ITEMS = PHASE_ITEMS.flat().filter(item => item.requi
 export const CRITICAL_ITEMS = PHASE_ITEMS.flat().filter(item => item.isCritical)
 
 // Get items for a specific phase
-export function getPhaseItems(phaseIndex: number): PhaseItem[] {
+export function getConstructionPhaseItems(phaseIndex: number): ConstructionPhaseItem[] {
   return PHASE_ITEMS[phaseIndex] || []
 }
 

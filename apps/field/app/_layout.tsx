@@ -17,34 +17,21 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen
-          name="index"
+          name="(tabs)"
           options={{
-            title: 'OnSite Eagle',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="lot/[id]"
+          options={{
+            title: 'Lot Details',
           }}
         />
         <Stack.Screen
           name="camera"
           options={{
             title: 'Take Photo',
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen
-          name="house/[id]"
-          options={{
-            title: 'House Details',
-          }}
-        />
-        <Stack.Screen
-          name="site/[id]"
-          options={{
-            title: 'Jobsite',
-          }}
-        />
-        <Stack.Screen
-          name="site/new"
-          options={{
-            title: 'Novo Jobsite',
             presentation: 'modal',
           }}
         />
