@@ -1090,15 +1090,15 @@ function ScheduleSection({
   // Add external events (inspections, deliveries, etc) from AI and manual entries
   for (const event of externalEvents) {
     // Map event_type to calendar type
-    const eventTypeToCalendarType: Record<string, 'inspection' | 'delivery' | 'milestone' | 'deadline' | 'target' | 'task'> = {
+    const eventTypeToCalendarType: Record<string, 'inspection' | 'delivery' | 'milestone' | 'deadline' | 'target' | 'work' | 'meeting' | 'custom'> = {
       'inspection_scheduled': 'inspection',
       'inspection_passed': 'inspection',
       'inspection_failed': 'inspection',
       'material_delivered': 'delivery',
       'material_delay': 'delivery',
-      'other': 'task',
+      'other': 'work',
     }
-    const calendarType = eventTypeToCalendarType[event.event_type] || 'task'
+    const calendarType = eventTypeToCalendarType[event.event_type] || 'work'
 
     calendarEvents.push(
       createCalendarEvent({
