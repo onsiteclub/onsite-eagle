@@ -1844,8 +1844,8 @@ function getEventColor(type: CalendarEvent['type']): string {
   switch (type) {
     case 'inspection': return '#007AFF'
     case 'delivery': return '#34C759'
-    case 'weather': return '#FF9500'
-    case 'holiday': return '#AF52DE'
+    case 'milestone': return '#FF9500'
+    case 'meeting': return '#AF52DE'
     default: return '#8E8E93'
   }
 }
