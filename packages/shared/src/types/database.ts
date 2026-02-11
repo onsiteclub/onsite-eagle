@@ -336,3 +336,199 @@ export interface PhotoValidationResult {
   quality_issues: string[]
   recommendation: 'approve' | 'request_new_photo' | 'needs_supervisor_review'
 }
+
+// ==========================================
+// Material Request Types
+// ==========================================
+
+export type UrgencyLevel = 'low' | 'medium' | 'high' | 'critical'
+export type MaterialRequestStatus = 'pending' | 'acknowledged' | 'in_transit' | 'delivered' | 'cancelled'
+
+export interface UrgencyFactors {
+  explicit_urgency: number      // 0-100 from user selection
+  schedule_deviation: number    // 0-100 if lot is behind
+  lot_priority: number          // 0-100 from house.priority_score
+}
+
+export interface MaterialRequest {
+  id: string
+  site_id: string
+  house_id: string | null
+  material_type: string
+  material_name: string
+  quantity: number
+  unit: string
+  notes: string | null
+  urgency_level: UrgencyLevel
+  urgency_score: number
+  urgency_reason: string | null
+  urgency_factors: UrgencyFactors | null
+  status: MaterialRequestStatus
+  requested_by_id: string | null
+  requested_by_name: string
+  requested_by_role: string | null
+  acknowledged_by_id: string | null
+  acknowledged_at: string | null
+  in_transit_at: string | null
+  delivered_by_id: string | null
+  delivered_by_name: string | null
+  delivered_at: string | null
+  delivery_notes: string | null
+  delivery_location: string | null
+  cancelled_by_id: string | null
+  cancelled_at: string | null
+  cancel_reason: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+  // Joined fields (optional)
+  house?: House
+  site?: Site
+  lot_number?: string
+  site_name?: string
+}
+
+export interface MaterialType {
+  id: string
+  code: string
+  name_en: string
+  name_pt: string | null
+  category: string
+  default_unit: string
+  icon: string | null
+  is_active: boolean
+  sort_order: number
+}
+
+export interface OperatorAssignment {
+  id: string
+  operator_id: string
+  site_id: string
+  is_active: boolean
+  assigned_at: string
+  assigned_by: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+// Constants for material request UI
+export const URGENCY_COLORS: Record<UrgencyLevel, string> = {
+  critical: '#FF3B30',
+  high: '#FF9500',
+  medium: '#FFCC00',
+  low: '#8E8E93'
+}
+
+export const URGENCY_LABELS: Record<UrgencyLevel, string> = {
+  critical: 'Critical - Blocking work NOW',
+  high: 'High - Needed within hours',
+  medium: 'Medium - Needed today',
+  low: 'Low - Can wait 24+ hours'
+}
+
+export const STATUS_LABELS: Record<MaterialRequestStatus, string> = {
+  pending: 'Pending',
+  acknowledged: 'Acknowledged',
+  in_transit: 'In Transit',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled'
+}
+
+// ==========================================
+// Document Types (Bulk Upload System)
+// ==========================================
+
+export type DocumentCategory = 'blueprint' | 'permit' | 'inspection' | 'contract' | 'plan' | 'other'
+export type DocumentLinkType = 'auto_parsed' | 'manual'
+export type BatchStatus = 'processing' | 'reviewing' | 'completed' | 'failed'
+
+export interface Document {
+  id: string
+  site_id: string
+  house_id: string | null // Legacy direct link
+  name: string
+  file_url: string
+  file_path: string | null
+  file_type: string | null
+  file_size: number | null
+  category: DocumentCategory
+  description: string | null
+  ai_analyzed: boolean
+  ai_summary: string | null
+  ai_extracted_data: Record<string, unknown> | null
+  // Bulk upload fields
+  parsed_lot_number: string | null
+  parsing_confidence: number | null
+  batch_id: string | null
+  // Metadata
+  uploaded_by: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export interface DocumentLink {
+  id: string
+  document_id: string
+  house_id: string
+  link_type: DocumentLinkType
+  show_in_timeline: boolean
+  created_at: string
+  created_by: string | null
+  // Joined fields (from view)
+  document?: Document
+  house?: House
+}
+
+export interface DocumentBatch {
+  id: string
+  site_id: string
+  status: BatchStatus
+  total_files: number
+  processed_files: number
+  linked_files: number
+  unlinked_files: number
+  failed_files: number
+  uploaded_by: string | null
+  uploaded_by_name: string | null
+  started_at: string
+  completed_at: string | null
+  created_at: string
+}
+
+// View type for lot documents (read-only)
+export interface HouseDocument {
+  house_id: string
+  link_id: string
+  document_id: string
+  file_name: string
+  file_url: string
+  file_type: string | null
+  file_size_bytes: number | null
+  document_type: string
+  description: string | null
+  uploaded_by: string | null
+  link_type: DocumentLinkType
+  show_in_timeline: boolean
+  uploaded_at: string
+}
+
+// Parsed filename result
+export interface ParsedFilename {
+  lotNumbers: string[]
+  documentType: string | null
+  confidence: number
+}
+
+// Bulk upload preview item
+export interface BulkUploadItem {
+  file: File
+  filename: string
+  parsed: ParsedFilename
+  status: 'pending' | 'uploading' | 'linked' | 'unlinked' | 'error'
+  documentId?: string
+  error?: string
+  // User can edit
+  editedLotNumber?: string
+}

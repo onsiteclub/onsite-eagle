@@ -4,19 +4,20 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Search, Building2, Settings,
-  ChevronRight, ChevronDown, FileText, Shield, Trash2,
-  Edit, Users, Home, Plus, Upload,
-  Info, AlertTriangle, MessageSquare, Layers, Lock, Unlock, UserPlus, Loader2,
+  ChevronRight, ChevronDown, FileText, Shield,
+  Users, Home, Plus, Upload,
+  MessageSquare, Layers, Lock, Unlock, UserPlus, Loader2,
   X, Check, CalendarDays
 } from 'lucide-react'
 import AddLotModal from '@/components/AddLotModal'
+import BulkDocumentUpload from '@/components/BulkDocumentUpload'
 import { supabase } from '@/lib/supabase'
 import type { Site, House, HouseStatus } from '@onsite/shared'
 import ChatTimeline from '@/components/ChatTimeline'
 import { Calendar } from '@onsite/ui/web'
 import type { CalendarEvent } from '@onsite/shared'
 
-type ViewType = 'lots' | 'schedule' | 'chat' | 'team' | 'settings-info' | 'settings-documents' | 'settings-rules' | 'settings-danger'
+type ViewType = 'lots' | 'schedule' | 'chat' | 'team' | 'documents'
 
 interface TeamMember {
   id: string
@@ -67,15 +68,13 @@ export default function SiteDetail() {
   const [houses, setHouses] = useState<House[]>([])
   const [loading, setLoading] = useState(true)
   const [activeView, setActiveView] = useState<ViewType>('lots')
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'lot_number' | 'created_at' | 'progress' | 'closing_date' | 'priority'>('lot_number')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [showAddLotModal, setShowAddLotModal] = useState(false)
-  const [showEditSiteModal, setShowEditSiteModal] = useState(false)
   const [showAddTeamModal, setShowAddTeamModal] = useState(false)
   const [showUploadDocModal, setShowUploadDocModal] = useState(false)
-  const [showAddRuleModal, setShowAddRuleModal] = useState(false)
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [showIssueLotModal, setShowIssueLotModal] = useState(false)
   const [selectedLotForIssue, setSelectedLotForIssue] = useState<House | null>(null)
 
@@ -93,16 +92,11 @@ export default function SiteDetail() {
         'schedule': 'schedule',
         'chat': 'chat',
         'team': 'team',
-        'documents': 'settings-documents',
-        'settings': 'settings-info',
+        'documents': 'documents',
       }
       const mappedView = tabMapping[tab]
       if (mappedView) {
         setActiveView(mappedView)
-        // Expand relevant menu section
-        if (tab === 'documents' || tab === 'settings') {
-          setExpandedMenus(prev => new Set([...prev, 'settings']))
-        }
       }
     }
   }, [searchParams])
@@ -218,36 +212,14 @@ export default function SiteDetail() {
     return { total, inProgress, completed, delayed }
   }, [houses])
 
-  // Menu structure - Root items: Lots, Schedule, Timeline, Team + Settings (collapsible)
+  // Menu structure - Root items: Lots, Schedule, Timeline, Team, Documents
   const menuItems: MenuItem[] = [
     { id: 'lots', label: 'Lots', icon: Building2, view: 'lots' },
     { id: 'schedule', label: 'Schedule', icon: CalendarDays, view: 'schedule' },
     { id: 'chat', label: 'Timeline', icon: MessageSquare, view: 'chat' },
     { id: 'team', label: 'Team', icon: Users, view: 'team' },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: Settings,
-      children: [
-        { id: 'settings-info', label: 'Information', icon: Info, view: 'settings-info' },
-        { id: 'settings-documents', label: 'Documents', icon: FileText, view: 'settings-documents' },
-        { id: 'settings-rules', label: 'Rules', icon: Shield, view: 'settings-rules' },
-        { id: 'settings-danger', label: 'Danger Zone', icon: AlertTriangle, view: 'settings-danger' },
-      ]
-    },
+    { id: 'documents', label: 'Documents', icon: FileText, view: 'documents' },
   ]
-
-  const toggleMenu = (menuId: string) => {
-    setExpandedMenus(prev => {
-      const next = new Set(prev)
-      if (next.has(menuId)) {
-        next.delete(menuId)
-      } else {
-        next.add(menuId)
-      }
-      return next
-    })
-  }
 
   const handleMenuClick = (item: MenuItem) => {
     if (item.view) {
@@ -262,10 +234,7 @@ export default function SiteDetail() {
       case 'schedule': return 'Site Schedule'
       case 'chat': return 'Site Timeline'
       case 'team': return 'Team'
-      case 'settings-info': return 'Project Information'
-      case 'settings-documents': return 'Documents'
-      case 'settings-rules': return 'Rules'
-      case 'settings-danger': return 'Danger Zone'
+      case 'documents': return 'Documents'
       default: return 'Site Detail'
     }
   }
@@ -348,66 +317,38 @@ export default function SiteDetail() {
         <nav className="flex-1 p-3 overflow-auto">
           <div className="space-y-1">
             {menuItems.map(menu => (
-              <div key={menu.id}>
-                {/* Root-level item (has view) or Collapsible menu (has children) */}
-                {menu.view && !menu.children ? (
-                  // Root-level clickable item
-                  <button
-                    onClick={() => handleMenuClick(menu)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                      activeView === menu.view
-                        ? 'bg-[#007AFF]/10 text-[#007AFF]'
-                        : 'text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
-                    }`}
-                  >
-                    <menu.icon className="w-5 h-5" />
-                    <span className="font-medium text-sm">{menu.label}</span>
-                  </button>
-                ) : (
-                  // Collapsible menu with children
-                  <div className="mt-4">
-                    <button
-                      onClick={() => toggleMenu(menu.id)}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-[#6E6E73] hover:bg-[#F5F5F7] transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <menu.icon className="w-4 h-4" />
-                        <span className="text-xs font-semibold uppercase tracking-wider">{menu.label}</span>
-                      </div>
-                      {expandedMenus.has(menu.id) ? (
-                        <ChevronDown className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4" />
-                      )}
-                    </button>
-
-                    {/* Submenu Items */}
-                    {expandedMenus.has(menu.id) && menu.children && (
-                      <div className="ml-2 mt-1 space-y-0.5">
-                        {menu.children.map(item => (
-                          <button
-                            key={item.id}
-                            onClick={() => handleMenuClick(item)}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
-                              activeView === item.view
-                                ? 'bg-[#007AFF]/10 text-[#007AFF]'
-                                : item.id === 'settings-danger'
-                                  ? 'text-[#FF3B30] hover:bg-[#FF3B30]/10'
-                                  : 'text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
-                            }`}
-                          >
-                            <item.icon className="w-5 h-5" />
-                            <span className="font-medium text-sm">{item.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <button
+                key={menu.id}
+                onClick={() => handleMenuClick(menu)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  activeView === menu.view
+                    ? 'bg-[#007AFF]/10 text-[#007AFF]'
+                    : 'text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
+                }`}
+              >
+                <menu.icon className="w-5 h-5" />
+                <span className="font-medium text-sm">{menu.label}</span>
+              </button>
             ))}
           </div>
         </nav>
+
+        {/* Settings Card */}
+        <div className="p-3 border-t border-[#E5E5EA]">
+          <button
+            onClick={() => router.push(`/site/${siteId}/settings`)}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] transition-colors"
+          >
+            <div className="w-10 h-10 bg-[#007AFF] rounded-full flex items-center justify-center text-white text-sm font-semibold">
+              <Settings className="w-5 h-5" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium text-[#1D1D1F]">Settings</p>
+              <p className="text-xs text-[#86868B]">Site Info, Rules & More</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#AEAEB2]" />
+          </button>
+        </div>
 
         {/* Dates at bottom */}
         <div className="p-4 border-t border-[#E5E5EA]">
@@ -460,10 +401,7 @@ export default function SiteDetail() {
             />
           )}
           {activeView === 'team' && <SettingsTeamView onAddTeam={() => setShowAddTeamModal(true)} />}
-          {activeView === 'settings-info' && <SettingsInfoView site={site} onEdit={() => setShowEditSiteModal(true)} onUploadDoc={() => setShowUploadDocModal(true)} />}
-          {activeView === 'settings-documents' && <SettingsDocumentsView onUploadDoc={() => setShowUploadDocModal(true)} />}
-          {activeView === 'settings-rules' && <SettingsRulesView onAddRule={() => setShowAddRuleModal(true)} onUploadDoc={() => setShowUploadDocModal(true)} />}
-          {activeView === 'settings-danger' && <SettingsDangerView site={site} />}
+          {activeView === 'documents' && <SettingsDocumentsView onUploadDoc={() => setShowUploadDocModal(true)} onBulkUpload={() => setShowBulkUploadModal(true)} />}
         </main>
       </div>
 
@@ -474,15 +412,6 @@ export default function SiteDetail() {
         siteId={siteId}
         onSuccess={loadSiteData}
       />
-
-      {/* Edit Site Modal */}
-      {showEditSiteModal && (
-        <EditSiteModal
-          site={site}
-          onClose={() => setShowEditSiteModal(false)}
-          onSuccess={loadSiteData}
-        />
-      )}
 
       {/* Add Team Member Modal */}
       {showAddTeamModal && (
@@ -500,11 +429,13 @@ export default function SiteDetail() {
         />
       )}
 
-      {/* Add Rule Modal */}
-      {showAddRuleModal && (
-        <AddRuleModal
+      {/* Bulk Document Upload Modal */}
+      {showBulkUploadModal && (
+        <BulkDocumentUpload
           siteId={siteId}
-          onClose={() => setShowAddRuleModal(false)}
+          houses={houses}
+          onClose={() => setShowBulkUploadModal(false)}
+          onComplete={loadSiteData}
         />
       )}
 
@@ -831,57 +762,6 @@ function LotesView({
 }
 
 // Settings Views
-function SettingsInfoView({ site, onEdit, onUploadDoc }: { site: Site; onEdit: () => void; onUploadDoc: () => void }) {
-  return (
-    <div className="max-w-2xl space-y-4">
-      <div className="flex justify-end gap-4">
-        <button
-          onClick={onUploadDoc}
-          className="text-sm text-[#007AFF] hover:text-[#0056B3] hover:underline"
-        >
-          Upload Document
-        </button>
-        <button
-          onClick={onEdit}
-          className="text-sm text-[#007AFF] hover:text-[#0056B3] hover:underline"
-        >
-          Edit Information
-        </button>
-      </div>
-      <div className="bg-white border border-[#D2D2D7] rounded-xl divide-y divide-[#E5E5EA]">
-        <div className="p-4 flex justify-between">
-          <span className="text-[#6E6E73]">Name</span>
-          <span className="text-[#1D1D1F] font-medium">{site.name}</span>
-        </div>
-        <div className="p-4 flex justify-between">
-          <span className="text-[#6E6E73]">Address</span>
-          <span className="text-[#1D1D1F] font-medium">{site.address || '—'}</span>
-        </div>
-        <div className="p-4 flex justify-between">
-          <span className="text-[#6E6E73]">City</span>
-          <span className="text-[#1D1D1F] font-medium">{site.city || '—'}</span>
-        </div>
-        <div className="p-4 flex justify-between">
-          <span className="text-[#6E6E73]">Total Lots</span>
-          <span className="text-[#1D1D1F] font-medium">{site.total_lots || 0}</span>
-        </div>
-        <div className="p-4 flex justify-between">
-          <span className="text-[#6E6E73]">Start Date</span>
-          <span className="text-[#1D1D1F] font-medium">
-            {site.start_date ? new Date(site.start_date).toLocaleDateString('en-CA') : '—'}
-          </span>
-        </div>
-        <div className="p-4 flex justify-between">
-          <span className="text-[#6E6E73]">Expected End Date</span>
-          <span className="text-[#1D1D1F] font-medium">
-            {site.expected_end_date ? new Date(site.expected_end_date).toLocaleDateString('en-CA') : '—'}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function SettingsTeamView({ onAddTeam }: { onAddTeam: () => void }) {
   return (
     <div className="max-w-2xl space-y-4">
@@ -906,7 +786,7 @@ function SettingsTeamView({ onAddTeam }: { onAddTeam: () => void }) {
   )
 }
 
-function SettingsDocumentsView({ onUploadDoc }: { onUploadDoc: () => void }) {
+function SettingsDocumentsView({ onUploadDoc, onBulkUpload }: { onUploadDoc: () => void; onBulkUpload: () => void }) {
   const documentCategories = [
     {
       id: 'contracts',
@@ -947,7 +827,14 @@ function SettingsDocumentsView({ onUploadDoc }: { onUploadDoc: () => void }) {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-4">
+        <button
+          onClick={onBulkUpload}
+          className="text-sm bg-[#007AFF] text-white px-4 py-2 rounded-lg hover:bg-[#0056B3] transition-colors flex items-center gap-2"
+        >
+          <Upload className="w-4 h-4" />
+          Bulk Upload
+        </button>
         <button
           onClick={onUploadDoc}
           className="text-sm text-[#007AFF] hover:text-[#0056B3] hover:underline"
@@ -999,317 +886,6 @@ function SettingsDocumentsView({ onUploadDoc }: { onUploadDoc: () => void }) {
             <p className="text-[#1D1D1F] font-medium">Drop files here or click to upload</p>
             <p className="text-[#86868B] text-sm mt-1">PDF, DOC, XLS, JPG, PNG (max 50MB)</p>
           </label>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SettingsRulesView({ onAddRule, onUploadDoc }: { onAddRule: () => void; onUploadDoc: () => void }) {
-  return (
-    <div className="max-w-2xl space-y-4">
-      <div className="flex justify-end gap-4">
-        <button
-          onClick={onUploadDoc}
-          className="text-sm text-[#007AFF] hover:text-[#0056B3] hover:underline"
-        >
-          Upload Document
-        </button>
-        <button
-          onClick={onAddRule}
-          className="text-sm text-[#007AFF] hover:text-[#0056B3] hover:underline"
-        >
-          Add Rule
-        </button>
-      </div>
-      <div className="bg-white border border-[#D2D2D7] rounded-xl p-6">
-        <h3 className="font-semibold text-[#1D1D1F] mb-4">Safety & Quality Rules</h3>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between py-3 border-b border-[#E5E5EA]">
-            <div>
-              <p className="text-[#1D1D1F] font-medium">PPE Verification</p>
-              <p className="text-[#86868B] text-sm">Require photo with PPE for check-in</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" defaultChecked />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-[#007AFF] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#007AFF]"></div>
-            </label>
-          </div>
-
-          <div className="flex items-center justify-between py-3 border-b border-[#E5E5EA]">
-            <div>
-              <p className="text-[#1D1D1F] font-medium">AI Photo Validation</p>
-              <p className="text-[#86868B] text-sm">Use AI to validate progress photos</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" defaultChecked />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-[#007AFF] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#007AFF]"></div>
-            </label>
-          </div>
-
-          <div className="flex items-center justify-between py-3">
-            <div>
-              <p className="text-[#1D1D1F] font-medium">Geofencing</p>
-              <p className="text-[#86868B] text-sm">Verify location on check-in</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-[#007AFF] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#007AFF]"></div>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SettingsDangerView({ site }: { site: Site }) {
-  const router = useRouter()
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [confirmText, setConfirmText] = useState('')
-  const [deleting, setDeleting] = useState(false)
-
-  const handleDeleteSite = async () => {
-    if (confirmText !== site.name) return
-
-    setDeleting(true)
-    try {
-      // First delete all related data
-      await supabase.from('egl_timeline').delete().eq('house_id', site.id)
-      await supabase.from('egl_photos').delete().match({ house_id: site.id })
-      await supabase.from('egl_issues').delete().match({ house_id: site.id })
-      await supabase.from('egl_progress').delete().match({ house_id: site.id })
-
-      // Delete all houses for this site
-      const { data: houses } = await supabase
-        .from('egl_houses')
-        .select('id')
-        .eq('site_id', site.id)
-
-      if (houses && houses.length > 0) {
-        const houseIds = houses.map(h => h.id)
-        await supabase.from('egl_timeline').delete().in('house_id', houseIds)
-        await supabase.from('egl_photos').delete().in('house_id', houseIds)
-        await supabase.from('egl_issues').delete().in('house_id', houseIds)
-        await supabase.from('egl_progress').delete().in('house_id', houseIds)
-        await supabase.from('egl_houses').delete().eq('site_id', site.id)
-      }
-
-      // Delete scans
-      await supabase.from('egl_scans').delete().eq('site_id', site.id)
-
-      // Finally delete the site
-      const { error } = await supabase
-        .from('egl_sites')
-        .delete()
-        .eq('id', site.id)
-
-      if (error) throw error
-
-      router.push('/')
-    } catch (error) {
-      console.error('Error deleting site:', error)
-      alert('Failed to delete site. Please try again.')
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  return (
-    <div className="max-w-2xl space-y-6">
-      <div className="bg-[#FF3B30]/5 border border-[#FF3B30]/20 rounded-xl p-6">
-        <h3 className="font-semibold text-[#FF3B30] mb-2">Danger Zone</h3>
-        <p className="text-[#6E6E73] text-sm mb-6">
-          Actions in this section are irreversible. Make sure before proceeding.
-        </p>
-
-        <div className="space-y-3">
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="w-full bg-[#FF3B30]/10 border border-[#FF3B30]/30 rounded-xl p-4 flex items-center gap-3 hover:bg-[#FF3B30]/20 transition-colors"
-          >
-            <Trash2 className="w-5 h-5 text-[#FF3B30]" />
-            <div className="text-left">
-              <span className="text-[#FF3B30] font-medium block">Delete Site</span>
-              <span className="text-[#FF3B30]/70 text-sm">This action cannot be undone</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
-            <div className="p-4 border-b border-[#E5E5EA]">
-              <h2 className="text-lg font-semibold text-[#FF3B30]">Delete Site</h2>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="bg-[#FF3B30]/10 border border-[#FF3B30]/30 rounded-lg p-3">
-                <p className="text-sm text-[#FF3B30]">
-                  This will permanently delete <strong>{site.name}</strong> and all its lots, photos, and data.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#1D1D1F] mb-1">
-                  Type "{site.name}" to confirm
-                </label>
-                <input
-                  type="text"
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder={site.name}
-                  className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:ring-2 focus:ring-[#FF3B30] focus:border-transparent"
-                />
-              </div>
-            </div>
-            <div className="p-4 border-t border-[#E5E5EA] flex gap-2">
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false)
-                  setConfirmText('')
-                }}
-                className="flex-1 px-4 py-2.5 border border-[#D2D2D7] rounded-lg hover:bg-[#F5F5F7] transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteSite}
-                disabled={confirmText !== site.name || deleting}
-                className="flex-1 px-4 py-2.5 bg-[#FF3B30] text-white rounded-lg hover:bg-[#E0352B] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {deleting ? 'Deleting...' : 'Delete Forever'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Edit Site Modal
-function EditSiteModal({ site, onClose, onSuccess }: { site: Site; onClose: () => void; onSuccess: () => void }) {
-  const [name, setName] = useState(site.name)
-  const [address, setAddress] = useState(site.address || '')
-  const [city, setCity] = useState(site.city || '')
-  const [startDate, setStartDate] = useState(site.start_date || '')
-  const [endDate, setEndDate] = useState(site.expected_end_date || '')
-  const [saving, setSaving] = useState(false)
-
-  const handleSave = async () => {
-    if (!name.trim()) return
-
-    setSaving(true)
-    try {
-      const { error } = await supabase
-        .from('egl_sites')
-        .update({
-          name: name.trim(),
-          address: address.trim() || null,
-          city: city.trim() || null,
-          start_date: startDate || null,
-          expected_end_date: endDate || null,
-        })
-        .eq('id', site.id)
-
-      if (error) throw error
-
-      onSuccess()
-      onClose()
-    } catch (error) {
-      console.error('Error updating site:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
-        <div className="p-4 border-b border-[#E5E5EA] flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#1D1D1F]">Edit Site</h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-[#F5F5F7] rounded-lg transition-colors"
-          >
-            <svg className="w-5 h-5 text-[#86868B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-[#6E6E73] mb-1">Name *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
-              placeholder="Site name"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[#6E6E73] mb-1">Address</label>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
-              placeholder="Street address"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[#6E6E73] mb-1">City</label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
-              placeholder="City"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-[#6E6E73] mb-1">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#6E6E73] mb-1">Expected End</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-[#E5E5EA] flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 border border-[#D2D2D7] text-[#1D1D1F] rounded-lg hover:bg-[#F5F5F7] transition-colors font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!name.trim() || saving}
-            className="flex-1 px-4 py-2.5 bg-[#007AFF] text-white rounded-lg hover:bg-[#0056B3] transition-colors font-medium disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
         </div>
       </div>
     </div>
@@ -1541,103 +1117,6 @@ function UploadDocModal({ siteId, onClose }: { siteId: string; onClose: () => vo
   )
 }
 
-// Add Rule Modal
-function AddRuleModal({ siteId, onClose }: { siteId: string; onClose: () => void }) {
-  const [ruleName, setRuleName] = useState('')
-  const [ruleDescription, setRuleDescription] = useState('')
-  const [ruleType, setRuleType] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const ruleTypes = [
-    { id: 'safety', label: 'Safety' },
-    { id: 'quality', label: 'Quality' },
-    { id: 'compliance', label: 'Compliance' },
-    { id: 'procedure', label: 'Procedure' },
-  ]
-
-  const handleSave = async () => {
-    if (!ruleName.trim() || !ruleType) return
-    setSaving(true)
-    // TODO: Implement actual save
-    setTimeout(() => {
-      setSaving(false)
-      onClose()
-    }, 500)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
-        <div className="p-4 border-b border-[#E5E5EA] flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#1D1D1F]">Add Rule</h2>
-          <button onClick={onClose} className="p-1 hover:bg-[#F5F5F7] rounded-lg transition-colors">
-            <svg className="w-5 h-5 text-[#86868B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4">
-          {/* Rule Type */}
-          <div>
-            <label className="block text-sm font-medium text-[#6E6E73] mb-1">Type *</label>
-            <select
-              value={ruleType}
-              onChange={(e) => setRuleType(e.target.value)}
-              className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF] bg-white"
-            >
-              <option value="">Select type...</option>
-              {ruleTypes.map(type => (
-                <option key={type.id} value={type.id}>{type.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Rule Name */}
-          <div>
-            <label className="block text-sm font-medium text-[#6E6E73] mb-1">Rule Name *</label>
-            <input
-              type="text"
-              value={ruleName}
-              onChange={(e) => setRuleName(e.target.value)}
-              placeholder="e.g., PPE Required on Site"
-              className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-[#6E6E73] mb-1">Description</label>
-            <textarea
-              value={ruleDescription}
-              onChange={(e) => setRuleDescription(e.target.value)}
-              placeholder="Describe the rule requirements..."
-              rows={3}
-              className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF] resize-none"
-            />
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-[#E5E5EA] flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 border border-[#D2D2D7] text-[#1D1D1F] rounded-lg hover:bg-[#F5F5F7] transition-colors font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!ruleName.trim() || !ruleType || saving}
-            className="flex-1 px-4 py-2.5 bg-[#007AFF] text-white rounded-lg hover:bg-[#0056B3] transition-colors font-medium disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save Rule'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // Issue Lot Modal - with direct plan upload
 function IssueLotModal({
   house,
@@ -1669,21 +1148,53 @@ function IssueLotModal({
   const workers = teamMembers.filter(m => m.role === 'worker')
   const selectedWorker = workers.find(w => w.id === selectedWorkerId)
 
-  // Check if plans already exist for this lot
+  // Check if plans already exist for this lot (direct + linked from bulk upload)
   useEffect(() => {
     async function checkPlans() {
       setCheckingPlans(true)
       try {
-        const { data, error } = await supabase
+        const plans: { id: string; name: string; file_url: string }[] = []
+        const seenIds = new Set<string>()
+
+        // 1. Check documents directly linked to house (legacy)
+        const { data: directDocs } = await supabase
           .from('egl_documents')
           .select('id, name, file_url')
           .eq('house_id', house.id)
-          .in('category', ['plan', 'plans'])
-          .limit(10)
+          .in('category', ['plan', 'plans', 'blueprint'])
+          .is('deleted_at', null)
+          .limit(20)
 
-        if (!error && data) {
-          setExistingPlans(data)
+        if (directDocs) {
+          for (const doc of directDocs) {
+            if (!seenIds.has(doc.id)) {
+              plans.push(doc)
+              seenIds.add(doc.id)
+            }
+          }
         }
+
+        // 2. Check documents linked via egl_document_links (bulk upload system)
+        const { data: linkedDocs } = await supabase
+          .from('v_house_documents')
+          .select('document_id, file_name, file_url')
+          .eq('house_id', house.id)
+          .limit(20)
+
+        if (linkedDocs) {
+          for (const doc of linkedDocs) {
+            if (!seenIds.has(doc.document_id)) {
+              plans.push({
+                id: doc.document_id,
+                name: doc.file_name,
+                file_url: doc.file_url
+              })
+              seenIds.add(doc.document_id)
+            }
+          }
+        }
+
+        setExistingPlans(plans)
       } catch (err) {
         console.error('[IssueLotModal] Error checking plans:', err)
       } finally {

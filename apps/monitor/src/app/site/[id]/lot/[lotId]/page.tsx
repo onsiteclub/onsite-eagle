@@ -4,18 +4,19 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Search, Clock, ExternalLink, Calendar as CalendarIcon, X,
-  Upload, File, Loader2, Sparkles, Users, Copy, Check
+  Upload, File, Loader2, Sparkles, Users, Copy, Check, Package
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { House, FormFieldSuggestion, CalendarEvent, SiteWorker } from '@onsite/shared'
 import { createCalendarEvent } from '@onsite/shared'
 import { Calendar } from '@onsite/ui/web'
 import ChatTimeline from '@/components/ChatTimeline'
+import MaterialRequestsView from '@/components/MaterialRequestsView'
 import { useAICopilot } from '@/hooks/useAICopilot'
 import AISuggestionPanel from '@/components/AISuggestionPanel'
 
 // Sidebar section types
-type SidebarSection = 'timeline' | 'documents' | 'schedule' | 'team'
+type SidebarSection = 'timeline' | 'documents' | 'schedule' | 'materials' | 'team'
 
 interface LotDocument {
   id: string
@@ -65,7 +66,7 @@ export default function LotDetail() {
   useEffect(() => {
     const tab = searchParams.get('tab')
     if (tab) {
-      const validTabs: SidebarSection[] = ['timeline', 'documents', 'schedule', 'team']
+      const validTabs: SidebarSection[] = ['timeline', 'documents', 'schedule', 'materials', 'team']
       if (validTabs.includes(tab as SidebarSection)) {
         setActiveSection(tab as SidebarSection)
       }
@@ -240,6 +241,18 @@ export default function LotDetail() {
               </button>
 
               <button
+                onClick={() => setActiveSection('materials')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  activeSection === 'materials'
+                    ? 'bg-[#FF3B30] text-white'
+                    : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                }`}
+              >
+                <Package className="w-5 h-5" />
+                <span className="font-medium">Materials</span>
+              </button>
+
+              <button
                 onClick={() => setActiveSection('team')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                   activeSection === 'team'
@@ -284,6 +297,13 @@ export default function LotDetail() {
           )}
           {activeSection === 'schedule' && (
             <ScheduleSection house={house} siteId={siteId} onRefresh={loadLotData} />
+          )}
+          {activeSection === 'materials' && (
+            <MaterialRequestsView
+              siteId={siteId}
+              houseId={lotId}
+              houseLotNumber={house.lot_number}
+            />
           )}
           {activeSection === 'team' && (
             <TeamSection lotId={lotId} lotNumber={house.lot_number} onAddTeam={() => setShowAddTeamModal(true)} />

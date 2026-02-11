@@ -33,11 +33,12 @@ export async function GET(request: NextRequest) {
 
   const allFiles: UnifiedDocument[] = []
 
-  // 1. Fetch from egl_documents table (if it exists)
+  // 1. Fetch from egl_documents table (directly linked via house_id)
   try {
     let docsQuery = supabase
       .from('egl_documents')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
 
     if (houseId) {
@@ -67,6 +68,41 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     // Table might not exist yet, continue
     console.log('egl_documents table not available:', e)
+  }
+
+  // 1b. Fetch LINKED documents (from bulk upload system)
+  if (houseId) {
+    try {
+      const { data: linkedDocs } = await supabase
+        .from('v_house_documents')
+        .select('*')
+        .eq('house_id', houseId)
+        .order('uploaded_at', { ascending: false })
+
+      if (linkedDocs) {
+        const existingIds = new Set(allFiles.map(f => f.id))
+        for (const doc of linkedDocs) {
+          // Avoid duplicates if document is both directly linked and via document_links
+          if (!existingIds.has(doc.document_id)) {
+            allFiles.push({
+              id: doc.document_id,
+              house_id: houseId,
+              site_id: null,
+              name: doc.file_name,
+              file_url: doc.file_url,
+              file_type: doc.file_type || 'unknown',
+              file_size: doc.file_size_bytes,
+              category: doc.document_type === 'blueprint' ? 'plan' : (doc.document_type || 'document'),
+              source: 'document',
+              created_at: doc.uploaded_at,
+            })
+            existingIds.add(doc.document_id)
+          }
+        }
+      }
+    } catch (e) {
+      console.log('v_house_documents view not available:', e)
+    }
   }
 
   // 2. Fetch attachments from egl_messages (timeline uploads)
