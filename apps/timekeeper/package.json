@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
     "lint": "eslint .",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package || true"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",
