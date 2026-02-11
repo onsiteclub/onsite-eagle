@@ -1672,9 +1672,9 @@ function SiteScheduleView({
   function mapEventType(dbType: string): CalendarEvent['type'] {
     if (dbType.startsWith('inspection')) return 'inspection'
     if (dbType.startsWith('material')) return 'delivery'
-    if (dbType.startsWith('weather')) return 'weather'
-    if (dbType === 'holiday') return 'holiday'
-    return 'other'
+    if (dbType.startsWith('weather')) return 'custom'
+    if (dbType === 'holiday') return 'custom'
+    return 'custom'
   }
 
   // Get events for selected date
