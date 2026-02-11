@@ -1793,7 +1793,7 @@ function SiteScheduleView({
             <div className="mt-4 pt-4 border-t border-[#E5E5EA]">
               <p className="text-xs font-semibold text-[#86868B] uppercase mb-2">Related Lots</p>
               <div className="space-y-1">
-                {[...new Set(eventsForSelectedDate.map(e => e.metadata?.house_id).filter(Boolean))].map(houseId => {
+                {[...new Set(eventsForSelectedDate.map(e => e.metadata?.house_id as string).filter(Boolean))].map(houseId => {
                   const house = houses.find(h => h.id === houseId)
                   if (!house) return null
                   return (
