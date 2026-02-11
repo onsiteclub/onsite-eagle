@@ -427,7 +427,7 @@ export const URGENCY_LABELS: Record<UrgencyLevel, string> = {
   low: 'Low - Can wait 24+ hours'
 }
 
-export const STATUS_LABELS: Record<MaterialRequestStatus, string> = {
+export const MATERIAL_REQUEST_STATUS_LABELS: Record<MaterialRequestStatus, string> = {
   pending: 'Pending',
   acknowledged: 'Acknowledged',
   in_transit: 'In Transit',
