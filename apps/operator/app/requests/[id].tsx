@@ -14,19 +14,21 @@ import type { MaterialRequest, MaterialRequestStatus } from '@onsite/shared';
 import { updateRequestStatus } from '@onsite/shared';
 import { formatDistanceToNow, format } from 'date-fns';
 
+const ACCENT = '#0F766E';
+
 const URGENCY_COLORS = {
-  critical: '#FF3B30',
-  high: '#FF9500',
-  medium: '#FFCC00',
-  low: '#8E8E93',
+  critical: '#DC2626',
+  high: '#F59E0B',
+  medium: '#C58B1B',
+  low: '#9CA3AF',
 };
 
 const STATUS_COLORS = {
-  pending: '#FF9500',
-  acknowledged: '#007AFF',
-  in_transit: '#5856D6',
-  delivered: '#34C759',
-  cancelled: '#8E8E93',
+  pending: '#DC2626',
+  acknowledged: '#F59E0B',
+  in_transit: '#0F766E',
+  delivered: '#16A34A',
+  cancelled: '#9CA3AF',
 };
 
 export default function RequestDetail() {
@@ -103,7 +105,7 @@ export default function RequestDetail() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={ACCENT} />
       </View>
     );
   }
@@ -262,7 +264,7 @@ export default function RequestDetail() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#F6F7F9',
   },
   content: {
     padding: 16,
@@ -272,7 +274,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#F6F7F9',
   },
   headerCard: {
     backgroundColor: '#fff',
@@ -386,7 +388,7 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: ACCENT,
   },
   primaryButtonText: {
     color: '#fff',
@@ -394,7 +396,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   successButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#16A34A',
   },
   successButtonText: {
     color: '#fff',

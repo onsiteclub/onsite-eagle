@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
+import { sendMessage } from '@onsite/timeline/data';
 import type { MaterialRequest } from '@onsite/shared';
 
 export default function DeliverConfirmation() {
@@ -20,10 +21,26 @@ export default function DeliverConfirmation() {
   const [submitting, setSubmitting] = useState(false);
   const [request, setRequest] = useState<MaterialRequest | null>(null);
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [operatorName, setOperatorName] = useState('Operator');
+  const [operatorId, setOperatorId] = useState<string | null>(null);
 
   useEffect(() => {
+    loadOperator();
     loadRequest();
   }, [id]);
+
+  async function loadOperator() {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      setOperatorId(data.user.id);
+      const { data: profile } = await supabase
+        .from('core_profiles')
+        .select('full_name')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      if (profile?.full_name) setOperatorName(profile.full_name);
+    }
+  }
 
   async function loadRequest() {
     try {
@@ -66,7 +83,7 @@ export default function DeliverConfirmation() {
           status: 'delivered',
           delivered_at: new Date().toISOString(),
           delivery_notes: deliveryNotes.trim() || null,
-          delivered_by_name: 'Operator', // TODO: Get from current user
+          delivered_by_name: operatorName,
         })
         .eq('id', request.id);
 
@@ -76,14 +93,29 @@ export default function DeliverConfirmation() {
         return;
       }
 
-      // Create timeline event if there's a house
+      // Create house-level timeline event
       if (request.house_id) {
         await supabase.from('egl_timeline').insert({
           house_id: request.house_id,
           event_type: 'note',
           title: `Material Delivered: ${request.material_name}`,
-          description: `${request.quantity} ${request.unit} delivered${deliveryNotes ? `. Notes: ${deliveryNotes}` : ''}`,
+          description: `${request.quantity} ${request.unit} delivered by ${operatorName}${deliveryNotes ? `. Notes: ${deliveryNotes}` : ''}`,
           source: 'operator_app',
+          created_by: operatorId,
+        });
+      }
+
+      // Post site-level timeline message so all team members see it
+      if (request.site_id) {
+        const notesSuffix = deliveryNotes ? ` — ${deliveryNotes}` : '';
+        await sendMessage(supabase as never, {
+          site_id: request.site_id,
+          house_id: request.house_id || undefined,
+          sender_type: 'operator',
+          sender_id: operatorId || undefined,
+          sender_name: operatorName,
+          content: `Delivered ${request.quantity} ${request.unit} of ${request.material_name}${request.lot_number ? ` to Lot ${request.lot_number}` : ''}${notesSuffix}`,
+          source_app: 'operator',
         });
       }
 
@@ -93,7 +125,7 @@ export default function DeliverConfirmation() {
         [
           {
             text: 'OK',
-            onPress: () => router.replace('/requests'),
+            onPress: () => router.replace('/(tabs)'),
           },
         ]
       );
@@ -108,7 +140,7 @@ export default function DeliverConfirmation() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#0F766E" />
       </View>
     );
   }
@@ -181,7 +213,7 @@ export default function DeliverConfirmation() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#F6F7F9',
   },
   content: {
     padding: 16,
@@ -191,7 +223,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#F6F7F9',
   },
   summaryCard: {
     backgroundColor: '#fff',
@@ -215,7 +247,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#34C759',
+    color: '#16A34A',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -260,7 +292,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   confirmButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#16A34A',
     padding: 18,
     borderRadius: 14,
     alignItems: 'center',
