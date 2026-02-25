@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../src/lib/supabase';
-import { sendMessage } from '@onsite/timeline/data';
+import { sendMessage } from '@onsite/timeline';
 
 const ACCENT = '#0F766E';
 

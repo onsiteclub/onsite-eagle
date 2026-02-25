@@ -1,4 +1,5 @@
 // Native (React Native) components
+export { Calendar } from './Calendar'
 export { SpineTimeline } from './SpineTimeline'
 export { ProgressBar, ProgressBarCompact } from './ProgressBar'
 export { LotCard } from './LotCard'

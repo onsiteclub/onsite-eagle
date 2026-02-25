@@ -31,23 +31,29 @@ Nenhuma mudanca em infraestrutura passa sem sua validacao.
 onsite-eagle/
 ├── CLAUDE.md               ← Voce esta aqui (identidade: Cerbero)
 ├── .mcp.json               ← Config MCP (Supabase + Memory)
+├── turbo.json              ← Turborepo config
 ├── packages/               ← SEU TERRITORIO
-│   ├── api/                # Queries Supabase
-│   ├── shared/             # Utils, validators
-│   ├── ui/                 # Componentes base
-│   ├── hooks/              # useAuth, useLocations
-│   ├── auth/               # Autenticacao
-│   ├── types/              # Types do banco
-│   └── tokens/             # Design tokens
+│   ├── shared/             # Types, interfaces compartilhadas
+│   ├── ui/                 # Componentes base (web + native) + theme/colors
+│   ├── hooks/              # useAuth, useLocations (React hooks)
+│   ├── auth/               # Autenticacao (pure JS core + React context)
+│   ├── supabase/           # Supabase SSR/client wrappers (Next.js)
+│   ├── utils/              # cn(), formatters, export helpers
+│   ├── logger/             # Structured logging
+│   └── ai/                 # AI specialists (Prumo foundation)
 ├── supabase/               ← SEU TERRITORIO
 │   └── migrations/         # Migrations do banco
 └── apps/                   ← TERRITORIO DOS APPS (nao seu)
-    ├── monitor/
-    ├── field/
-    ├── inspect/
-    ├── calculator/
-    ├── timekeeper/
-    └── timekeeper-web/
+    ├── monitor/            # Next.js — Dashboard supervisor
+    ├── analytics/          # Next.js — Business intelligence
+    ├── dashboard/          # Next.js — Admin dashboard
+    ├── auth/               # Next.js — Auth flows
+    ├── field/              # Expo — Worker app (fotos)
+    ├── inspect/            # Expo — Inspector app
+    ├── operator/           # Expo — Operator app
+    ├── calculator/         # Vite + Capacitor — Voice calculator
+    ├── timekeeper/         # Expo — GPS geofencing, auto clock-in/out
+    └── timekeeper-web/     # Next.js — Manual hours, reports
 ```
 
 ### Regra de Territorio
@@ -405,31 +411,143 @@ The Construction Intelligence Engine is the proactive AI system that powers Eagl
 
 ### 6.1 Apps Completos
 
-All projects share the **same Supabase project**, same Auth, same database, same RLS policies.
+All projects share the **same Supabase project** (`dbasazrdbtigrdntaehb`), same Auth, same database, same RLS policies.
 
-| App | Stack | Descricao | Dados Capturados |
-|-----|-------|-----------|------------------|
-| **Eagle Monitor** | Next.js | Dashboard web para supervisores | Site progress, AI validations |
-| **Eagle Field** | Expo | App do trabalhador (fotos) | Photos, checklist completion |
-| **Eagle Inspect** | Expo | App do inspetor (validacao) | Inspections, approvals |
-| **Timekeeper Mobile** | Expo | GPS geofencing, auto clock-in/out | Work hours, locations, movement patterns |
-| **Timekeeper Web** | Next.js | Manual hour entry, reports, QR scan | Manual entries, team structures |
-| **Calculator** | Vite + Capacitor | Voice-powered calculator | Voice patterns, calculation types, trade-specific formulas |
-| **Shop** | Next.js / Stripe | E-commerce for construction products | Purchase patterns, product demand by trade |
-| **SheetChat** | *(planned)* | Messaging & community | Social interactions, knowledge sharing |
-| **Onsite Analytics** | Next.js | Business health dashboard | Reads `agg_*`, `int_*`, `v_*` views |
+#### React Version Strategy
+
+O monorepo usa **DUAS versoes de React**:
+- **React 18.3.1** → Apps Expo/React Native (Timekeeper, Field, Inspect, Operator)
+- **React 19.x** → Apps Next.js (Monitor, Analytics, Dashboard, Auth, Timekeeper-Web)
+
+Apps Expo usam `blockList` + `extraNodeModules` no `metro.config.js` para isolar React 18 do React 19 hoisted no root. Ver secao 6.1.1.
+
+#### Tabela de Apps
+
+| App | Dir | Stack | React | Descricao | Dados Capturados |
+|-----|-----|-------|-------|-----------|------------------|
+| **Monitor** | `apps/monitor` | Next.js 16.1.6 | 19.2.3 | Dashboard supervisor | Site progress, AI validations |
+| **Analytics** | `apps/analytics` | Next.js 16.1.6 | 19.0.0 | Business intelligence | `agg_*`, `int_*`, `v_*` views |
+| **Dashboard** | `apps/dashboard` | Next.js 16.1.6 | 19.0.0 | Admin dashboard | Admin operations |
+| **Auth** | `apps/auth` | Next.js 16.1.6 | 19.0.0 | Auth flows | Auth events |
+| **Field** | `apps/field` | Expo 52 + RN 0.76 | 18.3.1 | Worker app (fotos) | Photos, checklist completion |
+| **Inspect** | `apps/inspect` | Expo 52 + RN 0.76 | 18.3.1 | Inspector app | Inspections, approvals |
+| **Operator** | `apps/operator` | Expo 52 + RN 0.76 | 18.3.1 | Operator app | Operations, assignments |
+| **Timekeeper** | `apps/timekeeper` | Expo 52 + RN 0.76 | 18.3.1 | GPS geofencing, auto clock-in/out | Work hours, locations, movement |
+| **Timekeeper Web** | `apps/timekeeper-web` | Next.js 16.1.6 | 19.0.0 | Manual hours, reports, QR | Manual entries, team structures |
+| **Calculator** | `apps/calculator` | Vite 5.4 + Capacitor 6.1 | 18.3.1 | Voice-powered calculator | Voice patterns, calculations |
+| **Shop** | *(planned)* | Next.js / Stripe | — | E-commerce for construction | Purchase patterns, demand |
+| **SheetChat** | *(planned)* | — | — | Messaging & community | Social interactions |
+
+#### Workspace Packages
+
+| Package | Export | Deps | Proposito |
+|---------|--------|------|-----------|
+| `@onsite/shared` | `./src/index.ts` | TS only | Types, interfaces compartilhadas |
+| `@onsite/auth` | `.` + `./core` | `@supabase/supabase-js` | Auth (pure JS core + React context) |
+| `@onsite/supabase` | `.` + `./client`, `./server`, `./middleware`, `./schema` | `@supabase/ssr`, `@supabase/supabase-js` | Supabase SSR wrappers (Next.js) |
+| `@onsite/ui` | `.` + `./theme`, `./web`, `./native` | `qrcode.react`, `react-native-qrcode-svg` | UI components + theme |
+| `@onsite/hooks` | `./src/index.ts` | `@onsite/supabase` | React hooks compartilhados |
+| `@onsite/utils` | `.` + `./cn`, `./format`, `./auth`, `./export` | `clsx`, `tailwind-merge` | Utilities (cn, formatters) |
+| `@onsite/logger` | `./src/index.ts` | TS only | Structured logging |
+| `@onsite/ai` | `.` + `./specialists/timekeeper.ts` | None | AI specialists (Prumo foundation) |
+
+### 6.1.1 Metro Config — React 18/19 Isolation
+
+Apps Expo vivem num monorepo com apps Next.js que usam React 19. Sem isolamento, Metro bundla React 19 do root `node_modules` causando runtime crashes (`recentlyCreatedOwnerStacks`, `ReactCurrentOwner`).
+
+**Solucao:** Cada app Expo usa `blockList` + `extraNodeModules` no `metro.config.js`:
+
+```javascript
+// Block React 19 from root node_modules entirely
+const rootReact = path.resolve(monorepoRoot, 'node_modules', 'react')
+  .replace(/[\\]/g, '\\\\');  // Windows backslash escape
+const rootReactDom = path.resolve(monorepoRoot, 'node_modules', 'react-dom')
+  .replace(/[\\]/g, '\\\\');
+
+config.resolver.blockList = [
+  new RegExp(`${rootReact}[\\\\/].*`),
+  new RegExp(`${rootReactDom}[\\\\/].*`),
+];
+
+// Map all react imports to local React 18.3.1
+config.resolver.extraNodeModules = {
+  react: path.resolve(projectRoot, 'node_modules/react'),
+  'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
+};
+```
+
+**Por que funciona:**
+- `blockList` impede Metro de processar qualquer arquivo em `root/node_modules/react/`
+- `extraNodeModules` redireciona imports de `react` para a versao local (18.3.1)
+- React 19 simplesmente nao existe no bundle. Ponto final.
+
+**IMPORTANTE:** NAO usar `resolveRequest` para isolamento de versao — context pode ser frozen/read-only em versoes recentes do Metro, e dependencias transitivas bypassam o resolver customizado.
+
+### 6.1.2 Babel Config — Expo Apps
+
+Apps Expo usam apenas `babel-preset-expo` sem plugins adicionais:
+
+```javascript
+module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+  };
+};
+```
+
+**IMPORTANTE:** NAO adicionar `transform-inline-environment-variables` com `EXPO_ROUTER_APP_ROOT` / `EXPO_ROUTER_IMPORT_MODE`. Esse plugin roda ANTES do `babel-preset-expo` (plugins antes de presets no Babel) e substitui essas variaveis por `undefined`, quebrando o route discovery do Expo Router.
+
+### 6.1.3 App Config — Dynamic vs Static
+
+Apps Expo que precisam de env vars em plugins devem usar `app.config.js` (nao `app.json`):
+
+```javascript
+// app.config.js — permite process.env em plugins
+export default {
+  expo: {
+    plugins: [
+      ["react-native-background-geolocation", {
+        license: process.env.EXPO_PUBLIC_BG_GEO_LICENSE_ANDROID,
+      }],
+    ],
+  },
+};
+```
+
+`app.json` e JSON estatico — nao suporta variaveis de ambiente.
 
 ### Scripts Turbo
 
 ```bash
-npm run dev              # Todos os apps
-npm run dev:monitor      # Apenas monitor
-npm run dev:field        # Apenas field
-npm run dev:inspect      # Apenas inspect
-npm run dev:calculator   # Apenas calculator
-npm run dev:timekeeper   # Apenas timekeeper
+npm run dev                # Todos os apps
+npm run dev:monitor        # Apenas monitor
+npm run dev:analytics      # Apenas analytics
+npm run dev:dashboard      # Apenas dashboard
+npm run dev:auth           # Apenas auth
+npm run dev:field          # Apenas field
+npm run dev:inspect        # Apenas inspect
+npm run dev:operator       # Apenas operator
+npm run dev:calculator     # Apenas calculator
+npm run dev:timekeeper     # Apenas timekeeper
 npm run dev:timekeeper-web # Apenas timekeeper-web
+npm run build              # Build all
+npm run lint               # Lint all
 ```
+
+### Versoes Criticas
+
+| Dependencia | Versao | Nota |
+|-------------|--------|------|
+| Node.js | `>=20.0.0` | Obrigatorio |
+| npm | `10.0.0` | Especificado em `packageManager` |
+| Turborepo | `^2.3.0` | Monorepo orchestration |
+| Expo SDK | `~52.0.0` | Mobile apps |
+| React Native | `0.76.0` | New Architecture enabled |
+| Next.js | `16.1.6` | Web apps |
+| TypeScript | `^5.3.0+` | Across all packages |
+| Supabase JS | `2.49.2–2.93.3` | **INCONSISTENTE — padronizar** |
+| date-fns | `3.x–4.x` | **INCONSISTENTE — padronizar** |
 
 ### 6.2 Onsite Analytics — The Hourglass Neck
 
@@ -631,6 +749,7 @@ Tables using `deleted_at` for soft delete:
 - units_system text default 'imperial', date_format, time_format
 - primary_device_id, primary_device_model, primary_device_platform
 - onboarding_completed_at, onboarding_source, referral_code, referred_by_user_id
+- worker_code varchar(12) UNIQUE (auto-generated: OSC-XXXXX, via trigger + sequence)
 - first_active_at, last_active_at, total_sessions, total_hours_tracked, profile_completeness
 - created_at, updated_at
 ```
@@ -1512,6 +1631,37 @@ O `OR organization_id IS NULL` permite dados legados sem org durante migração.
 | `supervisor` | Visualizar/editar sites e casas, validar fotos |
 | `inspector` | Visualizar e validar fotos |
 | `worker` | Visualizar e fazer upload de fotos |
+
+### [DIRECTIVE 2026-02-19] Avalon CONTROL como Spec Funcional do Eagle
+
+**Fonte:** `C:\Users\crist\OneDrive\Desktop\Avalon CONTROL.xlsx` (13 abas, 65 lotes)
+**Documentacao:** `REFACTOR_V2.md` secao 12
+
+A planilha Avalon CONTROL e a ferramenta REAL usada pelo fundador como supervisor
+de framing no projeto "The Ridge Stage 1" (Caivan/Minto). Ela define o padrao
+minimo que o Eagle precisa atingir para substituir o Excel no canteiro.
+
+**Regras derivadas:**
+
+| # | Regra | Justificativa |
+|---|-------|---------------|
+| 1 | Worker assignment e POR FASE, nao por casa | Planilha mostra workers diferentes para Frame/Roof/Bsmt/Backing no mesmo lote |
+| 2 | Sub-fases sao ~20 (nao 7 genericas) | Aba Management tem: backfill → frame start → roof ply → shingle → window → insulation → backing → framecheck → wire → city framing |
+| 3 | Checklist de inspecao tem 140 itens codificados | Aba FRAME-CHECK: RA01-RA23, SF01-SF17, MW01-MW19, SW01-SW25, ST01-ST15, MF01-MF24, OS01-OS10, GA01-GA07 |
+| 4 | Material tracking tem pipeline (ordered→delivered→installed→welded) | Aba Steel Posts: 80+ ordens com lifecycle completo |
+| 5 | Valores $$$ sao por fase por sqft | Vista 2: Framing ~$4/sqft, Roofing ~$2/sqft, Backing ~$1.10/sqft |
+| 6 | Documentacao pre-frame por lote e obrigatoria | Aba Management: Plan, Red Lines, RSO, Sales Details, Stair Layouts, Trusses book |
+| 7 | Crews existem como entidade (Frama, New York, etc.) | Aba Framers: 43 entries, mistura individuos e equipes |
+
+**Novas tabelas necessarias (ver REFACTOR_V2.md secao 7):**
+
+| Tabela | Prioridade | Proposito |
+|--------|------------|-----------|
+| `egl_phase_assignments` | P0 | Worker por fase por casa |
+| `egl_material_tracking` | P1 | Pipeline de materiais |
+| `egl_phase_rates` | P1 | Rate por sqft por fase |
+| `egl_documents` | P2 | Plantas, RSO, red lines por lote |
+| `egl_crews` + `egl_crew_members` | P2 | Equipes de campo |
 
 ---
 

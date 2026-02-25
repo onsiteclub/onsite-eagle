@@ -27,14 +27,19 @@ import { useSettingsStore } from '../src/stores/settingsStore';
 import {
   configureNotificationCategories,
 } from '../src/lib/notifications';
+import { registerPushToken } from '../src/lib/pushRegistration';
 import {
   initializeListeners,
   cleanupListeners,
   onUserLogin,
   onUserLogout,
 } from '../src/lib/bootstrap';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initQueue } from '@onsite/offline';
 import type { GeofenceNotificationData } from '../src/lib/notifications';
 
+// Initialize offline queue for timeline messages
+initQueue(AsyncStorage);
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -151,15 +156,20 @@ export default function RootLayout() {
         await initAuth();
         logger.info('boot', '✅ Auth store V2 initialized');
 
-        // 6. If authenticated, init stores + user session
+        // 6. If authenticated, init stores + user session + push token
         if (useAuthStore.getState().isAuthenticated()) {
           await initializeStores();
-          
+
           const currentUser = useAuthStore.getState().user;
           if (currentUser) {
             await onUserLogin(currentUser.id);
             userSessionRef.current = currentUser.id;
           }
+
+          // Register push token (fire-and-forget)
+          registerPushToken().catch((err) =>
+            logger.error('push', 'Push registration failed', { error: String(err) })
+          );
         }
 
         logger.info('boot', '✅ Bootstrap completed');

@@ -9,7 +9,11 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@onsite/ai": "*",
+    "@onsite/agenda": "*",
+    "@onsite/media": "*",
     "@onsite/shared": "*",
+    "@onsite/timeline": "*",
     "@onsite/ui": "*",
     "@onsite/auth": "*",
     "@supabase/supabase-js": "^2.93.3",

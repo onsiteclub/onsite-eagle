@@ -7,17 +7,22 @@ import {
   ChevronRight, ChevronDown, FileText, Shield,
   Users, Home, Plus, Upload,
   MessageSquare, Layers, Lock, Unlock, UserPlus, Loader2,
-  X, Check, CalendarDays
+  X, Check, CalendarDays, BarChart3, DollarSign, Sparkles,
 } from 'lucide-react'
 import AddLotModal from '@/components/AddLotModal'
 import BulkDocumentUpload from '@/components/BulkDocumentUpload'
 import { supabase } from '@/lib/supabase'
 import type { Site, House, HouseStatus } from '@onsite/shared'
 import ChatTimeline from '@/components/ChatTimeline'
+import ScheduleTab from '@/components/ScheduleTab'
+import DocumentsTab from '@/components/DocumentsTab'
+import GanttView from '@/components/GanttView'
+import PaymentsTab from '@/components/PaymentsTab'
+import WeeklyReport from '@/components/WeeklyReport'
 import { Calendar } from '@onsite/ui/web'
 import type { CalendarEvent } from '@onsite/shared'
 
-type ViewType = 'lots' | 'schedule' | 'chat' | 'team' | 'documents'
+type ViewType = 'lots' | 'schedule' | 'gantt' | 'chat' | 'team' | 'documents' | 'payments' | 'reports'
 
 interface TeamMember {
   id: string
@@ -216,9 +221,12 @@ export default function SiteDetail() {
   const menuItems: MenuItem[] = [
     { id: 'lots', label: 'Lots', icon: Building2, view: 'lots' },
     { id: 'schedule', label: 'Schedule', icon: CalendarDays, view: 'schedule' },
+    { id: 'gantt', label: 'Gantt Chart', icon: BarChart3, view: 'gantt' },
     { id: 'chat', label: 'Timeline', icon: MessageSquare, view: 'chat' },
     { id: 'team', label: 'Team', icon: Users, view: 'team' },
     { id: 'documents', label: 'Documents', icon: FileText, view: 'documents' },
+    { id: 'payments', label: 'Payments', icon: DollarSign, view: 'payments' },
+    { id: 'reports', label: 'AI Reports', icon: Sparkles, view: 'reports' },
   ]
 
   const handleMenuClick = (item: MenuItem) => {
@@ -232,9 +240,12 @@ export default function SiteDetail() {
     switch (activeView) {
       case 'lots': return 'Lots'
       case 'schedule': return 'Site Schedule'
+      case 'gantt': return 'Gantt Chart'
       case 'chat': return 'Site Timeline'
       case 'team': return 'Team'
       case 'documents': return 'Documents'
+      case 'payments': return 'Payment Milestones'
+      case 'reports': return 'AI Reports'
       default: return 'Site Detail'
     }
   }
@@ -391,7 +402,10 @@ export default function SiteDetail() {
             />
           )}
           {activeView === 'schedule' && (
-            <SiteScheduleView siteId={siteId} siteName={site.name} houses={houses} />
+            <ScheduleTab siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'gantt' && (
+            <GanttView siteId={siteId} siteName={site.name} />
           )}
           {activeView === 'chat' && (
             <ChatTimeline
@@ -401,7 +415,13 @@ export default function SiteDetail() {
             />
           )}
           {activeView === 'team' && <SettingsTeamView onAddTeam={() => setShowAddTeamModal(true)} />}
-          {activeView === 'documents' && <SettingsDocumentsView onUploadDoc={() => setShowUploadDocModal(true)} onBulkUpload={() => setShowBulkUploadModal(true)} />}
+          {activeView === 'documents' && <DocumentsTab siteId={siteId} onBulkUpload={() => setShowBulkUploadModal(true)} />}
+          {activeView === 'payments' && (
+            <PaymentsTab siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'reports' && (
+            <WeeklyReport siteId={siteId} siteName={site.name} />
+          )}
         </main>
       </div>
 
@@ -780,112 +800,6 @@ function SettingsTeamView({ onAddTeam }: { onAddTeam: () => void }) {
           <Users className="w-12 h-12 text-[#86868B] mx-auto mb-3" />
           <p className="text-[#6E6E73]">No members added yet</p>
           <p className="text-[#86868B] text-sm mt-1">Add supervisors and workers via QR code or token</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SettingsDocumentsView({ onUploadDoc, onBulkUpload }: { onUploadDoc: () => void; onBulkUpload: () => void }) {
-  const documentCategories = [
-    {
-      id: 'contracts',
-      label: 'Contracts',
-      description: 'Construction contracts, amendments, terms',
-      icon: FileText,
-      count: 0,
-    },
-    {
-      id: 'plans',
-      label: 'Plans & Blueprints',
-      description: 'Architectural, structural, plumbing plans',
-      icon: Layers,
-      count: 0,
-    },
-    {
-      id: 'licenses',
-      label: 'Licenses & Permits',
-      description: 'Building permits, environmental licenses',
-      icon: Shield,
-      count: 0,
-    },
-    {
-      id: 'institutional',
-      label: 'Institutional',
-      description: 'Company documents, insurance, certificates',
-      icon: Building2,
-      count: 0,
-    },
-    {
-      id: 'reports',
-      label: 'Reports',
-      description: 'Progress reports, inspections, assessments',
-      icon: FileText,
-      count: 0,
-    },
-  ]
-
-  return (
-    <div className="max-w-3xl space-y-4">
-      <div className="flex justify-end gap-4">
-        <button
-          onClick={onBulkUpload}
-          className="text-sm bg-[#007AFF] text-white px-4 py-2 rounded-lg hover:bg-[#0056B3] transition-colors flex items-center gap-2"
-        >
-          <Upload className="w-4 h-4" />
-          Bulk Upload
-        </button>
-        <button
-          onClick={onUploadDoc}
-          className="text-sm text-[#007AFF] hover:text-[#0056B3] hover:underline"
-        >
-          Upload Document
-        </button>
-      </div>
-      <div className="bg-white border border-[#D2D2D7] rounded-xl p-6">
-        <h3 className="font-semibold text-[#1D1D1F] mb-2">Project Documents</h3>
-        <p className="text-[#86868B] text-sm mb-6">
-          Organize project documents by category. Click a category to view or add documents.
-        </p>
-
-        <div className="space-y-3">
-          {documentCategories.map(category => (
-            <button
-              key={category.id}
-              className="w-full bg-[#F5F5F7] hover:bg-[#E5E5EA] rounded-xl p-4 flex items-center gap-4 transition-colors text-left"
-            >
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                <category.icon className="w-6 h-6 text-[#007AFF]" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[#1D1D1F] font-medium">{category.label}</span>
-                  <span className="text-[#86868B] text-sm">{category.count} files</span>
-                </div>
-                <p className="text-[#86868B] text-sm mt-0.5">{category.description}</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-[#AEAEB2]" />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Quick Upload */}
-      <div className="bg-white border border-[#D2D2D7] rounded-xl p-6">
-        <h4 className="font-semibold text-[#1D1D1F] mb-4">Quick Upload</h4>
-        <div className="border-2 border-dashed border-[#D2D2D7] rounded-xl p-8 text-center hover:border-[#007AFF] transition-colors cursor-pointer">
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-            className="hidden"
-            id="doc-upload"
-            multiple
-          />
-          <label htmlFor="doc-upload" className="cursor-pointer">
-            <Upload className="w-10 h-10 mx-auto text-[#86868B] mb-3" />
-            <p className="text-[#1D1D1F] font-medium">Drop files here or click to upload</p>
-            <p className="text-[#86868B] text-sm mt-1">PDF, DOC, XLS, JPG, PNG (max 50MB)</p>
-          </label>
         </div>
       </div>
     </div>

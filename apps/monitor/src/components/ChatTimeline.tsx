@@ -8,22 +8,12 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { CopilotSuggestions } from '@onsite/shared'
+import type { TimelineMessage, MessageAnalysis } from '@onsite/timeline'
+import { PHASE_COLORS } from '@onsite/timeline/constants'
 
-// Types
-interface Message {
-  id: string
-  site_id: string
-  house_id: string | null
-  sender_type: 'worker' | 'supervisor' | 'ai' | 'system'
-  sender_id: string | null
-  sender_name: string
-  sender_avatar_url: string | null
-  content: string
+// Monitor-specific Message alias — matches TimelineMessage but allows wider attachment types
+type Message = Omit<TimelineMessage, 'attachments' | 'source_app'> & {
   attachments: Array<{ type: string; url: string; thumbnail_url?: string; name?: string }>
-  is_ai_response: boolean
-  ai_question: string | null
-  phase_at_creation: number
-  created_at: string
 }
 
 interface SiteStats {
@@ -47,17 +37,6 @@ interface ChatTimelineProps {
   onLotUpdate?: () => void // Callback when lot data changes (e.g., phase change)
 }
 
-// Phase background colors - professional, light tones
-const PHASE_COLORS: Record<number, { bg: string; name: string; border: string }> = {
-  1: { bg: '#FFF8E7', name: 'First Floor', border: '#FFE0B2' },
-  2: { bg: '#FFFDE7', name: '1st Floor Walls', border: '#FFF59D' },
-  3: { bg: '#F1F8E9', name: 'Second Floor', border: '#C5E1A5' },
-  4: { bg: '#E3F2FD', name: '2nd Floor Walls', border: '#90CAF9' },
-  5: { bg: '#EDE7F6', name: 'Roof', border: '#B39DDB' },
-  6: { bg: '#FBE9E7', name: 'Stairs Landing', border: '#FFAB91' },
-  7: { bg: '#ECEFF1', name: 'Backing Frame', border: '#B0BEC5' },
-}
-
 // Site-level neutral colors
 const SITE_COLORS = {
   bg: '#FFFFFF',
@@ -65,8 +44,8 @@ const SITE_COLORS = {
   name: '',
 }
 
-// Sender type config
-const SENDER_CONFIG = {
+// Sender type config (keyed by SenderType — lucide icons for web)
+const SENDER_CONFIG: Record<import('@onsite/timeline').SenderType, { icon: typeof HardHat; color: string; bgColor: string; label: string }> = {
   worker: {
     icon: HardHat,
     color: '#FF9500',
@@ -78,6 +57,12 @@ const SENDER_CONFIG = {
     color: '#007AFF',
     bgColor: '#007AFF/10',
     label: 'Supervisor',
+  },
+  operator: {
+    icon: HardHat,
+    color: '#5856D6',
+    bgColor: '#5856D6/10',
+    label: 'Operator',
   },
   ai: {
     icon: Bot,
@@ -146,19 +131,7 @@ export default function ChatTimeline({
   }
 
   // Message analysis state (AI reads messages and suggests actions)
-  interface MessageAnalysis {
-    should_respond: boolean
-    response: string | null
-    detected_updates: {
-      phase_change: number | null
-      progress_change: number | null
-      status_change: string | null
-    }
-    detected_issues: Array<{ title: string; severity: string; description: string }>
-    detected_events: Array<{ title: string; date: string | null; type: string }>
-    confidence: number
-    reasoning: string
-  }
+  // MessageAnalysis type imported from @onsite/timeline
   const [messageAnalysis, setMessageAnalysis] = useState<MessageAnalysis | null>(null)
   const [analyzingMessage, setAnalyzingMessage] = useState(false)
   const [applyingMessageActions, setApplyingMessageActions] = useState(false)
@@ -705,6 +678,24 @@ export default function ChatTimeline({
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to send message')
+      }
+
+      // Fire-and-forget: request AI mediation to enrich message with typed event
+      const messageData = await response.json()
+      if (messageData?.id && messageText) {
+        fetch('/api/timeline/mediate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message_id: messageData.id,
+            message: messageText,
+            site_id: siteId,
+            house_id: houseId || null,
+            sender_type: 'supervisor',
+            sender_name: currentUserName,
+            source_app: 'monitor',
+          }),
+        }).catch(() => { /* mediation failure is non-fatal */ })
       }
 
       setInputValue('')
