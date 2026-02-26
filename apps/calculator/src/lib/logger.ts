@@ -28,8 +28,8 @@ interface DeviceInfo {
   isNative: boolean;
 }
 
-// Versão do app (atualizar a cada release)
-const APP_VERSION = '1.0.0';
+// Versão do app (injetada pelo Vite via package.json)
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 
 // Cache de device info
 let deviceInfoCache: DeviceInfo | null = null;

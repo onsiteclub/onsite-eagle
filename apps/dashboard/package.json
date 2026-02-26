@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@onsite/auth": "*",
     "@onsite/supabase": "*",
     "@onsite/utils": "*",
     "@stripe/stripe-js": "^2.4.0",

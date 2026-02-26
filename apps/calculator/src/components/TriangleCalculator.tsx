@@ -13,7 +13,7 @@ interface TriangleCalculatorProps {
   isRecording?: boolean;
 }
 
-export default function TriangleCalculator({}: TriangleCalculatorProps) {
+export default function TriangleCalculator(_props: TriangleCalculatorProps) {
   // The two "user-set" sides (editHistory[0] = older, editHistory[1] = most recent)
   // The third side is always computed.
   const [editHistory, setEditHistory] = useState<[SideType, SideType]>(['a', 'b']);
@@ -175,32 +175,51 @@ export default function TriangleCalculator({}: TriangleCalculatorProps) {
 
   return (
     <div className="easy-square">
-      {/* Header */}
-      <div className="easy-square-header">
-        <img src="/images/logo-onsite-club-02.png" alt="OnSite" className="easy-square-logo" />
-        <span className="easy-square-title">Easy-Square</span>
-      </div>
-
       {/* Content Container */}
       <div className="content-container">
         {/* Triangle visual with inputs */}
         <div className="easy-square-triangle">
-          <svg viewBox="0 0 200 160" className="easy-square-svg">
+          <svg viewBox="0 0 240 200" className="easy-square-svg">
+            <defs>
+              <marker id="arrow-start" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto">
+                <path d="M8,0 L0,3 L8,6" fill="none" stroke="#5C6B7A" strokeWidth="1" />
+              </marker>
+              <marker id="arrow-end" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <path d="M0,0 L8,3 L0,6" fill="none" stroke="#5C6B7A" strokeWidth="1" />
+              </marker>
+            </defs>
+
+            {/* Triangle fill */}
             <polygon
-              points="20,140 180,140 180,20"
+              points="30,138 195,138 195,18"
+              fill="rgba(15, 61, 58, 0.08)"
+              stroke="#0F3D3A"
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+            />
+
+            {/* Right angle square */}
+            <path
+              d="M177,138 L177,120 L195,120"
               fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
+              stroke="#0F3D3A"
+              strokeWidth="1.5"
             />
-            <rect
-              x="160" y="120" width="20" height="20"
-              fill="none" stroke="currentColor" strokeWidth="2"
-            />
+
+            {/* Dimension line A (base) - below */}
+            <line x1="30" y1="155" x2="195" y2="155" stroke="#5C6B7A" strokeWidth="1" markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
+            <line x1="30" y1="138" x2="30" y2="160" stroke="#5C6B7A" strokeWidth="0.5" strokeDasharray="3,2" />
+            <line x1="195" y1="138" x2="195" y2="160" stroke="#5C6B7A" strokeWidth="0.5" strokeDasharray="3,2" />
+
+            {/* Dimension line B (height) - right */}
+            <line x1="212" y1="18" x2="212" y2="138" stroke="#5C6B7A" strokeWidth="1" markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
+            <line x1="195" y1="18" x2="217" y2="18" stroke="#5C6B7A" strokeWidth="0.5" strokeDasharray="3,2" />
+            <line x1="195" y1="138" x2="217" y2="138" stroke="#5C6B7A" strokeWidth="0.5" strokeDasharray="3,2" />
           </svg>
 
           {/* C = hypotenuse (diagonal) */}
           <div
-            className={`easy-square-input easy-square-input-c ${activeSide === 'c' ? 'active' : ''}`}
+            className={`easy-square-input easy-square-input-c ${activeSide === 'c' ? 'active' : ''} ${getComputedSide(editHistory) === 'c' ? 'computed' : ''}`}
             onClick={() => handleSideClick('c')}
           >
             {sideC || ''}
@@ -208,7 +227,7 @@ export default function TriangleCalculator({}: TriangleCalculatorProps) {
 
           {/* B = height (right side) */}
           <div
-            className={`easy-square-input easy-square-input-b ${activeSide === 'b' ? 'active' : ''}`}
+            className={`easy-square-input easy-square-input-b ${activeSide === 'b' ? 'active' : ''} ${getComputedSide(editHistory) === 'b' ? 'computed' : ''}`}
             onClick={() => handleSideClick('b')}
           >
             {sideB || ''}
@@ -216,7 +235,7 @@ export default function TriangleCalculator({}: TriangleCalculatorProps) {
 
           {/* A = base (bottom) */}
           <div
-            className={`easy-square-input easy-square-input-a ${activeSide === 'a' ? 'active' : ''}`}
+            className={`easy-square-input easy-square-input-a ${activeSide === 'a' ? 'active' : ''} ${getComputedSide(editHistory) === 'a' ? 'computed' : ''}`}
             onClick={() => handleSideClick('a')}
           >
             {sideA || ''}

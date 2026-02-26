@@ -5,12 +5,12 @@ import { useCallback, useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useCalculator, useOnlineStatus, useVoiceRecorder, useCalculatorHistory } from '../hooks';
 import { logger } from '../lib/logger';
-import { getConsentStatus, getLocalConsentStatus } from '../lib/consent';
+import { getLocalConsentStatus } from '../lib/consent';
 import { HistoryModal } from './HistoryModal';
 import VoiceConsentModal from './VoiceConsentModal';
-import HamburgerMenu from './HamburgerMenu';
+import Toast from './Toast';
+import AutoFitText from './AutoFitText';
 import type { VoiceState, VoiceResponse } from '../types/calculator';
-import type { User } from '@supabase/supabase-js';
 
 // Teclado de frações
 const FRACTION_PAD = [
@@ -50,11 +50,6 @@ interface CalculatorProps {
   hasVoiceAccess: boolean;
   onVoiceUpgradeClick: () => void;
   onVoiceUsed?: () => void;
-  onSignOut: () => void;
-  onAuthSuccess: (user: User, isNewUser: boolean) => void;
-  user: User | null;
-  userName?: string;
-  userId?: string;
 }
 
 export default function Calculator({
@@ -63,52 +58,31 @@ export default function Calculator({
   hasVoiceAccess,
   onVoiceUpgradeClick,
   onVoiceUsed,
-  onSignOut,
-  onAuthSuccess,
-  user,
-  userName,
-  userId,
 }: CalculatorProps) {
   const isOnline = useOnlineStatus();
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [voiceConsentChecked, setVoiceConsentChecked] = useState(false);
   const [hasVoiceConsent, setHasVoiceConsent] = useState<boolean | null>(null);
+  const [hasVoiceTrainingConsent, setHasVoiceTrainingConsent] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'info' | 'success' } | null>(null);
   const { history, addToHistory } = useCalculatorHistory();
 
-  // Check microphone consent when component mounts (for all users)
+  // Check microphone consent when component mounts
   // microphone_usage is REQUIRED for App Store compliance
   useEffect(() => {
     if (voiceConsentChecked) return;
 
-    const checkMicrophoneConsent = async () => {
-      try {
-        let status: boolean | null = null;
+    const status = getLocalConsentStatus('microphone_usage');
+    setHasVoiceConsent(status);
+    const trainingStatus = getLocalConsentStatus('voice_training');
+    setHasVoiceTrainingConsent(trainingStatus === true);
+    setVoiceConsentChecked(true);
+    console.log('[Calculator] Microphone consent status:', status, 'Voice training:', trainingStatus);
+  }, [voiceConsentChecked]);
 
-        if (userId) {
-          // Logged in user - check database
-          status = await getConsentStatus(userId, 'microphone_usage');
-        } else {
-          // Anonymous user - check localStorage
-          status = getLocalConsentStatus('microphone_usage');
-        }
-
-        setHasVoiceConsent(status);
-        setVoiceConsentChecked(true);
-        console.log('[Calculator] Microphone consent status:', status);
-      } catch (err) {
-        console.warn('[Calculator] Error checking microphone consent:', err);
-        // On error, set to null to prompt user
-        setHasVoiceConsent(null);
-        setVoiceConsentChecked(true);
-      }
-    };
-
-    checkMicrophoneConsent();
-  }, [userId, voiceConsentChecked]);
   const {
     expression,
-    setExpression,
     setExpressionAndCompute,
     displayValue,
     lastResult,
@@ -135,16 +109,18 @@ export default function Calculator({
 
     const formData = new FormData();
     formData.append('file', audioBlob, 'recording.webm');
-    // Envia userId para API salvar voice_log (se usuário tiver consentimento)
-    if (userId) {
-      formData.append('user_id', userId);
-    }
+    formData.append('voice_training_consent', hasVoiceTrainingConsent ? '1' : '0');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     try {
       const response = await fetch(API_ENDPOINT, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       const duration = Date.now() - startTime;
 
@@ -162,7 +138,6 @@ export default function Calculator({
       if (data.expression) {
         // Usa setExpressionAndCompute para atualizar expressão E calcular o resultado
         const result = setExpressionAndCompute(data.expression, {
-          userId,
           inputMethod: 'voice',
           voiceLogId: data.voice_log_id,
         });
@@ -171,9 +146,11 @@ export default function Calculator({
           expression: data.expression,
           result: result?.resultDecimal,
         });
-        // Salva no histórico se houver resultado
         if (result) {
           addToHistory(result);
+        } else {
+          // API returned text that isn't a valid calculation
+          setToast({ message: 'Could not understand. Try saying a calculation like "5 and a half plus 3".', type: 'info' });
         }
         // Incrementa contador de uso de voz (para trial)
         if (onVoiceUsed) {
@@ -184,28 +161,45 @@ export default function Calculator({
           status: response.status,
           apiError: data.error,
         });
+        setToast({ message: 'Could not understand. Please try again.', type: 'info' });
       }
     } catch (error) {
+      clearTimeout(timeoutId);
       const duration = Date.now() - startTime;
-      logger.voice.error('API request failed', { error: String(error), duration_ms: duration });
+
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        logger.voice.error('Voice API timeout after 20s', { duration_ms: duration });
+        setToast({ message: 'Voice request timed out. Please try again.', type: 'error' });
+      } else {
+        logger.voice.error('API request failed', { error: String(error), duration_ms: duration });
+        setToast({ message: 'Voice recognition failed. Please try again.', type: 'error' });
+      }
     } finally {
       setVoiceState('idle');
     }
-  }, [setExpressionAndCompute, setVoiceState, addToHistory, userId]);
+  }, [setExpressionAndCompute, setVoiceState, addToHistory]);
 
   const { startRecording, stopRecording } = useVoiceRecorder({
     onRecordingComplete: handleAudioUpload,
     onError: (error) => {
-      logger.voice.error('Recording error - microphone access denied', { error: String(error) });
-      alert('Microphone access denied or not available.');
+      logger.voice.error('Recording error', { error: String(error) });
+      setVoiceState('idle');
+      const isDenied = String(error).toLowerCase().includes('denied') || String(error).toLowerCase().includes('permission');
+      setToast({
+        message: isDenied
+          ? 'Microphone access denied. Check device settings.'
+          : 'Could not start recording. Please try again.',
+        type: 'error',
+      });
     },
   });
 
   // Handler for consent modal response
   // microphoneGranted: whether user allowed microphone access
   // voiceTrainingGranted: whether user opted in to help improve recognition
-  const handleConsentResponse = (microphoneGranted: boolean, _voiceTrainingGranted: boolean) => {
+  const handleConsentResponse = (microphoneGranted: boolean, voiceTrainingGranted: boolean) => {
     setHasVoiceConsent(microphoneGranted);
+    setHasVoiceTrainingConsent(voiceTrainingGranted);
     setShowConsentModal(false);
 
     // If microphone was granted, start recording automatically
@@ -216,12 +210,9 @@ export default function Calculator({
     }
   };
 
-  // Voice button handlers - simplified for maximum reliability
-  // Press = start recording, Release = stop and process
-  const handleVoiceStart = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
+  // Voice button handler - click to toggle recording
+  // 1st click = start recording, 2nd click = stop and process
+  const handleVoiceToggle = () => {
     // Block if offline or processing
     if (!isOnline || voiceState === 'processing') return;
 
@@ -231,10 +222,10 @@ export default function Calculator({
       return;
     }
 
-    // If user has DECLINED microphone consent, show a message and don't proceed
-    // They need to go to device settings to re-enable
+    // If user previously declined, re-show consent modal to give another chance
     if (hasVoiceConsent === false) {
-      alert('Microphone access was denied. Please enable it in your device settings to use voice input.');
+      logger.consent.prompted('microphone_usage');
+      setShowConsentModal(true);
       return;
     }
 
@@ -246,23 +237,14 @@ export default function Calculator({
       return;
     }
 
-    // Only start if idle and consent was granted
+    // Toggle: if idle → start, if recording → stop
     if (voiceState === 'idle') {
       logger.voice.start();
       setVoiceState('recording');
       startRecording();
-    }
-  };
-
-  const handleVoiceEnd = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Só para se estiver gravando
-    if (voiceState === 'recording') {
+    } else if (voiceState === 'recording') {
       logger.voice.stop();
       stopRecording();
-      // O estado muda para 'processing' no handleAudioUpload quando receber o blob
     }
   };
 
@@ -270,7 +252,7 @@ export default function Calculator({
   const handleKeyClick = (key: string) => {
     switch (key) {
       case '=': {
-        const result = compute({ userId, inputMethod: 'keypad' });
+        const result = compute({ inputMethod: 'keypad' });
         if (result) {
           addToHistory(result);
         }
@@ -312,9 +294,9 @@ export default function Calculator({
   // Texto do botão de voz baseado no estado
   const getVoiceButtonText = () => {
     if (!isOnline) return 'Offline';
-    if (voiceState === 'recording') return 'Listening...';
+    if (voiceState === 'recording') return 'Tap to Stop';
     if (voiceState === 'processing') return 'Processing...';
-    return 'Hold to Speak';
+    return 'Tap to Speak';
   };
 
   // Classes CSS do botão
@@ -324,13 +306,6 @@ export default function Calculator({
     if (voiceState === 'processing') classes.push('processing');
     if (!hasVoiceAccess) classes.push('locked');
     return classes.join(' ');
-  };
-
-  // Handler para abrir site OnSite Club
-  const handleLogoClick = () => {
-    if (window.confirm('Você tem certeza que quer abrir o site OnSite Club?')) {
-      window.open('https://onsiteclub.ca', '_blank');
-    }
   };
 
   // Handler para quando clicar em entrada do histórico
@@ -343,37 +318,15 @@ export default function Calculator({
       resultTotalInches: entry.resultTotalInches,
       isInchMode: entry.isInchMode,
     };
-    
+
     // Carrega o resultado na calculadora
     loadResult(result);
-    
+
     console.log('[Calculator] Loaded result from history:', entry.expression);
   };
 
   return (
-    <div className="app">
-      {/* Header */}
-      <header className="header">
-        <div className="brand">
-          <img
-            src="/images/onsite-club-logo.png"
-            alt="OnSite Club"
-            className="logo-img"
-            onClick={handleLogoClick}
-            style={{ cursor: 'pointer' }}
-          />
-        </div>
-        <div className="header-actions">
-          {!isOnline && <div className="offline-badge">Offline</div>}
-          <HamburgerMenu
-            user={user}
-            userName={userName}
-            onAuthSuccess={onAuthSuccess}
-            onSignOut={onSignOut}
-          />
-        </div>
-      </header>
-
+    <>
       <main className="main">
         {/* Left Card: Display & Voice */}
         <div className="card left-card">
@@ -381,44 +334,34 @@ export default function Calculator({
             <div className="display-row">
               {/* Display ESQUERDO */}
               <div className="display-box equal">
-                <span className={`display-value ${voiceState}`}>
-                  {lastResult?.isInchMode 
+                <AutoFitText className={`display-value ${voiceState}`}>
+                  {lastResult?.isInchMode
                     ? lastResult.resultFeetInches  // Modo inches: mostra feet/inches (ex: "1' 6 1/2"")
                     : displayValue                 // Modo decimal: mostra resultado decimal (ex: "887.3")
                   }
-                </span>
+                </AutoFitText>
               </div>
               {/* Display DIREITO */}
               <div className="display-box equal">
-                <span className={`display-value ${voiceState}`}>
-                  {lastResult?.isInchMode 
+                <AutoFitText className={`display-value ${voiceState}`}>
+                  {lastResult?.isInchMode
                     ? lastResult.resultTotalInches // Modo inches: mostra total inches (ex: "18 1/2 In")
                     : '—'                          // Modo decimal: mostra traço (não aplicável)
                   }
-                </span>
+                </AutoFitText>
               </div>
             </div>
           </div>
-          
+
           <div className="divider" />
 
-          {/* Expression input com botão M */}
+          {/* Expression display com botão M */}
           <div className="expression-wrapper">
-            <input
-              type="text"
-              className="expression-input"
-              value={expression}
-              onChange={(e) => setExpression(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const result = compute({ userId, inputMethod: 'keypad' });
-                  if (result) {
-                    addToHistory(result);
-                  }
-                }
-              }}
-              placeholder="Type or speak: 5 1/2 + 3 1/4 - 2"
-            />
+            <div className="expression-input">
+              <AutoFitText className={`expression-text ${!expression ? 'placeholder' : ''}`} maxFontSize={18} minFontSize={10}>
+                {expression || 'Type or speak: 5 1/2 + 3 1/4 - 2'}
+              </AutoFitText>
+            </div>
             <button
               className="history-btn"
               onClick={() => setShowHistoryModal(true)}
@@ -431,13 +374,7 @@ export default function Calculator({
           <button
             className={getVoiceButtonClass()}
             disabled={!isOnline || voiceState === 'processing'}
-            onTouchStart={handleVoiceStart}
-            onTouchEnd={handleVoiceEnd}
-            onTouchCancel={handleVoiceEnd}
-            onMouseDown={handleVoiceStart}
-            onMouseUp={handleVoiceEnd}
-            onMouseLeave={handleVoiceEnd}
-            style={{ touchAction: 'none' }}
+            onClick={handleVoiceToggle}
           >
             <span className="voice-icon">
               {voiceState === 'recording' ? (
@@ -508,11 +445,17 @@ export default function Calculator({
       {/* Voice Consent Modal - shown BEFORE accessing microphone (App Store compliance) */}
       {showConsentModal && (
         <VoiceConsentModal
-          userId={userId}
           onConsent={handleConsentResponse}
-          onClose={() => setShowConsentModal(false)}
         />
       )}
-    </div>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </>
   );
 }

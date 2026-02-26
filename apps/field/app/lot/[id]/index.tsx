@@ -1,9 +1,16 @@
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, FlatList } from 'react-native';
+/**
+ * Lot Detail — House detail with progress, quick actions, activity
+ *
+ * Queries egl_houses, egl_sites, egl_timeline.
+ * Enterprise v3 light theme.
+ */
+
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { supabase } from '../../../src/lib/supabase';
-import { CONSTRUCTION_PHASES } from '@onsite/shared';
 
 interface House {
   id: string;
@@ -13,12 +20,7 @@ interface House {
   current_phase: number;
   progress_percentage: number;
   site_id: string;
-}
-
-interface Site {
-  id: string;
-  name: string;
-  address: string | null;
+  site: { id: string; name: string } | null;
 }
 
 interface TimelineEvent {
@@ -46,16 +48,16 @@ const STATUS_LABELS: Record<string, string> = {
   on_hold: 'On Hold',
 };
 
-const EVENT_ICONS: Record<string, string> = {
-  photo: '📷',
-  alert: '⚠️',
-  note: '📝',
-  ai_validation: '✅',
-  status_change: '🔄',
-  issue: '🚨',
-  inspection: '🔍',
-  document: '📄',
-  assignment: '👤',
+const EVENT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  photo: 'camera',
+  alert: 'warning',
+  note: 'document-text',
+  ai_validation: 'checkmark-circle',
+  status_change: 'swap-horizontal',
+  issue: 'alert-circle',
+  inspection: 'search',
+  document: 'document',
+  assignment: 'person',
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -70,52 +72,46 @@ const EVENT_COLORS: Record<string, string> = {
   assignment: '#10B981',
 };
 
+const ACCENT = '#0F766E';
+
 export default function LotDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [house, setHouse] = useState<House | null>(null);
-  const [site, setSite] = useState<Site | null>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) {
-      loadLotData();
-    }
+    if (id) loadLotData();
   }, [id]);
 
   async function loadLotData() {
     try {
-      // Load house
       const { data: houseData } = await supabase
-        .from('houses')
-        .select('*')
+        .from('egl_houses')
+        .select(`
+          id, lot_number, address, status,
+          current_phase, progress_percentage, site_id,
+          site:egl_sites ( id, name )
+        `)
         .eq('id', id)
         .single();
 
       if (houseData) {
-        setHouse(houseData);
-
-        // Load site
-        const { data: siteData } = await supabase
-          .from('sites')
-          .select('id, name, address')
-          .eq('id', houseData.site_id)
-          .single();
-
-        if (siteData) setSite(siteData);
+        const normalized = {
+          ...houseData,
+          site: Array.isArray(houseData.site) ? houseData.site[0] : houseData.site,
+        } as House;
+        setHouse(normalized);
       }
 
-      // Load timeline
       const { data: timelineData } = await supabase
-        .from('timeline_events')
+        .from('egl_timeline')
         .select('*')
         .eq('house_id', id)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(10);
 
-      if (timelineData) {
-        setTimeline(timelineData);
-      }
+      if (timelineData) setTimeline(timelineData);
     } catch (error) {
       console.error('Error loading lot:', error);
     } finally {
@@ -126,7 +122,7 @@ export default function LotDetailScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#10B981" />
+        <ActivityIndicator size="large" color={ACCENT} />
         <Text style={styles.loadingText}>Loading lot details...</Text>
       </View>
     );
@@ -135,7 +131,7 @@ export default function LotDetailScreen() {
   if (!house) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorIcon}>🏠</Text>
+        <Ionicons name="home-outline" size={64} color="#D1D5DB" />
         <Text style={styles.errorText}>Lot not found</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
@@ -144,24 +140,11 @@ export default function LotDetailScreen() {
     );
   }
 
-  const currentPhase = CONSTRUCTION_PHASES[house.current_phase - 1] || CONSTRUCTION_PHASES[0];
   const statusColor = STATUS_COLORS[house.status] || STATUS_COLORS.not_started;
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: `Lot ${house.lot_number}`,
-          headerRight: () => (
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={() => router.push(`/lot/${id}/documents`)}
-            >
-              <Text style={styles.headerButtonText}>📄 Docs</Text>
-            </TouchableOpacity>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ title: `Lot ${house.lot_number}` }} />
 
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Header Card */}
@@ -175,19 +158,18 @@ export default function LotDetailScreen() {
             </View>
           </View>
 
-          <Text style={styles.siteName}>{site?.name || 'Unknown Site'}</Text>
+          <Text style={styles.siteName}>{house.site?.name || 'Unknown Site'}</Text>
           {house.address && <Text style={styles.address}>{house.address}</Text>}
 
           {/* Progress */}
           <View style={styles.progressSection}>
             <View style={styles.progressInfo}>
-              <Text style={styles.phaseName}>{currentPhase?.name || 'Phase 1'}</Text>
+              <Text style={styles.phaseLabel}>Phase {house.current_phase} of 7</Text>
               <Text style={styles.progressPercent}>{house.progress_percentage}%</Text>
             </View>
             <View style={styles.progressBarContainer}>
               <View style={[styles.progressBarFill, { width: `${house.progress_percentage}%` }]} />
             </View>
-            <Text style={styles.phaseInfo}>Phase {house.current_phase} of 7</Text>
           </View>
         </View>
 
@@ -196,56 +178,81 @@ export default function LotDetailScreen() {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsRow}>
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#3B82F6' }]}
+              style={styles.actionButton}
               onPress={() => router.push(`/camera?houseId=${house.id}&phaseId=${house.current_phase}`)}
             >
-              <Text style={styles.actionIcon}>📷</Text>
-              <Text style={styles.actionText}>Take Photo</Text>
+              <View style={[styles.actionIconBg, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="camera" size={22} color="#3B82F6" />
+              </View>
+              <Text style={styles.actionText}>Photo</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#6B7280' }]}
+              style={styles.actionButton}
               onPress={() => router.push(`/lot/${id}/notes`)}
             >
-              <Text style={styles.actionIcon}>📝</Text>
-              <Text style={styles.actionText}>Add Note</Text>
+              <View style={[styles.actionIconBg, { backgroundColor: '#F0FDF4' }]}>
+                <Ionicons name="document-text" size={22} color="#10B981" />
+              </View>
+              <Text style={styles.actionText}>Note</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#6366F1' }]}
+              style={styles.actionButton}
+              onPress={() => router.push(`/lot/${id}/timeline`)}
+            >
+              <View style={[styles.actionIconBg, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="chatbubbles" size={22} color="#F59E0B" />
+              </View>
+              <Text style={styles.actionText}>Timeline</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
               onPress={() => router.push(`/lot/${id}/documents`)}
             >
-              <Text style={styles.actionIcon}>📄</Text>
-              <Text style={styles.actionText}>Documents</Text>
+              <View style={[styles.actionIconBg, { backgroundColor: '#EDE9FE' }]}>
+                <Ionicons name="folder-open" size={22} color="#8B5CF6" />
+              </View>
+              <Text style={styles.actionText}>Docs</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Phases Overview */}
+        {/* Phases Carousel */}
         <View style={styles.phasesSection}>
           <Text style={styles.sectionTitle}>Construction Phases</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.phasesRow}>
-              {CONSTRUCTION_PHASES.map((phase, index) => {
-                const phaseNumber = index + 1;
+              {Array.from({ length: 7 }, (_, i) => {
+                const phaseNumber = i + 1;
                 const isCompleted = phaseNumber < house.current_phase;
                 const isCurrent = phaseNumber === house.current_phase;
 
                 return (
-                  <View key={phase.id} style={styles.phaseChip}>
+                  <View key={i} style={styles.phaseChip}>
                     <View style={[
                       styles.phaseIndicator,
-                      { backgroundColor: isCompleted ? '#10B981' : isCurrent ? '#3B82F6' : '#374151' }
+                      {
+                        backgroundColor: isCompleted ? '#10B981' : isCurrent ? ACCENT : '#E5E7EB',
+                      }
                     ]}>
-                      <Text style={styles.phaseIndicatorText}>
-                        {isCompleted ? '✓' : phaseNumber}
-                      </Text>
+                      {isCompleted ? (
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      ) : (
+                        <Text style={[
+                          styles.phaseIndicatorText,
+                          { color: isCurrent ? '#fff' : '#6B7280' }
+                        ]}>
+                          {phaseNumber}
+                        </Text>
+                      )}
                     </View>
                     <Text style={[
                       styles.phaseChipText,
-                      isCurrent && styles.phaseChipTextCurrent
+                      isCurrent && { color: ACCENT, fontWeight: '600' }
                     ]} numberOfLines={1}>
-                      {phase.name}
+                      Phase {phaseNumber}
                     </Text>
                   </View>
                 );
@@ -254,13 +261,20 @@ export default function LotDetailScreen() {
           </ScrollView>
         </View>
 
-        {/* Timeline */}
+        {/* Recent Activity */}
         <View style={styles.timelineSection}>
-          <Text style={styles.sectionTitle}>Activity Timeline</Text>
+          <View style={styles.timelineHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            {timeline.length > 0 && (
+              <TouchableOpacity onPress={() => router.push(`/lot/${id}/timeline`)}>
+                <Text style={styles.viewAllLink}>View All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {timeline.length === 0 ? (
             <View style={styles.emptyTimeline}>
-              <Text style={styles.emptyIcon}>⏱️</Text>
+              <Ionicons name="time-outline" size={40} color="#D1D5DB" />
               <Text style={styles.emptyText}>No activity yet</Text>
               <Text style={styles.emptySubtext}>
                 Take a photo or add a note to start the timeline
@@ -268,29 +282,28 @@ export default function LotDetailScreen() {
             </View>
           ) : (
             <View style={styles.timeline}>
-              {timeline.map((event, index) => {
+              {timeline.slice(0, 5).map((event, index) => {
                 const color = EVENT_COLORS[event.event_type] || '#6B7280';
-                const icon = EVENT_ICONS[event.event_type] || '📄';
-                const isLast = index === timeline.length - 1;
+                const iconName = EVENT_ICONS[event.event_type] || 'document';
+                const isLast = index === Math.min(timeline.length, 5) - 1;
 
                 return (
                   <View key={event.id} style={styles.timelineItem}>
-                    {/* Spine */}
                     <View style={styles.timelineSpine}>
                       <View style={[styles.timelineDot, { backgroundColor: color }]}>
-                        <Text style={styles.timelineDotIcon}>{icon}</Text>
+                        <Ionicons name={iconName} size={14} color="#fff" />
                       </View>
                       {!isLast && <View style={styles.timelineLine} />}
                     </View>
-
-                    {/* Content */}
                     <View style={styles.timelineContent}>
                       <Text style={styles.timelineTitle}>{event.title}</Text>
                       {event.description && (
-                        <Text style={styles.timelineDesc}>{event.description}</Text>
+                        <Text style={styles.timelineDesc} numberOfLines={2}>
+                          {event.description}
+                        </Text>
                       )}
                       <Text style={styles.timelineDate}>
-                        {format(new Date(event.created_at), 'MMM d, yyyy • h:mm a')}
+                        {format(new Date(event.created_at), 'MMM d, yyyy \u2022 h:mm a')}
                       </Text>
                     </View>
                   </View>
@@ -309,7 +322,7 @@ export default function LotDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#F6F7F9',
   },
   content: {
     padding: 16,
@@ -318,53 +331,36 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: '#F6F7F9',
   },
   loadingText: {
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginTop: 12,
     fontSize: 14,
-  },
-  errorIcon: {
-    fontSize: 64,
-    marginBottom: 16,
   },
   errorText: {
     color: '#EF4444',
     fontSize: 18,
     fontWeight: '600',
+    marginTop: 16,
     marginBottom: 16,
   },
   backButton: {
-    backgroundColor: '#374151',
+    backgroundColor: ACCENT,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   backButtonText: {
     color: '#fff',
     fontWeight: '600',
   },
-  headerButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#374151',
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  headerButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '500',
-  },
   // Header Card
   headerCard: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
   },
   lotHeader: {
     flexDirection: 'row',
@@ -375,7 +371,7 @@ const styles = StyleSheet.create({
   lotNumber: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fff',
+    color: '#101828',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -389,13 +385,13 @@ const styles = StyleSheet.create({
   },
   siteName: {
     fontSize: 16,
-    color: '#10B981',
+    color: ACCENT,
     fontWeight: '500',
     marginBottom: 4,
   },
   address: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginBottom: 16,
   },
   progressSection: {
@@ -406,31 +402,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  phaseName: {
-    fontSize: 15,
-    color: '#fff',
-    fontWeight: '600',
+  phaseLabel: {
+    fontSize: 14,
+    color: '#6B7280',
   },
   progressPercent: {
     fontSize: 18,
-    color: '#10B981',
+    color: ACCENT,
     fontWeight: '700',
   },
   progressBarContainer: {
     height: 10,
-    backgroundColor: '#374151',
+    backgroundColor: '#E5E7EB',
     borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: 8,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#10B981',
+    backgroundColor: ACCENT,
     borderRadius: 5,
-  },
-  phaseInfo: {
-    fontSize: 13,
-    color: '#6B7280',
   },
   // Actions
   actionsSection: {
@@ -450,18 +440,23 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 14,
     alignItems: 'center',
   },
-  actionIcon: {
-    fontSize: 28,
+  actionIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 8,
   },
   actionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#fff',
+    color: '#101828',
   },
   // Phases
   phasesSection: {
@@ -485,86 +480,86 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   phaseIndicatorText: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
   phaseChipText: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: '#6B7280',
     textAlign: 'center',
-  },
-  phaseChipTextCurrent: {
-    color: '#3B82F6',
-    fontWeight: '600',
   },
   // Timeline
   timelineSection: {
     marginBottom: 20,
   },
+  timelineHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  viewAllLink: {
+    fontSize: 13,
+    color: ACCENT,
+    fontWeight: '600',
+  },
   timeline: {
-    marginTop: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
   },
   timelineItem: {
     flexDirection: 'row',
   },
   timelineSpine: {
     alignItems: 'center',
-    width: 50,
+    width: 44,
   },
   timelineDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  timelineDotIcon: {
-    fontSize: 16,
   },
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#374151',
-    minHeight: 40,
+    backgroundColor: '#E5E7EB',
+    minHeight: 32,
   },
   timelineContent: {
     flex: 1,
     paddingLeft: 12,
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   timelineTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: '#101828',
     marginBottom: 4,
   },
   timelineDesc: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginBottom: 6,
   },
   timelineDate: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#9CA3AF',
   },
-  // Empty Timeline
+  // Empty
   emptyTimeline: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 32,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
   },
   emptyText: {
     fontSize: 16,
-    color: '#9CA3AF',
+    color: '#101828',
     fontWeight: '500',
+    marginTop: 12,
     marginBottom: 4,
   },
   emptySubtext: {

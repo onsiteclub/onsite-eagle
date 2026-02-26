@@ -42,8 +42,10 @@ describe('parseToInches', () => {
 
 describe('formatInches', () => {
   it('formats whole inches', () => {
-    expect(formatInches(8)).toBe('8"');
-    expect(formatInches(12)).toBe('1\' 0"');
+    // Whole inches without fractions/feet: no " suffix (engine v3.2 behavior)
+    expect(formatInches(8)).toBe('8');
+    // 12 inches = 1 foot exactly: shows feet with " but no 0 inches
+    expect(formatInches(12)).toBe("1' \"");
   });
 
   it('formats fractions', () => {
@@ -163,13 +165,15 @@ describe('calculate', () => {
     it('adds feet', () => {
       const result = calculate("2' + 1'");
       expect(result?.resultDecimal).toBe(36);
-      expect(result?.resultFeetInches).toBe("3' 0\"");
+      // 36 inches = 3 feet exactly
+      expect(result?.resultFeetInches).toBe("3' \"");
     });
 
     it('adds feet and inches', () => {
       const result = calculate("2' 6 + 1' 6");
       expect(result?.resultDecimal).toBe(48);
-      expect(result?.resultFeetInches).toBe("4' 0\"");
+      // 48 inches = 4 feet exactly
+      expect(result?.resultFeetInches).toBe("4' \"");
     });
   });
 

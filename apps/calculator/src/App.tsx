@@ -1,103 +1,110 @@
 // src/App.tsx
-// App principal - Calculadora com abas: Calculator, Converter, Triangle
-// Versão simplificada sem sistema de pagamento
+// Main app — Calculator with tabs: Calculator, Converter, Triangle
+// Freemium model: basic calculator without login, voice + history require login
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { AuthProvider, useAuth } from '@onsite/auth';
 import Calculator from './components/Calculator';
 import TabNavigation, { type TabType } from './components/TabNavigation';
 import UnitConverter from './components/UnitConverter';
 import TriangleCalculator from './components/TriangleCalculator';
-import ResetPasswordModal from './components/auth/ResetPasswordModal';
+import HamburgerMenu from './components/HamburgerMenu';
+import AuthGate from './components/AuthGate';
+import { useOnlineStatus } from './hooks';
 import { supabase } from './lib/supabase';
-import type { User } from '@supabase/supabase-js';
 import type { VoiceState } from './types/calculator';
 import './styles/App.css';
 
 export default function App() {
+  if (supabase) {
+    return (
+      <AuthProvider supabase={supabase}>
+        <AppContent />
+      </AuthProvider>
+    );
+  }
+  // No Supabase configured — run in anonymous mode
+  return <AppContent />;
+}
+
+function AppContent() {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [activeTab, setActiveTab] = useState<TabType>('calculator');
-  const [user, setUser] = useState<User | null>(null);
-  const [userName, setUserName] = useState<string | undefined>(undefined);
-  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
+  const [authMessage, setAuthMessage] = useState<string | undefined>();
+  const isOnline = useOnlineStatus();
 
-  // Check for reset password flow on mount
-  useEffect(() => {
-    // Check if URL contains reset-password path or recovery token
-    const isResetPasswordFlow =
-      window.location.pathname.includes('reset-password') ||
-      window.location.hash.includes('type=recovery') ||
-      window.location.hash.includes('access_token');
+  // Safely access auth (may not be within AuthProvider if supabase is null)
+  const auth = useOptionalAuth();
+  const user = auth?.user ?? null;
 
-    if (isResetPasswordFlow) {
-      console.log('[App] Reset password flow detected');
-      setShowResetPassword(true);
-    }
+  const handleLogoClick = () => {
+    window.open('https://onsiteclub.ca', '_blank');
+  };
+
+  // Show auth gate with a contextual message
+  const promptLogin = useCallback((message: string) => {
+    setAuthMessage(message);
+    setShowAuthGate(true);
   }, []);
 
-  // Check for existing session on mount
-  useEffect(() => {
-    if (!supabase) return;
+  // Called when voice button is clicked but user is not logged in
+  const handleVoiceUpgradeClick = useCallback(() => {
+    promptLogin('Sign in to use voice input');
+  }, [promptLogin]);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        // Get user's first name from metadata or profile
-        const firstName = session.user.user_metadata?.first_name;
-        setUserName(firstName || session.user.email?.split('@')[0]);
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[App] Auth state change:', event);
-
-      // Handle password recovery event
-      if (event === 'PASSWORD_RECOVERY') {
-        console.log('[App] Password recovery event - showing reset modal');
-        setShowResetPassword(true);
-      }
-
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const firstName = session.user.user_metadata?.first_name;
-        setUserName(firstName || session.user.email?.split('@')[0]);
-      } else {
-        setUserName(undefined);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+  const handleAuthSuccess = useCallback(() => {
+    setShowAuthGate(false);
+    setAuthMessage(undefined);
   }, []);
 
-  // Handle successful authentication
-  const handleAuthSuccess = useCallback((authUser: User, isNewUser: boolean) => {
-    setUser(authUser);
-    const firstName = authUser.user_metadata?.first_name;
-    setUserName(firstName || authUser.email?.split('@')[0]);
-    console.log('[App] Auth success:', isNewUser ? 'New user' : 'Returning user');
-  }, []);
-
-  // Handle sign out
   const handleSignOut = useCallback(async () => {
-    if (!supabase) return;
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setUserName(undefined);
-      console.log('[App] User signed out');
-    } catch (err) {
-      console.error('[App] Sign out error:', err);
+    if (auth?.signOut) {
+      await auth.signOut();
     }
-  }, []);
+  }, [auth]);
 
   return (
     <div className="app">
-      {/* Reset Password Modal */}
-      <ResetPasswordModal
-        isOpen={showResetPassword}
-        onClose={() => setShowResetPassword(false)}
-        onSuccess={() => setShowResetPassword(false)}
-      />
+      {/* Shared Header */}
+      <header className="header">
+        <div className="brand">
+          <img
+            src="/images/onsite-club-logo.png"
+            alt="OnSite Club"
+            className="logo-img"
+            onClick={handleLogoClick}
+            style={{ cursor: 'pointer' }}
+          />
+        </div>
+        <div className="header-actions">
+          {!isOnline && <div className="offline-badge">Offline</div>}
+          {user ? (
+            <>
+              <span className="user-name">{user.name}</span>
+              <button
+                className="sign-out-btn"
+                onClick={handleSignOut}
+                title="Sign out"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </button>
+            </>
+          ) : supabase ? (
+            <button
+              className="sign-in-btn"
+              onClick={() => promptLogin('Sign in to unlock all features')}
+            >
+              Sign In
+            </button>
+          ) : null}
+          <HamburgerMenu />
+        </div>
+      </header>
 
       {/* Tab Content */}
       <div className="tab-content">
@@ -105,26 +112,21 @@ export default function App() {
           <Calculator
             voiceState={voiceState}
             setVoiceState={setVoiceState}
-            hasVoiceAccess={true}
-            onVoiceUpgradeClick={() => {}}
-            onSignOut={handleSignOut}
-            onAuthSuccess={handleAuthSuccess}
-            user={user}
-            userName={userName}
-            userId={user?.id}
+            hasVoiceAccess={!!user}
+            onVoiceUpgradeClick={handleVoiceUpgradeClick}
           />
         )}
 
         {activeTab === 'converter' && (
           <UnitConverter
-            voiceEnabled={true}
+            voiceEnabled={!!user}
             isRecording={voiceState === 'recording'}
           />
         )}
 
         {activeTab === 'triangle' && (
           <TriangleCalculator
-            voiceEnabled={true}
+            voiceEnabled={!!user}
             isRecording={voiceState === 'recording'}
           />
         )}
@@ -132,6 +134,28 @@ export default function App() {
 
       {/* Tab Navigation - Bottom */}
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Auth Gate Modal */}
+      {showAuthGate && supabase && (
+        <AuthGate
+          supabase={supabase}
+          onClose={() => setShowAuthGate(false)}
+          onSuccess={handleAuthSuccess}
+          message={authMessage}
+        />
+      )}
     </div>
   );
+}
+
+/**
+ * Safely access auth context — returns null if not within AuthProvider.
+ * This allows AppContent to work both with and without Supabase configured.
+ */
+function useOptionalAuth() {
+  try {
+    return useAuth();
+  } catch {
+    return null;
+  }
 }

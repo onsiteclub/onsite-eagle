@@ -92,7 +92,6 @@ npm install
 
 # Rode um app especifico
 npm run dev:timekeeper    # Timekeeper Mobile
-npm run dev:timekeeper-web # Timekeeper Web
 npm run dev:calculator     # Calculator
 npm run dev:analytics      # Analytics Dashboard
 ```
@@ -122,7 +121,6 @@ Leia [Cerbero](./identity/cerbero.md) para entender as regras fundamentais:
 onsite-eagle/
 ├── apps/
 │   ├── timekeeper/        # React Native (Expo) - Mobile
-│   ├── timekeeper-web/    # Next.js - Web dashboard
 │   ├── calculator/        # React Native - Voice calculator
 │   ├── field/             # Expo - Field inspector
 │   ├── monitor/           # Next.js - Site monitoring

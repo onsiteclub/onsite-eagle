@@ -35,7 +35,6 @@ O ecossistema OnSite Club cresceu para incluir multiplos apps e pacotes:
 onsite-eagle/
 ├── apps/
 │   ├── timekeeper/        # React Native (Expo)
-│   ├── timekeeper-web/    # Next.js
 │   ├── calculator/        # React Native
 │   ├── field/             # Expo
 │   ├── monitor/           # Next.js
@@ -136,7 +135,6 @@ onsite-eagle/
 
 ### Fase 2: Migracao de Apps
 - [ ] Migrar timekeeper-mobile
-- [ ] Migrar timekeeper-web
 - [ ] Migrar calculator
 - [ ] Migrar analytics
 - [ ] Migrar auth-app

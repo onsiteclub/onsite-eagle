@@ -1,6 +1,14 @@
+/**
+ * Documents — Lot documents grouped by category
+ *
+ * Queries egl_houses, egl_timeline.
+ * Enterprise v3 light theme.
+ */
+
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Linking, Alert } from 'react-native';
-import { useLocalSearchParams, Stack, router } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { supabase } from '../../../src/lib/supabase';
 
@@ -23,12 +31,12 @@ interface House {
   lot_number: string;
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  plan: '📐',
-  inspection: '📋',
-  upgrade: '⬆️',
-  photo: '📷',
-  other: '📄',
+const CATEGORY_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  plan: 'compass',
+  inspection: 'clipboard',
+  upgrade: 'arrow-up-circle',
+  photo: 'camera',
+  other: 'document',
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -39,6 +47,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: 'Other Documents',
 };
 
+const ACCENT = '#0F766E';
+
 export default function DocumentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [house, setHouse] = useState<House | null>(null);
@@ -46,34 +56,27 @@ export default function DocumentsScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) {
-      loadDocuments();
-    }
+    if (id) loadDocuments();
   }, [id]);
 
   async function loadDocuments() {
     try {
-      // Load house info
       const { data: houseData } = await supabase
-        .from('houses')
+        .from('egl_houses')
         .select('id, lot_number')
         .eq('id', id)
         .single();
 
       if (houseData) setHouse(houseData);
 
-      // Load documents from timeline_events where event_type = 'document'
-      // or has source_link
       const { data: docsData } = await supabase
-        .from('timeline_events')
+        .from('egl_timeline')
         .select('*')
         .eq('house_id', id)
         .or('event_type.eq.document,source_link.not.is.null')
         .order('created_at', { ascending: false });
 
-      if (docsData) {
-        setDocuments(docsData);
-      }
+      if (docsData) setDocuments(docsData);
     } catch (error) {
       console.error('Error loading documents:', error);
     } finally {
@@ -101,12 +104,9 @@ export default function DocumentsScreen() {
     }
   };
 
-  // Group documents by category
   const groupedDocs = documents.reduce((acc, doc) => {
     const category = doc.metadata?.category || 'other';
-    if (!acc[category]) {
-      acc[category] = [];
-    }
+    if (!acc[category]) acc[category] = [];
     acc[category].push(doc);
     return acc;
   }, {} as Record<string, Document[]>);
@@ -114,7 +114,7 @@ export default function DocumentsScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#10B981" />
+        <ActivityIndicator size="large" color={ACCENT} />
         <Text style={styles.loadingText}>Loading documents...</Text>
       </View>
     );
@@ -126,16 +126,14 @@ export default function DocumentsScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: `Lot ${house?.lot_number || ''} Documents`,
-        }}
-      />
+      <Stack.Screen options={{ title: `Lot ${house?.lot_number || ''} Documents` }} />
 
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Summary */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryIcon}>📂</Text>
+          <View style={styles.summaryIconBg}>
+            <Ionicons name="folder-open" size={24} color={ACCENT} />
+          </View>
           <View style={styles.summaryInfo}>
             <Text style={styles.summaryTitle}>{documents.length} Documents</Text>
             <Text style={styles.summarySubtitle}>
@@ -146,7 +144,7 @@ export default function DocumentsScreen() {
 
         {documents.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📄</Text>
+            <Ionicons name="document-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>No Documents</Text>
             <Text style={styles.emptyText}>
               Documents and plans will appear here when they are added by the supervisor
@@ -157,15 +155,19 @@ export default function DocumentsScreen() {
             {categories.map(category => (
               <View key={category} style={styles.categorySection}>
                 <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryIcon}>
-                    {CATEGORY_ICONS[category] || '📄'}
-                  </Text>
+                  <Ionicons
+                    name={CATEGORY_ICONS[category] || 'document'}
+                    size={18}
+                    color={ACCENT}
+                  />
                   <Text style={styles.categoryTitle}>
                     {CATEGORY_LABELS[category] || category}
                   </Text>
-                  <Text style={styles.categoryCount}>
-                    {groupedDocs[category].length}
-                  </Text>
+                  <View style={styles.categoryCountBadge}>
+                    <Text style={styles.categoryCount}>
+                      {groupedDocs[category].length}
+                    </Text>
+                  </View>
                 </View>
 
                 {groupedDocs[category].map(doc => (
@@ -173,11 +175,14 @@ export default function DocumentsScreen() {
                     key={doc.id}
                     style={styles.documentCard}
                     onPress={() => openDocument(doc)}
+                    activeOpacity={0.7}
                   >
                     <View style={styles.documentIcon}>
-                      <Text style={styles.documentIconText}>
-                        {doc.metadata?.file_type === 'pdf' ? '📕' : '📄'}
-                      </Text>
+                      <Ionicons
+                        name={doc.metadata?.file_type === 'pdf' ? 'document-text' : 'document'}
+                        size={22}
+                        color="#6B7280"
+                      />
                     </View>
                     <View style={styles.documentInfo}>
                       <Text style={styles.documentTitle} numberOfLines={2}>
@@ -192,7 +197,7 @@ export default function DocumentsScreen() {
                         {format(new Date(doc.created_at), 'MMM d, yyyy')}
                       </Text>
                     </View>
-                    <Text style={styles.documentArrow}>→</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -202,7 +207,7 @@ export default function DocumentsScreen() {
 
         {/* Help text */}
         <View style={styles.helpSection}>
-          <Text style={styles.helpIcon}>💡</Text>
+          <Ionicons name="information-circle" size={18} color={ACCENT} />
           <Text style={styles.helpText}>
             Tap a document to open it. Documents are added by your supervisor through the Monitor app.
           </Text>
@@ -217,7 +222,7 @@ export default function DocumentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#F6F7F9',
   },
   content: {
     padding: 16,
@@ -226,10 +231,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: '#F6F7F9',
   },
   loadingText: {
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginTop: 12,
     fontSize: 14,
   },
@@ -237,15 +242,18 @@ const styles = StyleSheet.create({
   summaryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#374151',
   },
-  summaryIcon: {
-    fontSize: 36,
+  summaryIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F0FDFA',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
   },
   summaryInfo: {
@@ -254,11 +262,11 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: '#101828',
   },
   summarySubtitle: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginTop: 2,
   },
   // Empty
@@ -267,19 +275,16 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     paddingHorizontal: 40,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: '#101828',
+    marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -291,47 +296,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  categoryIcon: {
-    fontSize: 20,
-    marginRight: 8,
+    gap: 8,
   },
   categoryTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: '#101828',
     flex: 1,
+  },
+  categoryCountBadge: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   categoryCount: {
     fontSize: 13,
     color: '#6B7280',
-    backgroundColor: '#374151',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    fontWeight: '500',
   },
   // Document Card
   documentCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 14,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#374151',
   },
   documentIcon: {
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#374151',
+    backgroundColor: '#F6F7F9',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-  },
-  documentIconText: {
-    fontSize: 22,
   },
   documentInfo: {
     flex: 1,
@@ -339,43 +339,32 @@ const styles = StyleSheet.create({
   documentTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: '#101828',
     marginBottom: 2,
   },
   documentDesc: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginBottom: 4,
   },
   documentDate: {
     fontSize: 12,
-    color: '#6B7280',
-  },
-  documentArrow: {
-    fontSize: 18,
-    color: '#6B7280',
-    marginLeft: 8,
+    color: '#9CA3AF',
   },
   // Help
   helpSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  helpIcon: {
-    fontSize: 16,
-    marginRight: 10,
-    marginTop: 2,
+    gap: 10,
   },
   helpText: {
     flex: 1,
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#6B7280',
     lineHeight: 18,
   },
 });

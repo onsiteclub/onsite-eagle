@@ -3,6 +3,7 @@
 // Supports: in, ft, yd, mm, cm, m
 
 import { useState, useCallback } from 'react';
+import { parseToInches } from '../lib/calculator/engine';
 
 type UnitType = 'in' | 'ft' | 'yd' | 'mm' | 'cm' | 'm';
 
@@ -10,17 +11,6 @@ const FRACTION_PAD = [
   ['1/8"', '1/4"', '3/8"', '1/2"'],
   ['5/8"', '3/4"', '7/8"', "'ft"],
 ];
-
-// Decimal equivalents for fractions
-const FRACTION_DECIMALS: Record<string, number> = {
-  '1/8"': 1/8,
-  '1/4"': 1/4,
-  '3/8"': 3/8,
-  '1/2"': 1/2,
-  '5/8"': 5/8,
-  '3/4"': 3/4,
-  '7/8"': 7/8,
-};
 
 interface ConversionResult {
   value: number;
@@ -66,7 +56,7 @@ interface UnitConverterProps {
   voiceEnabled?: boolean;
 }
 
-export default function UnitConverter({}: UnitConverterProps) {
+export default function UnitConverter(_props: UnitConverterProps) {
   const [inputValue, setInputValue] = useState('');
   const [fromUnit, setFromUnit] = useState<UnitType>('mm');
   const [toUnit, setToUnit] = useState<UnitType>('in');
@@ -129,16 +119,33 @@ export default function UnitConverter({}: UnitConverterProps) {
 
   // Execute conversion
   const handleConvert = useCallback(() => {
-    const value = parseFloat(inputValue);
-    if (isNaN(value)) {
+    if (!inputValue.trim()) {
       setResult(null);
       return;
     }
 
-    const resultValue = convert(value, fromUnit, toUnit);
+    // If input contains feet (') or fractions (/), parse as imperial → inches
+    const isImperial = inputValue.includes("'") || inputValue.includes('/');
+    let valueInFromUnit: number;
+    let effectiveFromUnit: UnitType = fromUnit;
+
+    if (isImperial) {
+      // parseToInches handles: "19' 4 3/4", "5 1/2", "3'", "3/4", etc.
+      valueInFromUnit = parseToInches(inputValue);
+      effectiveFromUnit = 'in'; // parseToInches always returns inches
+    } else {
+      valueInFromUnit = parseFloat(inputValue);
+    }
+
+    if (isNaN(valueInFromUnit)) {
+      setResult(null);
+      return;
+    }
+
+    const resultValue = convert(valueInFromUnit, effectiveFromUnit, toUnit);
     setResult({
-      value,
-      fromUnit,
+      value: valueInFromUnit,
+      fromUnit: effectiveFromUnit,
       toUnit,
       result: resultValue,
       formatted: formatResult(resultValue, toUnit),
@@ -179,38 +186,38 @@ export default function UnitConverter({}: UnitConverterProps) {
       handleConvert();
     } else if (key === '.' && inputValue.includes('.')) {
       return;
+    } else if (key === "'") {
+      // Feet marker: append apostrophe + space
+      if (!inputValue.includes("'")) {
+        setInputValue(prev => prev + "' ");
+      }
     } else {
       setInputValue(prev => prev + key);
     }
   }, [inputValue, handleClear, handleConvert]);
 
-  // Handle fraction pad: append decimal value or switch to feet
+  // Handle fraction pad: append fraction text (same pattern as Calculator)
   const handleFractionClick = useCallback((frac: string) => {
     if (frac === "'ft") {
-      // Switch "from" unit to feet
-      setFromUnit('ft');
+      // Append feet marker (apostrophe + space)
+      setInputValue(prev => prev + "' ");
       return;
     }
-    const decimal = FRACTION_DECIMALS[frac];
-    if (decimal !== undefined) {
-      setInputValue(prev => {
-        const num = parseFloat(prev) || 0;
-        const whole = Math.floor(num);
-        return String(whole + decimal);
-      });
-    }
+    // Remove the " from fraction label, e.g. '3/4"' → '3/4'
+    const fracText = frac.replace('"', '');
+    setInputValue(prev => {
+      // Add space before fraction if input ends with a digit (mixed number: "5 1/2")
+      if (prev && /\d$/.test(prev)) {
+        return prev + ' ' + fracText;
+      }
+      return prev + fracText;
+    });
   }, []);
 
   const units: UnitType[] = ['in', 'ft', 'yd', 'mm', 'cm', 'm'];
 
   return (
     <div className="unit-converter">
-      {/* Header */}
-      <div className="unit-converter-header">
-        <img src="/images/logo-onsite-club-02.png" alt="OnSite" className="easy-square-logo" />
-        <span className="unit-converter-title">Unit Converter</span>
-      </div>
-
       {/* Content Container */}
       <div className="content-container">
         {/* Display Area */}
@@ -315,6 +322,7 @@ export default function UnitConverter({}: UnitConverterProps) {
         <div className="easy-square-row">
           <button className="easy-square-key" onClick={() => handleKeyPress('0')}>0</button>
           <button className="easy-square-key" onClick={() => handleKeyPress('.')}>.</button>
+          <button className="easy-square-key" onClick={() => handleKeyPress("'")}>'ft</button>
         </div>
       </div>
     </div>

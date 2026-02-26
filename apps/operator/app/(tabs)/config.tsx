@@ -7,7 +7,7 @@
  * - Sign Out
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,45 +19,39 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
+import { useAuth } from '@onsite/auth';
 import { supabase } from '../../src/lib/supabase';
 
 const ACCENT = '#0F766E';
 
 export default function ConfigScreen() {
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+  const operatorName = user?.name || '';
+  const operatorEmail = user?.email || '';
   const [loading, setLoading] = useState(true);
   const [isAvailable, setIsAvailable] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [operatorName, setOperatorName] = useState('');
-  const [operatorEmail, setOperatorEmail] = useState('');
   const [siteName, setSiteName] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadConfig();
-  }, []);
+  // Reload config when screen gets focus (e.g. returning from scanner)
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) loadConfig(user.id);
+    }, [user?.id])
+  );
 
-  async function loadConfig() {
+  async function loadConfig(userId: string) {
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) return;
-
-      setOperatorEmail(auth.user.email || '');
-
-      // Load profile
-      const { data: profile } = await supabase
-        .from('core_profiles')
-        .select('full_name, first_name')
-        .eq('id', auth.user.id)
-        .maybeSingle();
-
-      setOperatorName(profile?.full_name || profile?.first_name || '');
-
       // Load assignment + availability
       const { data: assignment } = await supabase
         .from('egl_operator_assignments')
         .select('id, site_id, is_available, site:egl_sites(name)')
-        .eq('operator_id', auth.user.id)
+        .eq('operator_id', userId)
         .eq('is_active', true)
         .maybeSingle();
 
@@ -75,7 +69,7 @@ export default function ConfigScreen() {
 
   async function toggleAvailability(value: boolean) {
     if (!assignmentId) {
-      Alert.alert('Erro', 'Nenhum site atribuido.');
+      Alert.alert('Error', 'No site assigned.');
       return;
     }
 
@@ -94,28 +88,26 @@ export default function ConfigScreen() {
       if (error) {
         console.error('Error toggling availability:', error);
         setIsAvailable(!value); // revert
-        Alert.alert('Erro', 'Falha ao atualizar disponibilidade');
+        Alert.alert('Error', 'Failed to update availability');
       }
     } catch {
       setIsAvailable(!value);
-      Alert.alert('Erro', 'Algo deu errado');
+      Alert.alert('Error', 'Something went wrong');
     } finally {
       setToggling(false);
     }
   }
 
-  async function handleSignOut() {
+  function handleSignOut() {
     Alert.alert(
-      'Sair',
-      'Tem certeza que deseja sair?',
+      'Sign Out',
+      'Are you sure you want to sign out?',
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Sair',
+          text: 'Sign Out',
           style: 'destructive',
-          onPress: async () => {
-            await supabase.auth.signOut();
-          },
+          onPress: () => signOut(),
         },
       ]
     );
@@ -133,7 +125,7 @@ export default function ConfigScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Configuracoes</Text>
+        <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
       {/* Operator Info */}
@@ -154,7 +146,7 @@ export default function ConfigScreen() {
 
       {/* Availability Toggle — Primary Feature */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>DISPONIBILIDADE</Text>
+        <Text style={styles.sectionTitle}>AVAILABILITY</Text>
         <View style={[
           styles.availabilityCard,
           isAvailable ? styles.availableCard : styles.unavailableCard,
@@ -174,8 +166,8 @@ export default function ConfigScreen() {
               </Text>
               <Text style={styles.availabilityHint}>
                 {isAvailable
-                  ? 'Recebendo pedidos normalmente'
-                  : 'Pedidos irao para a fila automaticamente'
+                  ? 'Receiving requests normally'
+                  : 'Requests will be queued automatically'
                 }
               </Text>
             </View>
@@ -192,15 +184,15 @@ export default function ConfigScreen() {
 
       {/* Settings List */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>GERAL</Text>
+        <Text style={styles.sectionTitle}>GENERAL</Text>
 
         <View style={styles.settingsGroup}>
-          <TouchableOpacity style={styles.settingRow}>
+          <TouchableOpacity style={styles.settingRow} onPress={() => router.push('/scanner')}>
             <View style={styles.settingLeft}>
               <View style={[styles.settingIcon, { backgroundColor: '#EFF6FF' }]}>
                 <Ionicons name="qr-code" size={20} color="#2563EB" />
               </View>
-              <Text style={styles.settingLabel}>Scanner QR Code</Text>
+              <Text style={styles.settingLabel}>QR Code Scanner</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
           </TouchableOpacity>
@@ -212,7 +204,7 @@ export default function ConfigScreen() {
               <View style={[styles.settingIcon, { backgroundColor: '#FEF3C7' }]}>
                 <Ionicons name="notifications" size={20} color="#D97706" />
               </View>
-              <Text style={styles.settingLabel}>Notificacoes</Text>
+              <Text style={styles.settingLabel}>Notifications</Text>
             </View>
             <Switch
               value={notificationsEnabled}
@@ -229,10 +221,10 @@ export default function ConfigScreen() {
               <View style={[styles.settingIcon, { backgroundColor: '#F3F4F6' }]}>
                 <Ionicons name="language" size={20} color="#6B7280" />
               </View>
-              <Text style={styles.settingLabel}>Idioma</Text>
+              <Text style={styles.settingLabel}>Language</Text>
             </View>
             <View style={styles.settingRight}>
-              <Text style={styles.settingValue}>Portugues</Text>
+              <Text style={styles.settingValue}>English</Text>
               <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
             </View>
           </TouchableOpacity>
@@ -244,7 +236,7 @@ export default function ConfigScreen() {
               <View style={[styles.settingIcon, { backgroundColor: '#F3F4F6' }]}>
                 <Ionicons name="information-circle" size={20} color="#6B7280" />
               </View>
-              <Text style={styles.settingLabel}>Sobre</Text>
+              <Text style={styles.settingLabel}>About</Text>
             </View>
             <View style={styles.settingRight}>
               <Text style={styles.settingValue}>v1.0.0</Text>
@@ -257,7 +249,7 @@ export default function ConfigScreen() {
       {/* Sign Out */}
       <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
         <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-        <Text style={styles.signOutText}>Sair da conta</Text>
+        <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>
   );

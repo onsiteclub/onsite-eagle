@@ -3,15 +3,9 @@
 // Vercel Serverless Function
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import {
-  canCollectVoice,
-  saveVoiceLog,
-  extractEntities,
-  detectInformalTerms,
-  detectLanguage,
-  type VoiceLogRecord,
-} from './lib/voice-logs.js';
 import { apiLogger } from './lib/api-logger.js';
+import { checkRateLimit } from './lib/rate-limit.js';
+import { saveVoiceLog, detectLanguage, detectInformalTerms, extractEntities } from './lib/voice-logs.js';
 
 // Helper para extrair IP do request
 function getClientIP(headers: Record<string, string | string[] | undefined>): string {
@@ -25,52 +19,32 @@ function getClientIP(headers: Record<string, string | string[] | undefined>): st
   return 'unknown';
 }
 
-// CORS - Domínios permitidos
+// CORS - Allowed origins
 const ALLOWED_ORIGINS = [
+  // Production domains
   'https://calculator.onsiteclub.ca',
+  'https://calc.onsiteclub.ca',
   'https://app.onsiteclub.ca',
+  'https://monitor.onsiteclub.ca',
+  // Vercel deployments
   'https://onsiteclub-calculator.vercel.app',
+  'https://onsite-calculator.vercel.app',
+  // Native apps (Capacitor)
   'capacitor://localhost',
   'https://localhost',
+  // Local development
   'http://localhost:5173',
   'http://localhost:3000',
 ];
 
-function isAllowedOrigin(origin: string): boolean {
+export function isAllowedOrigin(origin: string): boolean {
   if (!origin) return false;
   if (ALLOWED_ORIGINS.includes(origin)) return true;
   if (origin.startsWith('capacitor://') || origin.startsWith('ionic://')) return true;
-  // Allow all Vercel preview deployments
-  if (origin.includes('.vercel.app')) return true;
+  // Allow only OUR project's Vercel preview deployments (not any .vercel.app)
+  if (origin.endsWith('-onsiteclub-calculator.vercel.app') ||
+      origin.endsWith('-onsite-calculator.vercel.app')) return true;
   return false;
-}
-
-// Rate limiting simples
-const rateLimitMap = new Map<string, number[]>();
-const RATE_LIMIT_WINDOW_MS = 60000;
-const RATE_LIMIT_MAX_REQUESTS = 30;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const requests = rateLimitMap.get(ip) || [];
-  const recent = requests.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
-
-  if (recent.length >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-
-  recent.push(now);
-  rateLimitMap.set(ip, recent);
-
-  if (rateLimitMap.size > 10000) {
-    for (const [key, times] of rateLimitMap.entries()) {
-      if (times.every(t => now - t > RATE_LIMIT_WINDOW_MS)) {
-        rateLimitMap.delete(key);
-      }
-    }
-  }
-
-  return true;
 }
 
 // System prompt para GPT - SPEC V9 (tabela completa de unidades + variações multilíngue)
@@ -108,7 +82,7 @@ MM (milímetro):
 - EN: mm, millimeter, millimeters, millimetre, mili, mill
 - PT: milímetro, milímetros, mili, mm
 - ES: milímetro, milímetros
-- Noise: "mil" (dangerous - could be thousand), "double m"
+- Noise: "mil" (dangerous - usually means thousand/1000, only means mm if explicitly followed by "imetro/imetros")
 
 CM (centímetro):
 - EN: cm, centimeter, centimeters, centimetre, see em, c em
@@ -149,6 +123,53 @@ DECIMAL POINT:
 - "five point five" → "5.5"
 - "dois ponto cinco" → "2.5"
 
+SEQUENTIAL DIGITS (CRITICAL):
+- When someone reads digits one by one, concatenate them into ONE number.
+- "oh" or "O" in a digit sequence = 0 (zero). Example: "one oh four" → "104", "three oh five" → "305"
+- "cinco três dois quatro" → "5324" (NOT "5,3,2,4" or "5 + 3 + 2 + 4")
+- "um dois três" → "123"
+- "sete oito cinco" → "785"
+- "nine four two" → "942"
+- "one oh four" → "104"
+- "three oh eight" → "308"
+- "five oh five" → "505"
+- "dois um cinco zero" → "2150"
+- Only separate numbers when there is an explicit operator word (mais/plus/menos/minus/vezes/times)
+
+LARGE NUMBERS (CRITICAL - NO thousands separator):
+- NEVER use dot or comma as thousands separator. NEVER output "10.000" or "1.325". Output PLAIN integers only.
+- "mil" / "thousand" = 1000. Multiply the preceding number by 1000.
+- "dez mil" → "10000" (NOT "10.000" or "10.")
+- "vinte mil" → "20000" (NOT "20.000")
+- "quinze mil" → "15000"
+- "cem mil" → "100000"
+- "mil trezentos e vinte e cinco" → "1325" (NOT "1.325")
+- "two thousand five hundred" → "2500" (NOT "2.500" or "2,500")
+- "mil e quinhentos" → "1500" (NOT "1.500")
+- "tres mil" → "3000"
+- "mil duzentos" → "1200"
+- "dez mil e duzentos" → "10200"
+- "cento e vinte" → "120"
+- "duzentos e trinta e cinco" → "235"
+- Dot (.) is ONLY allowed when user explicitly says "ponto" / "point" / "dot"
+- Example: "cinco ponto cinco" → "5.5" (user explicitly said "ponto")
+- If there is NO word "ponto"/"point"/"dot" in the speech, there should be NO dot in the output
+
+PERCENTAGE (CRITICAL - use % symbol, NEVER /100):
+- "percent" / "por cento" / "porcento" / "por ciento" / "pour cent" = %
+- ALWAYS keep the % symbol in the output. NEVER convert to /100.
+- "ten percent" → "10%" (NOT "10/100")
+- "dez por cento" → "10%" (NOT "10/100")
+- Supported formats:
+  - "100 + 10%" → "100 + 10%"
+  - "100 - 20%" → "100 - 20%"
+  - "10% of 150" → "10% of 150"
+  - "20% de 200" → "20% of 200"
+  - "150 * 20%" → "150 * 20%"
+- "quanto é dez por cento de cem" → "10% of 100"
+- "add fifteen percent to two hundred" → "200 + 15%"
+- "desconto de vinte por cento em mil" → "1000 - 20%"
+
 DIMENSION SEPARATOR (lumber: "2x4"):
 - "by" / "buy" / "bai" / "por" = x (multiply/dimension)
 - "two by four" → "2x4"
@@ -183,19 +204,34 @@ EXAMPLES:
 "cinco ponto cinco" → {"expression":"5.5"}
 "three n a quarter" → {"expression":"3 1/4"}
 "uno y medio" → {"expression":"1 1/2"}
-"dos por cuatro" → {"expression":"2x4"}`;
+"dos por cuatro" → {"expression":"2x4"}
+"mil trezentos e vinte e cinco" → {"expression":"1325"}
+"mil trezentos e vinte e cinco mais dois mil" → {"expression":"1325 + 2000"}
+"two thousand three hundred" → {"expression":"2300"}
+"cinco três dois quatro" → {"expression":"5324"}
+"cinco três dois quatro mais mil" → {"expression":"5324 + 1000"}
+"um dois três mais quatro cinco seis" → {"expression":"123 + 456"}
+"duzentos e trinta e cinco" → {"expression":"235"}
+"dez mil" → {"expression":"10000"}
+"dez mil mais cinco mil" → {"expression":"10000 + 5000"}
+"vinte mil e trezentos" → {"expression":"20300"}
+"ten percent of one hundred" → {"expression":"10% of 100"}
+"cem mais dez por cento" → {"expression":"100 + 10%"}
+"mil menos vinte por cento" → {"expression":"1000 - 20%"}
+"quinze por cento de duzentos" → {"expression":"15% of 200"}
+"two hundred plus five percent" → {"expression":"200 + 5%"}`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startTime = Date.now();
   const ip = getClientIP(req.headers as Record<string, string | string[] | undefined>);
 
-  // CORS
+  // CORS - apenas origens permitidas (sem wildcard fallback)
   const origin = req.headers.origin || '';
   if (isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-  } else if (!origin) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
   }
+  // Se origin ausente ou nao permitido, nao seta CORS header
+  // Requests server-to-server (sem origin) ainda funcionam, mas sem CORS
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
@@ -207,12 +243,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Rate limiting
-  if (!checkRateLimit(ip)) {
+  // Rate limiting (persistente via Supabase)
+  if (!(await checkRateLimit(ip))) {
     console.error('[API] Rate limited:', ip);
     apiLogger.voice.rateLimited(ip);
     return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
   }
+
+  // Log request para contagem de rate limit
+  apiLogger.voice.request(undefined, ip);
 
   // Check API key
   const apiKey = process.env.OPENAI_API_KEY;
@@ -243,41 +282,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parts = body.toString('binary').split(`--${boundary}`);
     let audioData: Buffer | null = null;
     let filename = 'audio.webm';
-    let userId: string | undefined;
+    const formFields: Record<string, string> = {};
 
     for (const part of parts) {
-      // Extract user_id field if present
-      if (part.includes('name="user_id"')) {
-        const headerEnd = part.indexOf('\r\n\r\n');
-        if (headerEnd !== -1) {
-          const content = part.slice(headerEnd + 4).trim();
-          userId = content.replace(/\r\n--$/, '').replace(/--\r\n$/, '').trim();
-        }
-      }
+      const headerEnd = part.indexOf('\r\n\r\n');
+      if (headerEnd === -1) continue;
 
       if (part.includes('filename=')) {
         const filenameMatch = part.match(/filename="([^"]+)"/);
         if (filenameMatch) filename = filenameMatch[1];
 
-        const headerEnd = part.indexOf('\r\n\r\n');
-        if (headerEnd !== -1) {
-          const content = part.slice(headerEnd + 4);
-          const cleanContent = content.replace(/\r\n--$/, '').replace(/--\r\n$/, '');
-          audioData = Buffer.from(cleanContent, 'binary');
+        const content = part.slice(headerEnd + 4);
+        const cleanContent = content.replace(/\r\n--$/, '').replace(/--\r\n$/, '');
+        audioData = Buffer.from(cleanContent, 'binary');
+      } else {
+        // Text field
+        const nameMatch = part.match(/name="([^"]+)"/);
+        if (nameMatch) {
+          formFields[nameMatch[1]] = part.slice(headerEnd + 4).replace(/\r\n--?$/, '').trim();
         }
       }
     }
+
+    const hasVoiceTrainingConsent = formFields['voice_training_consent'] === '1';
 
     if (!audioData || audioData.length === 0) {
       return res.status(400).json({ error: 'No audio file uploaded' });
     }
 
+    // Validar tamanho maximo (25MB = limite do Whisper API)
+    if (audioData.length > 25 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Audio file too large (max 25MB)' });
+    }
+
     // 1. Whisper transcription
+    // Language: auto-detect by default, overridable via env var or query param
+    const whisperLang = (req.query?.lang as string) || process.env.WHISPER_LANGUAGE || '';
+
     const formData = new FormData();
     const audioBlob = new Blob([new Uint8Array(audioData)], { type: 'audio/webm' });
     formData.append('file', audioBlob, filename);
     formData.append('model', 'whisper-1');
-    formData.append('language', 'pt');
+    if (whisperLang) {
+      formData.append('language', whisperLang);
+    }
     formData.append('prompt', 'Construction measurements: inches, feet, yards, millimeters, centimeters, meters. Fractions: half, quarter, eighth, 1/2, 3/8, 1/4, 5/8, 7/8. Portuguese: polegada, pé, metro, milímetro, centímetro, meio, quarto, oitavo, mais, menos, vezes, dividido, ponto. Informal: incha, inchas, fit, fiti, fits, mai, meno, mili, haf, haff. Spanish: pulgada, pie, yarda, metro, medio, cuarto, punto, por. Lumber dimensions: two by four. Mixed multilingual speech.');
 
     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -291,7 +339,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!whisperResponse.ok) {
       const errText = await whisperResponse.text();
       console.error('[Voice] Whisper error:', errText);
-      apiLogger.voice.error('Whisper transcription failed', Date.now() - startTime, { error: errText }, userId, ip);
+      apiLogger.voice.error('Whisper transcription failed', Date.now() - startTime, { error: errText }, undefined, ip);
       return res.status(500).json({ error: 'Transcription failed' });
     }
 
@@ -319,54 +367,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!gptResponse.ok) {
       const errText = await gptResponse.text();
-      console.error('[Voice] GPT error:', errText, 'transcription:', transcribedText);
-      apiLogger.voice.error('GPT interpretation failed', Date.now() - startTime, { error: errText, transcription: transcribedText }, userId, ip);
+      console.error('[Voice] GPT error:', errText);
+      apiLogger.voice.error('GPT interpretation failed', Date.now() - startTime, { error: errText }, undefined, ip);
       return res.status(500).json({ error: 'Interpretation failed' });
     }
 
     const gptResult = await gptResponse.json();
     const content = gptResult.choices[0]?.message?.content || '{}';
-    const parsed = JSON.parse(content);
-
-    const durationMs = Date.now() - startTime;
-    console.log('[Voice] Success:', { transcription: transcribedText, expression: parsed.expression, duration_ms: durationMs });
-
-    // Log de sucesso para app_logs
-    apiLogger.voice.success(durationMs, { transcription: transcribedText, expression: parsed.expression }, userId, ip);
-
-    // 3. Salvar voice_log se usuário tiver consentimento
-    let voiceLogId: string | null = null;
-    console.log('[Voice] Checking voice_log save - userId:', userId);
-    if (userId) {
-      const hasConsent = await canCollectVoice(userId);
-      console.log('[Voice] canCollectVoice result:', hasConsent, 'for userId:', userId);
-      if (hasConsent) {
-        const voiceLog: VoiceLogRecord = {
-          user_id: userId,
-          feature_context: 'main_calculator',
-          audio_format: 'webm',
-          transcription_raw: transcribedText,
-          transcription_normalized: parsed.expression,
-          transcription_engine: 'whisper-1',
-          language_detected: detectLanguage(transcribedText),
-          intent_detected: 'calculate',
-          intent_fulfilled: !!parsed.expression,
-          entities: extractEntities(parsed.expression || ''),
-          informal_terms: detectInformalTerms(transcribedText),
-          was_successful: !!parsed.expression,
-        };
-
-        voiceLogId = await saveVoiceLog(voiceLog);
-        if (voiceLogId) {
-          console.log('[Voice] Saved voice_log:', voiceLogId);
-        }
-      }
+    let parsed: { expression?: string };
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      console.error('[Voice] Invalid JSON from GPT:', content.substring(0, 200));
+      apiLogger.voice.error('GPT returned invalid JSON', Date.now() - startTime, { raw_length: content.length }, undefined, ip);
+      return res.status(500).json({ error: 'Failed to parse voice input' });
     }
 
-    return res.status(200).json({
-      ...parsed,
-      voice_log_id: voiceLogId, // Retornar ID para vincular ao calculation
-    });
+    if (!parsed.expression) {
+      return res.status(200).json({ error: 'Could not understand the input' });
+    }
+
+    // Sanitizar separadores de milhar que GPT insere mesmo com instrucao contraria
+    // Regra: ponto ou vírgula seguido de exatamente 3 digitos = separador de milhar
+    // Ponto seguido de 1-2 digitos = decimal legítimo (ex: "10.5" permanece)
+    // Loop para tratar multiplos separadores: "1.000.000" → "1000.000" → "1000000"
+    let expr = parsed.expression;
+    let prev;
+    // Remove comma thousands separators (e.g. "10,000" → "10000")
+    do {
+      prev = expr;
+      expr = expr.replace(/(\d),(\d{3})(?=\D|$)/g, '$1$2');
+    } while (expr !== prev);
+    // Remove dot thousands separators (e.g. "10.000" → "10000")
+    do {
+      prev = expr;
+      expr = expr.replace(/(\d)\.(\d{3})(?=\D|$)/g, '$1$2');
+    } while (expr !== prev);
+    // Sanitizar "N / 100" → "N%" (GPT às vezes converte "por cento" para "/ 100")
+    expr = expr.replace(/(\d+)\s*\/\s*100\b/g, '$1%');
+    parsed.expression = expr;
+
+    const durationMs = Date.now() - startTime;
+    console.log('[Voice] Success:', { expression: parsed.expression, duration_ms: durationMs });
+
+    // Log de sucesso para app_logs (expression only, no transcription unless consented)
+    apiLogger.voice.success(durationMs, {
+      expression: parsed.expression,
+      has_transcription: hasVoiceTrainingConsent && !!transcribedText,
+    }, undefined, ip);
+
+    // Save detailed voice_log ONLY if user opted in to voice training
+    let voiceLogId: string | null = null;
+    if (hasVoiceTrainingConsent && transcribedText) {
+      voiceLogId = await saveVoiceLog({
+        transcription_raw: transcribedText,
+        transcription_normalized: parsed.expression,
+        transcription_engine: 'whisper-1',
+        language_detected: detectLanguage(transcribedText),
+        informal_terms: detectInformalTerms(transcribedText),
+        entities: extractEntities(parsed.expression),
+        was_successful: true,
+        audio_duration_ms: durationMs,
+        audio_format: 'webm',
+      });
+    }
+
+    return res.status(200).json({ ...parsed, voice_log_id: voiceLogId });
 
   } catch (err) {
     console.error('[API] Exception:', String(err));

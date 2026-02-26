@@ -54,7 +54,6 @@ All projects share the **same Supabase project** (`bjkhofdrzpczgnwxoauk`), same 
 | App | Agent | Stack | Repo | Purpose | Data Captured |
 |-----|-------|-------|------|---------|---------------|
 | **Timekeeper Mobile** | KRONOS | React Native / Expo | `onsite-timekeeper` | GPS geofencing, auto clock-in/out, push notifications | Work hours, locations, movement patterns |
-| **Timekeeper Web** | KRONOS.JR | Next.js 14+ / Vercel | `onsite-timekeeper-web` | Manual hour entry, reports, map management, QR scan | Manual entries, team structures |
 | **Calculator** | CEULEN | React Native | `onsite-calculator` | Voice-powered calculator for quick field calculations | Voice patterns, calculation types, trade-specific formulas |
 | **Shop** | HERMES | Next.js / Stripe | `onsite-shop` | E-commerce for construction products | Purchase patterns, product demand by trade |
 | **SheetChat** | *(TBD)* | *(planned)* | *(planned)* | Messaging & community — "No chitchat. SheetChat" | Social interactions, knowledge sharing, organic growth from Timekeeper base |
@@ -279,7 +278,7 @@ Views used by web (backward-compat): `records`, `locations`, `profiles`
 - ~~`profiles`~~ → `core_profiles`
 - ~~`records`~~ → `app_timekeeper_entries`
 - ~~`geofences`/`locations`~~ → `app_timekeeper_geofences`
-- Documentation updated. Code migration pending in `onsite-timekeeper-web` repo.
+- Documentation updated. `onsite-timekeeper-web` was removed (2026-02-25).
 - Backward-compat views remain in Supabase but should not be used in new code.
 
 ---

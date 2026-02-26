@@ -60,7 +60,7 @@ export function formatInches(inches: number): string {
   inches = Math.abs(inches);
 
   const feet = Math.floor(inches / 12);
-  let remaining = inches % 12;
+  const remaining = inches % 12;
 
   const whole = Math.floor(remaining);
   const frac = remaining - whole;
@@ -280,7 +280,7 @@ export function evaluateTokens(tokens: string[]): number {
 
 function calculatePercentage(expr: string): CalculationResult | null {
   // Formato: "100 + 10%" = 100 + (100 * 0.10) = 110
-  const percentMatch = expr.match(/^([\d.]+)\s*([\+\-])\s*([\d.]+)\s*%$/);
+  const percentMatch = expr.match(/^([\d.]+)\s*([+-])\s*([\d.]+)\s*%$/);
   if (percentMatch) {
     const base = parseFloat(percentMatch[1]);
     const op = percentMatch[2];
@@ -331,7 +331,7 @@ function calculatePureMath(expr: string): number | null {
   const cleanExpr = expr.replace(/×/g, '*').replace(/÷/g, '/');
   
   // Validação: só permite números, operadores e parênteses
-  if (!/^[\d\s\.\+\-\*\/\(\)]+$/.test(cleanExpr)) {
+  if (!/^[\d\s.+\-*/()]+$/.test(cleanExpr)) {
     return null;
   }
   

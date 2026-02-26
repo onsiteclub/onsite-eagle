@@ -13,7 +13,7 @@ interface StairsCalculatorProps {
   isRecording?: boolean;
 }
 
-export default function StairsCalculator({}: StairsCalculatorProps) {
+export default function StairsCalculator(_props: StairsCalculatorProps) {
   const [riserHeight, setRiserHeight] = useState('7');
   const [treadDepth, setTreadDepth] = useState('10');
   const [numSteps, setNumSteps] = useState('12');

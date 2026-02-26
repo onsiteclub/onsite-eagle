@@ -8,39 +8,37 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '@onsite/auth';
 import { supabase } from '../../src/lib/supabase';
 import { sendMessage } from '@onsite/timeline';
 import type { MaterialRequest } from '@onsite/shared';
 
+const ACCENT = '#0F766E';
+
 export default function DeliverConfirmation() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const operatorId = user?.id || null;
+  const operatorName = user?.name || 'Operator';
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [request, setRequest] = useState<MaterialRequest | null>(null);
   const [deliveryNotes, setDeliveryNotes] = useState('');
-  const [operatorName, setOperatorName] = useState('Operator');
-  const [operatorId, setOperatorId] = useState<string | null>(null);
+
+  // Photo state
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    loadOperator();
     loadRequest();
   }, [id]);
-
-  async function loadOperator() {
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      setOperatorId(data.user.id);
-      const { data: profile } = await supabase
-        .from('core_profiles')
-        .select('full_name')
-        .eq('id', data.user.id)
-        .maybeSingle();
-      if (profile?.full_name) setOperatorName(profile.full_name);
-    }
-  }
 
   async function loadRequest() {
     try {
@@ -71,8 +69,81 @@ export default function DeliverConfirmation() {
     }
   }
 
+  async function takePhoto() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+      allowsEditing: false,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setPhotoUri(result.assets[0].uri);
+      setPhotoUrl(null); // Reset any previous upload
+    }
+  }
+
+  async function uploadPhoto() {
+    if (!photoUri || !request) return;
+
+    setUploading(true);
+    try {
+      // Read file as base64
+      const FileSystem = await import('expo-file-system');
+      const base64 = await FileSystem.readAsStringAsync(photoUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Build storage path
+      const siteFolder = request.site_id || 'unsorted';
+      const houseFolder = request.house_id || 'deliveries';
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(2, 7);
+      const storagePath = `${siteFolder}/${houseFolder}/${timestamp}_${random}.jpg`;
+
+      // Convert base64 to bytes
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('egl-media')
+        .upload(storagePath, bytes, { contentType: 'image/jpeg', upsert: false });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        Alert.alert('Error', 'Failed to upload photo. Try again.');
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('egl-media')
+        .getPublicUrl(storagePath);
+
+      setPhotoUrl(urlData.publicUrl);
+    } catch (err) {
+      console.error('Upload error:', err);
+      Alert.alert('Error', 'Failed to upload photo.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function confirmDelivery() {
     if (!request) return;
+
+    // Upload photo first if taken but not yet uploaded
+    if (photoUri && !photoUrl) {
+      await uploadPhoto();
+    }
 
     setSubmitting(true);
 
@@ -93,41 +164,39 @@ export default function DeliverConfirmation() {
         return;
       }
 
-      // Create house-level timeline event
+      // Create house-level timeline event with photo
       if (request.house_id) {
+        const photoSuffix = photoUrl ? `\nFoto: ${photoUrl}` : '';
         await supabase.from('egl_timeline').insert({
           house_id: request.house_id,
-          event_type: 'note',
+          event_type: 'material_delivery',
           title: `Material Delivered: ${request.material_name}`,
-          description: `${request.quantity} ${request.unit} delivered by ${operatorName}${deliveryNotes ? `. Notes: ${deliveryNotes}` : ''}`,
+          description: `${request.quantity} ${request.unit} delivered by ${operatorName}${deliveryNotes ? `. Notes: ${deliveryNotes}` : ''}${photoSuffix}`,
           source: 'operator_app',
           created_by: operatorId,
+          metadata: photoUrl ? { photo_url: photoUrl, delivery_request_id: request.id } : { delivery_request_id: request.id },
         });
       }
 
-      // Post site-level timeline message so all team members see it
+      // Post site-level timeline message
       if (request.site_id) {
         const notesSuffix = deliveryNotes ? ` — ${deliveryNotes}` : '';
+        const photoTag = photoUrl ? ' [with photo]' : '';
         await sendMessage(supabase as never, {
           site_id: request.site_id,
           house_id: request.house_id || undefined,
           sender_type: 'operator',
           sender_id: operatorId || undefined,
           sender_name: operatorName,
-          content: `Delivered ${request.quantity} ${request.unit} of ${request.material_name}${request.lot_number ? ` to Lot ${request.lot_number}` : ''}${notesSuffix}`,
+          content: `Delivered ${request.quantity} ${request.unit} of ${request.material_name}${request.lot_number ? ` at Lot ${request.lot_number}` : ''}${notesSuffix}${photoTag}`,
           source_app: 'operator',
         });
       }
 
       Alert.alert(
         'Success',
-        'Delivery confirmed successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/(tabs)'),
-          },
-        ]
+        'Delivery confirmed!',
+        [{ text: 'OK', onPress: () => router.replace('/(tabs)') }],
       );
     } catch (err) {
       console.error('Error:', err);
@@ -140,7 +209,7 @@ export default function DeliverConfirmation() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0F766E" />
+        <ActivityIndicator size="large" color={ACCENT} />
       </View>
     );
   }
@@ -158,7 +227,7 @@ export default function DeliverConfirmation() {
       {/* Delivery Summary */}
       <View style={styles.summaryCard}>
         <View style={styles.checkIcon}>
-          <Text style={styles.checkEmoji}>📦</Text>
+          <Ionicons name="cube-outline" size={40} color="#16A34A" />
         </View>
         <Text style={styles.summaryTitle}>Confirm Delivery</Text>
         <Text style={styles.materialName}>{request.material_name}</Text>
@@ -169,17 +238,57 @@ export default function DeliverConfirmation() {
         </Text>
       </View>
 
+      {/* Photo Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Delivery Photo</Text>
+
+        {photoUri ? (
+          <View style={styles.photoPreview}>
+            <Image source={{ uri: photoUri }} style={styles.photoImage} />
+            <View style={styles.photoActions}>
+              {photoUrl ? (
+                <View style={styles.uploadedBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+                  <Text style={styles.uploadedText}>Uploaded</Text>
+                </View>
+              ) : uploading ? (
+                <ActivityIndicator size="small" color={ACCENT} />
+              ) : null}
+              <TouchableOpacity
+                style={styles.retakeBtn}
+                onPress={takePhoto}
+              >
+                <Ionicons name="camera-reverse-outline" size={18} color="#6B7280" />
+                <Text style={styles.retakeBtnText}>Retake</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.removeBtn}
+                onPress={() => { setPhotoUri(null); setPhotoUrl(null); }}
+              >
+                <Ionicons name="trash-outline" size={18} color="#DC2626" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.takePhotoBtn} onPress={takePhoto}>
+            <Ionicons name="camera-outline" size={32} color={ACCENT} />
+            <Text style={styles.takePhotoBtnText}>Take Photo</Text>
+            <Text style={styles.takePhotoBtnHint}>Document the material delivery</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* Delivery Notes */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Delivery Notes (Optional)</Text>
+        <Text style={styles.sectionTitle}>Notes (Optional)</Text>
         <TextInput
           style={styles.notesInput}
-          placeholder="Add any notes about the delivery..."
-          placeholderTextColor="#86868B"
+          placeholder="Delivery notes..."
+          placeholderTextColor="#9CA3AF"
           value={deliveryNotes}
           onChangeText={setDeliveryNotes}
           multiline
-          numberOfLines={4}
+          numberOfLines={3}
           textAlignVertical="top"
         />
       </View>
@@ -189,12 +298,15 @@ export default function DeliverConfirmation() {
         <TouchableOpacity
           style={styles.confirmButton}
           onPress={confirmDelivery}
-          disabled={submitting}
+          disabled={submitting || uploading}
         >
           {submitting ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.confirmButtonText}>Confirm Delivery</Text>
+            <>
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={styles.confirmButtonText}>Confirm Delivery</Text>
+            </>
           )}
         </TouchableOpacity>
 
@@ -203,7 +315,7 @@ export default function DeliverConfirmation() {
           onPress={() => router.back()}
           disabled={submitting}
         >
-          <Text style={styles.cancelButtonText}>Go Back</Text>
+          <Text style={styles.cancelButtonText}>Back</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -227,25 +339,22 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   checkIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#E8F5E9',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  checkEmoji: {
-    fontSize: 40,
+    marginBottom: 12,
   },
   summaryTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#16A34A',
     marginBottom: 8,
@@ -253,68 +362,138 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   materialName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#1D1D1F',
+    color: '#101828',
     textAlign: 'center',
     marginBottom: 4,
   },
   quantity: {
-    fontSize: 16,
-    color: '#86868B',
-    marginBottom: 8,
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 6,
   },
   location: {
-    fontSize: 14,
-    color: '#86868B',
+    fontSize: 13,
+    color: '#9CA3AF',
     textAlign: 'center',
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#86868B',
+    color: '#6B7280',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  // Photo styles
+  takePhotoBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  takePhotoBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: ACCENT,
+    marginTop: 8,
+  },
+  takePhotoBtnHint: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  photoPreview: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  photoImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  photoActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    gap: 10,
+  },
+  uploadedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+  },
+  uploadedText: {
+    fontSize: 13,
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+  retakeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+  },
+  retakeBtnText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  removeBtn: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: '#FEF2F2',
+  },
   notesInput: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1D1D1F',
-    minHeight: 120,
+    padding: 14,
+    fontSize: 15,
+    color: '#101828',
+    minHeight: 80,
   },
   actions: {
-    gap: 12,
+    gap: 10,
+    marginTop: 4,
   },
   confirmButton: {
     backgroundColor: '#16A34A',
-    padding: 18,
-    borderRadius: 14,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 54,
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
   },
   cancelButton: {
     backgroundColor: '#fff',
-    padding: 18,
-    borderRadius: 14,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D2D2D7',
+    borderColor: '#E5E7EB',
   },
   cancelButtonText: {
-    color: '#1D1D1F',
-    fontSize: 17,
+    color: '#6B7280',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

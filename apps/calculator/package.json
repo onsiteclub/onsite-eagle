@@ -1,6 +1,6 @@
 {
   "name": "@onsite/calculator",
-  "version": "1.0.0",
+  "version": "1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,13 +13,17 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
+    "validate": "npm run type-check && npm run lint && vitest run && npm run build",
+    "test:phase": "vitest run --reporter=verbose",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
     "cap:build": "npm run build && cap sync",
     "android:build": "npm run build && npx cap sync android && npx cap open android",
-    "android:apk": "cd android && gradlew assembleDebug && cd ..",
-    "android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "android:apk": "cd android && gradlew assembleRelease && cd ..",
+    "android:apk:debug": "cd android && gradlew assembleDebug && cd ..",
+    "android:aab": "cd android && gradlew bundleRelease && cd ..",
+    "android:install": "adb install -r android/app/build/outputs/apk/release/app-release.apk",
     "android:logs": "adb logcat -s Capacitor:* chromium:*"
   },
   "dependencies": {
@@ -30,6 +34,10 @@
     "@capacitor/device": "^6.0.3",
     "@capacitor/ios": "^6.1.0",
     "@capacitor/preferences": "^6.0.4",
+    "@onsite/auth": "*",
+    "@onsite/logger": "*",
+    "@onsite/tokens": "*",
+    "@onsite/utils": "*",
     "@supabase/supabase-js": "^2.49.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -45,6 +53,7 @@
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.0.0",
+    "jsdom": "^28.1.0",
     "sharp": "^0.34.5",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0",

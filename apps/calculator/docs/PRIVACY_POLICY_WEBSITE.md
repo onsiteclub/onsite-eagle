@@ -32,6 +32,7 @@ We automatically collect:
 - Calculations performed (expressions and results)
 - App usage patterns (which features you use)
 - Device information (OS version, device model)
+- IP address (for rate limiting and security)
 - Error logs for troubleshooting
 
 ### 1.4 Consent Records
@@ -118,7 +119,7 @@ We protect your data using:
 
 ## 7. Children's Privacy
 
-Our App is **not intended for children under 13**. We do not knowingly collect data from children. If you believe a child has provided us data, please contact us.
+Our App is **not intended for users under 16 years of age**. We do not knowingly collect personal data from children under 16. If you believe a child has provided us data, please contact us immediately at privacy@onsiteclub.ca.
 
 ---
 

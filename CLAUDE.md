@@ -52,8 +52,7 @@ onsite-eagle/
     ├── inspect/            # Expo — Inspector app
     ├── operator/           # Expo — Operator app
     ├── calculator/         # Vite + Capacitor — Voice calculator
-    ├── timekeeper/         # Expo — GPS geofencing, auto clock-in/out
-    └── timekeeper-web/     # Next.js — Manual hours, reports
+    └── timekeeper/         # Expo — GPS geofencing, auto clock-in/out
 ```
 
 ### Regra de Territorio
@@ -433,7 +432,6 @@ Apps Expo usam `blockList` + `extraNodeModules` no `metro.config.js` para isolar
 | **Inspect** | `apps/inspect` | Expo 52 + RN 0.76 | 18.3.1 | Inspector app | Inspections, approvals |
 | **Operator** | `apps/operator` | Expo 52 + RN 0.76 | 18.3.1 | Operator app | Operations, assignments |
 | **Timekeeper** | `apps/timekeeper` | Expo 52 + RN 0.76 | 18.3.1 | GPS geofencing, auto clock-in/out | Work hours, locations, movement |
-| **Timekeeper Web** | `apps/timekeeper-web` | Next.js 16.1.6 | 19.0.0 | Manual hours, reports, QR | Manual entries, team structures |
 | **Calculator** | `apps/calculator` | Vite 5.4 + Capacitor 6.1 | 18.3.1 | Voice-powered calculator | Voice patterns, calculations |
 | **Shop** | *(planned)* | Next.js / Stripe | — | E-commerce for construction | Purchase patterns, demand |
 | **SheetChat** | *(planned)* | — | — | Messaging & community | Social interactions |
@@ -530,7 +528,6 @@ npm run dev:inspect        # Apenas inspect
 npm run dev:operator       # Apenas operator
 npm run dev:calculator     # Apenas calculator
 npm run dev:timekeeper     # Apenas timekeeper
-npm run dev:timekeeper-web # Apenas timekeeper-web
 npm run build              # Build all
 npm run lint               # Lint all
 ```

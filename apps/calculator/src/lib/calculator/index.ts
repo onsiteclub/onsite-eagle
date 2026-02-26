@@ -6,11 +6,8 @@ export {
   parseToInches,
   formatInches,
   formatTotalInches,
+  tokenize,
+  evaluateTokens,
 } from './engine';
 
 export type { CalculationResult } from '../../types/calculator';
-
-// Funções internas disponíveis em engine.ts se necessário:
-// - formatNumber: formata números com precisão
-// - tokenize: tokeniza expressões matemáticas
-// - evaluateTokens: avalia tokens em resultado

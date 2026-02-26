@@ -13,6 +13,7 @@
     "@onsite/agenda": "*",
     "@onsite/media": "*",
     "@onsite/shared": "*",
+    "@onsite/sharing": "*",
     "@onsite/timeline": "*",
     "@onsite/ui": "*",
     "@onsite/auth": "*",

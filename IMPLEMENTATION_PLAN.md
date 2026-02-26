@@ -71,9 +71,8 @@ ja suporta web build nativo:
 - Android: `eas build --platform android` → APK
 - Web: `expo export --platform web` → static site (deploy em Vercel/Cloudflare Pages)
 
-**`apps/timekeeper-web/` permanece CONGELADO** — codigo existente pode ser usado
-como referencia para migrar componentes para o Timekeeper Expo.
-Nao recebe mais desenvolvimento ativo.
+**`apps/timekeeper-web/` foi REMOVIDO do monorepo.** Features web do Timekeeper
+sao servidas via `expo export --platform web` (static build).
 
 ### Principio Arquitetural
 
@@ -260,7 +259,7 @@ Modals (ja existem):
 - QR code sharing (ja existe no Timekeeper, manter)
 - Manual entry (criar modal ou tela)
 
-**O app `apps/timekeeper-web/` permanece CONGELADO como referencia.**
+**O app `apps/timekeeper-web/` foi removido do monorepo (2026-02-25).**
 
 ### 2.4 Operator Expo (Maquinista — Mobile only)
 
@@ -1645,7 +1644,6 @@ REVERTIDO, e o que precisa ser RECONCILIADO.
 | `packages/media/src/` | Media upload types e funcoes |
 | `packages/ai/src/specialists/` | AI prompts (eagle, calculator, timekeeper) |
 | `packages/supabase/src/schema.ts` | TABLE_NAMES canonicos + interfaces |
-| `apps/timekeeper-web/` | **CONGELADO** — referencia para migrar features para Timekeeper Expo |
 
 ---
 

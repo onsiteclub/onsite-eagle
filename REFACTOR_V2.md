@@ -433,17 +433,10 @@ apps/dashboard/
 │       └── [id]/page.tsx          ← Detalhe do lote (timeline, fotos)
 ```
 
-### 3.3 Migracao do Timekeeper-Web
+### 3.3 ~~Migracao do Timekeeper-Web~~ (REMOVIDO)
 
-O `apps/timekeeper-web` ja tem:
-- Dashboard de horas
-- Team management + QR
-- Reports + export
-- Plans/Agenda (skeleton)
-
-**Plano:** Migrar os componentes funcionais do timekeeper-web para dentro do Dashboard como secao `/timekeeper/`. O timekeeper-web ja esta congelado.
-
-**Prioridade:** BAIXA — Timekeeper mobile e o foco agora.
+`apps/timekeeper-web` foi **deletado do monorepo** em 2026-02-25.
+Web build do Timekeeper agora e via `expo export --platform web`.
 
 ---
 

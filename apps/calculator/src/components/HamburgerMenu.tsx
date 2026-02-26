@@ -3,12 +3,9 @@
 
 import { useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { AuthModal } from './auth';
 import LegalModal from './LegalModal';
-import { supabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 
 // External URLs for legal pages
 const LEGAL_URLS = {
@@ -16,21 +13,10 @@ const LEGAL_URLS = {
   terms: 'https://onsiteclub.ca/legal/calculator/terms.html',
 };
 
-interface HamburgerMenuProps {
-  user: User | null;
-  userName?: string;
-  onAuthSuccess: (user: User, isNewUser: boolean) => void;
-  onSignOut: () => void;
-}
-
-export default function HamburgerMenu({ user, userName, onAuthSuccess, onSignOut }: HamburgerMenuProps) {
+export default function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
   const [legalChoice, setLegalChoice] = useState<'privacy' | 'terms' | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const openUrl = useCallback((url: string) => {
     window.open(url, Capacitor.isNativePlatform() ? '_system' : '_blank');
@@ -59,17 +45,6 @@ export default function HamburgerMenu({ user, userName, onAuthSuccess, onSignOut
     }
   }, [legalChoice]);
 
-  const handleAuthSuccess = useCallback((authUser: User, isNewUser: boolean) => {
-    setShowAuthModal(false);
-    setIsOpen(false);
-    onAuthSuccess(authUser, isNewUser);
-  }, [onAuthSuccess]);
-
-  const handleSignOut = useCallback(() => {
-    setIsOpen(false);
-    onSignOut();
-  }, [onSignOut]);
-
   const handlePrivacyPolicy = useCallback(() => {
     openLegalChoice('privacy');
   }, [openLegalChoice]);
@@ -79,12 +54,11 @@ export default function HamburgerMenu({ user, userName, onAuthSuccess, onSignOut
   }, [openLegalChoice]);
 
   const handleSupport = useCallback(() => {
-    openUrl('https://onsiteclub.ca/support');
+    openUrl('https://www.onsiteclub.ca/#contact');
     setIsOpen(false);
   }, [openUrl]);
 
   const handleRateApp = useCallback(() => {
-    // TODO: Replace with actual store URLs when published
     const isAndroid = Capacitor.getPlatform() === 'android';
     const storeUrl = isAndroid
       ? 'https://play.google.com/store/apps/details?id=ca.onsiteclub.calculator'
@@ -93,59 +67,6 @@ export default function HamburgerMenu({ user, userName, onAuthSuccess, onSignOut
     setIsOpen(false);
   }, [openUrl]);
 
-  const handleDeleteAccount = useCallback(async () => {
-    if (!supabase || !user) return;
-
-    setIsDeleting(true);
-    setDeleteError(null);
-
-    try {
-      // 1. Delete user's calculation history
-      await supabase
-        .from('app_calculator_calculations')
-        .delete()
-        .eq('user_id', user.id);
-
-      // 2. Delete user's consents
-      await supabase
-        .from('core_consents')
-        .delete()
-        .eq('user_id', user.id);
-
-      // 3. Delete user's voice logs
-      await supabase
-        .from('voice_logs')
-        .delete()
-        .eq('user_id', user.id);
-
-      // 4. Delete user's profile
-      await supabase
-        .from('core_profiles')
-        .delete()
-        .eq('id', user.id);
-
-      // 5. Delete auth user (this signs out automatically)
-      // Note: This requires the user to be authenticated
-      // For complete deletion, we use Supabase's delete user function
-      const { error } = await supabase.rpc('delete_user');
-
-      if (error) {
-        // If RPC doesn't exist, just sign out (admin will need to delete auth user)
-        console.warn('[DeleteAccount] RPC not available, signing out only:', error.message);
-      }
-
-      // 6. Sign out and close
-      setShowDeleteConfirm(false);
-      setIsOpen(false);
-      onSignOut();
-
-    } catch (err) {
-      console.error('[DeleteAccount] Error:', err);
-      setDeleteError('Failed to delete account. Please try again or contact support.');
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [user, onSignOut]);
 
   return (
     <>
@@ -191,52 +112,8 @@ export default function HamburgerMenu({ user, userName, onAuthSuccess, onSignOut
           </button>
         </div>
 
-        {/* User Info */}
-        {userName && (
-          <div className="menu-user">
-            <div className="menu-user-avatar">
-              {userName.charAt(0).toUpperCase()}
-            </div>
-            <span className="menu-user-name">{userName}</span>
-          </div>
-        )}
-
         {/* Menu Items */}
         <nav className="menu-nav">
-          {/* Auth Button */}
-          {!user ? (
-            <button className="menu-item menu-item-primary" onClick={() => setShowAuthModal(true)}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                <polyline points="10 17 15 12 10 7" />
-                <line x1="15" y1="12" x2="3" y2="12" />
-              </svg>
-              <span>Sign In / Create Account</span>
-            </button>
-          ) : (
-            <>
-              <button className="menu-item menu-item-signout" onClick={handleSignOut}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                <span>Sign Out</span>
-              </button>
-              <button className="menu-item menu-item-danger" onClick={() => setShowDeleteConfirm(true)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  <line x1="10" y1="11" x2="10" y2="17" />
-                  <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
-                <span>Delete Account</span>
-              </button>
-            </>
-          )}
-
-          <div className="menu-divider" />
-
           <button className="menu-item" onClick={handleSupport}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
@@ -272,6 +149,7 @@ export default function HamburgerMenu({ user, userName, onAuthSuccess, onSignOut
             </svg>
             <span>Terms of Service</span>
           </button>
+
         </nav>
 
         {/* Footer */}
@@ -280,13 +158,6 @@ export default function HamburgerMenu({ user, userName, onAuthSuccess, onSignOut
           <span className="menu-copyright">OnSite Club Inc.</span>
         </div>
       </div>
-
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={handleAuthSuccess}
-      />
 
       {/* Legal Modal (Privacy Policy / Terms of Service) */}
       <LegalModal
@@ -323,55 +194,6 @@ export default function HamburgerMenu({ user, userName, onAuthSuccess, onSignOut
             <button className="legal-choice-cancel" onClick={() => setLegalChoice(null)}>
               Cancel
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Account Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="delete-modal-overlay" onClick={() => !isDeleting && setShowDeleteConfirm(false)}>
-          <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="delete-modal-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc3545" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            </div>
-            <h3 className="delete-modal-title">Delete Account?</h3>
-            <p className="delete-modal-text">
-              This will permanently delete your account and all associated data including:
-            </p>
-            <ul className="delete-modal-list">
-              <li>Your profile information</li>
-              <li>Calculation history</li>
-              <li>Voice logs</li>
-              <li>All preferences and settings</li>
-            </ul>
-            <p className="delete-modal-warning">
-              This action cannot be undone.
-            </p>
-
-            {deleteError && (
-              <div className="delete-modal-error">{deleteError}</div>
-            )}
-
-            <div className="delete-modal-actions">
-              <button
-                className="delete-modal-btn delete-modal-btn-cancel"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isDeleting}
-              >
-                Cancel
-              </button>
-              <button
-                className="delete-modal-btn delete-modal-btn-delete"
-                onClick={handleDeleteAccount}
-                disabled={isDeleting}
-              >
-                {isDeleting ? 'Deleting...' : 'Delete My Account'}
-              </button>
-            </div>
           </div>
         </div>
       )}

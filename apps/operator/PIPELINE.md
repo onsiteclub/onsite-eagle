@@ -25,7 +25,7 @@
 
 | Tab | Arquivo | Funcao |
 |-----|---------|--------|
-| **Pedidos** | `app/(tabs)/index.tsx` | Cards de material requests por urgência, botões de ação inline |
+| **Pedidos** | `app/(tabs)/index.tsx` | Cards de material requests por urgência, botões de ação inline, FAB de camera |
 | **Reportar** | `app/(tabs)/report.tsx` | 4 botões rápidos (gasolina, pneu, máquina, outro) → site timeline |
 | **Config** | `app/(tabs)/config.tsx` | Toggle ON/OFF, QR, notificações, sign out |
 
@@ -33,11 +33,42 @@
 
 | Tela | Arquivo | Quando abre |
 |------|---------|-------------|
+| **Login** | `app/(auth)/login.tsx` | Sem sessão ativa → redirect automático |
 | **Detalhe do Pedido** | `app/requests/[id].tsx` | Tap no card para ver info completa |
-| **Confirmar Entrega** | `app/deliver/[id].tsx` | Tap em "Entregue" → evidence + timeline post |
+| **Confirmar Entrega** | `app/deliver/[id].tsx` | Tap em "Entregue" → foto + notas + timeline post |
+| **Foto Avulsa** | `app/photo.tsx` | FAB de camera no Pedidos → classificar + enviar |
+| **Scanner QR** | `app/scanner.tsx` | Config → Scan QR → vincular a site |
 
 ### Cor Accent
 `#0F766E` (verde teal) — unificado com Timekeeper e Monitor (Enterprise Theme v3).
+
+### Fluxos de Foto (2026-02-25)
+
+**Fluxo 1: Foto na Entrega**
+```
+Pedidos → [Entregue] → deliver/[id].tsx
+  → Botão "Tirar Foto" (expo-image-picker)
+  → Preview + opção trocar/remover
+  → Upload ao egl-media (Supabase Storage)
+  → Confirmar → foto_url no egl_timeline (material_delivery)
+  → Mensagem site-level via sendMessage
+```
+
+**Fluxo 2: Foto Avulsa (FAB)**
+```
+Pedidos → FAB camera (canto inferior direito)
+  → photo.tsx → Tirar foto
+  → Modal de classificação:
+    • Tipo: Entrega, Acidente, Bloqueio, Roubo, Dano, Progresso, Outro
+    • Lote: chips com todos os lotes do site + "Geral"
+    • Comentário (opcional)
+  → Upload ao egl-media
+  → Timeline event (house-level se lote selecionado)
+  → Mensagem site-level via sendMessage
+```
+
+**Storage path:** `{siteId}/{houseId|'site-level'}/{timestamp}_{random}.jpg`
+**Bucket:** `egl-media` (public)
 
 ---
 
@@ -139,9 +170,20 @@ module.exports = function (api) {
 
 | Package | Import | Uso |
 |---------|--------|-----|
-| `@onsite/shared` | `MaterialRequest`, `getMaterialRequests`, `updateRequestStatus` | Types e queries de material requests |
-| `@onsite/timeline` | `sendMessage` (from `/data`) | Posta eventos na timeline do site/lote |
+| `@onsite/shared` | `MaterialRequest`, `getOperatorQueue`, `updateRequestStatus` | Types e queries de material requests |
+| `@onsite/timeline` | `sendMessage` | Posta eventos na timeline do site/lote |
 | `@onsite/offline` | `initQueue`, `useOfflineSync` | Queue offline para sync quando volta online |
+| `@onsite/sharing` | `parseQRPayload`, `joinSite` | QR code scanning para vincular a site |
+| `@onsite/camera` | `uploadPhoto`, `uploadPhotoFromUri` | Pipeline de upload de fotos (Storage + DB + timeline) |
+
+### Native deps adicionais
+
+| Dep | Versao | Uso |
+|-----|--------|-----|
+| `expo-camera` | ~16.0.0 | QR scanner + camera (scanner.tsx) |
+| `expo-image-picker` | ~16.0.6 | Captura de fotos (deliver, photo.tsx) |
+| `expo-file-system` | ~18.0.12 | Leitura de arquivos para upload base64 |
+| `expo-notifications` | ~0.29.11 | Push notifications (FCM) |
 
 ### Packages REMOVIDOS (phantom deps)
 
@@ -345,32 +387,128 @@ Forçar `metro-cache-key` para 0.81.0 via override e depois tentar usar com `@ex
 
 ---
 
+#### Problema 10: Metro não resolve subpath exports
+
+**Sintoma:** Metro falha com:
+```
+Unable to resolve "@onsite/timeline/data" from "apps/operator/app/deliver/[id].tsx"
+```
+
+**Causa raiz:** Metro bundler **não suporta** o campo `exports` do package.json com subpaths como `./data`. Isso é uma limitação conhecida — Node.js resolve, mas Metro não.
+
+**Fix:** Mudar imports de subpath para root export:
+```diff
+- import { sendMessage } from '@onsite/timeline/data';
++ import { sendMessage } from '@onsite/timeline';
+```
+
+O `index.ts` de cada package já re-exporta tudo. Funciona porque Metro resolve o campo `main` ou `module` do package.json.
+
+**Exceção:** `@onsite/utils` — o root export puxa `tailwind-merge` (web-only). Para mobile, usar import direto do arquivo: `import { uuid } from '@onsite/utils/src/uuid'`.
+
+**Arquivos corrigidos:**
+- `apps/operator/app/deliver/[id].tsx`
+- `apps/operator/app/(tabs)/report.tsx`
+
+---
+
+#### Problema 11: Expo prebuild da raiz contamina root package.json
+
+**Sintoma:** Rodar `npx expo prebuild --clean` ou `npx expo run:android` da **raiz do monorepo** (em vez de `apps/operator/`) causa:
+1. Expo adiciona `expo@54`, `react@19.1.0`, `react-native@0.81.5` ao `package.json` raiz
+2. Cria diretório `android/` na raiz (projeto Android fantasma)
+3. Metro trava ao iniciar — fica hanging infinitamente
+4. `npm install` subsequente instala versões conflitantes no root
+
+**Causa raiz:** Expo resolve tudo relativo ao `cwd`. Da raiz, cria um projeto Android no lugar errado e poluiu as dependências.
+
+**Fix (3 passos):**
+```bash
+# 1. Deletar o android/ fantasma da raiz
+rm -rf android/
+
+# 2. Limpar deps erradas do root package.json
+# Remover "dependencies": { "expo": "...", "react": "...", "react-native": "..." }
+# O root SÓ deve ter devDependencies (metro-cache-key, metro-transform-worker, turbo)
+
+# 3. Reinstalar limpo
+rm -rf node_modules
+npm install
+```
+
+**Prevenção:** SEMPRE `cd apps/operator` antes de qualquer comando Expo. NUNCA da raiz.
+
+---
+
+#### Problema 12: Metro hanging (trava >5 minutos sem output)
+
+**Sintoma:** `npx expo start --dev-client` ou `npx expo run:android` inicia mas não produz output. Metro fica congelado sem mostrar o QR code ou URL.
+
+**Causas possíveis (em ordem de probabilidade):**
+
+1. **Diretório `android/` na raiz** — criado por prebuild acidental da raiz. Metro tenta processar esse diretório extra e trava.
+   - Fix: `rm -rf android/` na raiz do monorepo
+
+2. **node_modules corrompido** — múltiplos `npm install` com overrides, deps adicionadas e removidas.
+   - Fix: `rm -rf node_modules && npm install` na raiz
+
+3. **Cache do Metro corrompido** — cache com referencias a módulos que mudaram.
+   - Fix: `npx expo start --dev-client -c` (flag `-c` limpa cache)
+
+4. **Processo Metro anterior ainda rodando** — porta 8081 ocupada.
+   - Fix (Windows): `netstat -ano | findstr :8081` → `taskkill /PID <pid> /F`
+   - Fix (Unix): `lsof -i :8081` → `kill -9 <pid>`
+
+**Sequência de recovery recomendada:**
+```bash
+# 1. Matar processos Metro residuais
+# (Windows) taskkill /IM node.exe /F  ← CUIDADO: mata TODOS os processos node
+
+# 2. Limpar tudo
+cd c:\Dev\Onsite-club\onsite-eagle
+rm -rf android/              # fantasma da raiz
+rm -rf node_modules
+npm install
+
+# 3. Reconstruir do app
+cd apps/operator
+npx expo start --dev-client -c
+```
+
+---
+
 ## 7. Estrutura de Arquivos Final
 
 ```
 apps/operator/
 ├── app/
-│   ├── _layout.tsx              # Root Stack (offline, push, auth)
+│   ├── _layout.tsx              # Root Stack (offline, push, auth guard)
+│   ├── (auth)/
+│   │   ├── _layout.tsx          # Auth group layout
+│   │   └── login.tsx            # Email/password login (operators pre-registered)
 │   ├── (tabs)/
 │   │   ├── _layout.tsx          # 3 tabs: Pedidos, Reportar, Config
-│   │   ├── index.tsx            # Pedidos (main) — cards com ação
-│   │   ├── report.tsx           # Reportar — botões rápidos
-│   │   └── config.tsx           # Config — disponibilidade, settings
+│   │   ├── index.tsx            # Pedidos (main) — cards + realtime + FAB camera
+│   │   ├── report.tsx           # Reportar — botões rápidos → timeline
+│   │   └── config.tsx           # Config — disponibilidade, QR, settings
 │   ├── requests/
 │   │   ├── index.tsx            # Redirect → tabs (deep link compat)
 │   │   └── [id].tsx             # Detalhe do pedido
-│   └── deliver/
-│       └── [id].tsx             # Confirmar entrega + timeline
+│   ├── deliver/
+│   │   └── [id].tsx             # Confirmar entrega + foto + timeline
+│   ├── photo.tsx                # Foto avulsa — captura + modal (lote, categoria)
+│   └── scanner.tsx              # QR scanner — vincular a site
+├── index.js                     # Entry point (import "expo-router/entry")
 ├── src/
 │   └── lib/
-│       ├── supabase.ts          # Supabase client (lazy proxy)
+│       ├── supabase.ts          # Supabase client (AsyncStorage sessions)
 │       └── pushRegistration.ts  # Push notifications (FCM)
 ├── assets/                      # Icons e splash (placeholder)
 ├── .env.local                   # Supabase keys (não commitar)
 ├── .env.example                 # Template de env vars
-├── app.json                     # Expo config
+├── app.json                     # Expo config (newArchEnabled: false)
 ├── babel.config.js              # Apenas babel-preset-expo
-├── metro.config.js              # React 18/19 isolation
+├── metro.config.js              # React 18/19 isolation + watchFolders
 ├── package.json                 # Dependencies
 └── tsconfig.json                # TypeScript config
 ```
@@ -406,3 +544,63 @@ apps/operator/
 | Metro não resolve packages | node_modules desatualizado | `npm install` na raiz |
 | `ERR_PACKAGE_PATH_NOT_EXPORTED` getMinifier | metro-transform-worker 0.83.3 hoisted | `npm install metro-transform-worker@0.81.0 metro-cache-key@0.81.0 --save-dev` na raiz |
 | `metro_cache_key_1.default is not a function` | metro-cache-key 0.83.3 mudou API | Mesmo fix acima — pinar `metro-cache-key@0.81.0` como devDep na raiz |
+| `Unable to resolve "@onsite/timeline/data"` | Metro não suporta subpath exports | Mudar import para `@onsite/timeline` (root export) |
+| Metro trava ao iniciar (hanging >5min) | Diretório `android/` na raiz do monorepo | Deletar `android/` da raiz: `rm -rf android/` e rodar `npm install` |
+| `expo prebuild` adiciona deps erradas ao root | Rodou Expo da raiz do monorepo | SEMPRE `cd apps/operator` primeiro! Remover expo/react/react-native do root package.json |
+
+---
+
+### Sessão: 2026-02-25 — Auth + Realtime + Foto
+
+#### Feature 1: Login/Auth Flow
+
+Operator não tinha tela de login. Criados:
+- `app/(auth)/login.tsx` — email/password, sem signup (operators pré-registrados pelo supervisor)
+- `app/(auth)/_layout.tsx` — Stack layout para auth group
+- `app/_layout.tsx` refatorado com auth guard (`useSegments` + `useRouter`)
+- `src/lib/supabase.ts` — adicionado AsyncStorage para persistência de sessão
+
+**Bug fix:** Login screen flashing em loop. Causa: `segments` mudava e re-triggava redirect. Fix: `hasNavigated` useRef.
+
+#### Feature 2: Realtime Material Requests
+
+- Migration: `ALTER PUBLICATION supabase_realtime ADD TABLE egl_material_requests`
+- `(tabs)/index.tsx` refatorado: `getMaterialRequests` → `getOperatorQueue` (filtra por sites atribuídos)
+- Subscription realtime via `supabase.channel('operator-requests')` com `postgres_changes`
+- Badge "Live" no header
+
+#### Feature 3: AI Mediator Fix (Monitor → Operator pipeline)
+
+2 bugs impediam o fluxo timeline → material_request:
+
+1. **Condição muito restritiva**: `event_type === 'material_request'` exigido junto com `material_request` object. IA podia classificar como `calendar` mas popular `material_request`. Fix: checar só `result.material_request.material_name`.
+2. **`material_type` NOT NULL**: Insert não incluía a coluna obrigatória. Fix: `material_type: mr.material_type || 'general'`.
+
+Arquivos: `apps/monitor/src/app/api/timeline/mediate/route.ts`, `packages/ai/src/specialists/mediator.ts` (v1→v2)
+
+#### Feature 4: Foto na Entrega + Foto Avulsa
+
+**Dependências adicionadas:** `expo-image-picker`, `expo-file-system`, `@onsite/camera`
+**metro.config.js:** `packages/camera` adicionado aos watchFolders
+
+**deliver/[id].tsx** — Reescrito com:
+- Botão "Tirar Foto" (expo-image-picker, quality 0.8)
+- Preview da foto + trocar/remover
+- Upload ao `egl-media` bucket via Supabase Storage
+- Foto URL incluída no timeline event (`metadata.photo_url`)
+- Entrega funciona com ou sem foto (opcional)
+
+**photo.tsx** — Nova tela de foto avulsa:
+- Acessada via FAB de camera na tela de Pedidos
+- Tira foto → modal de classificação automático
+- 7 categorias: Entrega, Acidente, Bloqueio na Rua, Roubo de Material, Dano, Progresso, Outro
+- Seleção de lote via chips (todos os lotes do site + "Geral")
+- Comentário opcional
+- Upload → timeline event + mensagem site-level
+
+**NOTA:** Novas libs nativas (expo-image-picker, expo-file-system) exigem rebuild:
+```bash
+cd apps/operator
+npx expo prebuild --clean --platform android
+npx expo run:android
+```

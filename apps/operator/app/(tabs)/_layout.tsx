@@ -1,8 +1,8 @@
 /**
- * Tabs Layout - OnSite Operator (Maquinista)
+ * Tabs Layout - OnSite Operator
  *
- * 3 tabs: Pedidos (main), Reportar, Config
- * Simplified design — operator lives on Pedidos 95% of the time.
+ * 3 tabs: Requests (main), Report, Settings
+ * Simplified design — operator lives on Requests 95% of the time.
  */
 
 import { Platform } from 'react-native';
@@ -40,7 +40,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Pedidos',
+          title: 'Requests',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cube" size={size} color={color} />
           ),
@@ -49,7 +49,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="report"
         options={{
-          title: 'Reportar',
+          title: 'Report',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="warning" size={size} color={color} />
           ),
@@ -58,7 +58,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="config"
         options={{
-          title: 'Config',
+          title: 'Settings',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings" size={size} color={color} />
           ),

@@ -1,5 +1,5 @@
 /**
- * Reportar — Quick vehicle/equipment issue reporting
+ * Report — Quick vehicle/equipment issue reporting
  *
  * Quick-tap buttons that post to site-level timeline (house_id = null).
  * Visible to Monitor (supervisor) but not tied to any specific lot.
@@ -19,6 +19,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@onsite/auth';
 import { supabase } from '../../src/lib/supabase';
 import { sendMessage } from '@onsite/timeline';
 
@@ -36,65 +37,67 @@ const QUICK_REPORTS: QuickReport[] = [
   {
     id: 'gas',
     icon: 'flash',
-    label: 'Gasolina',
-    message: 'Preciso de gasolina',
+    label: 'Low Fuel',
+    message: 'Need fuel',
     color: '#F59E0B',
   },
   {
     id: 'tire',
     icon: 'build',
-    label: 'Pneu furou',
-    message: 'Pneu furou',
+    label: 'Flat Tire',
+    message: 'Flat tire',
     color: '#DC2626',
   },
   {
     id: 'machine',
     icon: 'close-circle',
-    label: 'Maquina parou',
-    message: 'Maquina nao funciona',
+    label: 'Machine Down',
+    message: 'Machine not working',
     color: '#7C3AED',
+  },
+  {
+    id: 'accident',
+    icon: 'medkit',
+    label: 'Accident',
+    message: 'Accident on site',
+    color: '#B91C1C',
+  },
+  {
+    id: 'road_block',
+    icon: 'remove-circle',
+    label: 'Road Block',
+    message: 'Road blocked',
+    color: '#EA580C',
   },
   {
     id: 'other',
     icon: 'create',
-    label: 'Outro',
+    label: 'Other',
     message: '',
     color: '#6B7280',
   },
 ];
 
 export default function ReportScreen() {
+  const { user } = useAuth();
+  const operatorId = user?.id || null;
+  const operatorName = user?.name || 'Operator';
   const [sending, setSending] = useState<string | null>(null);
   const [customText, setCustomText] = useState('');
   const [showCustom, setShowCustom] = useState(false);
   const [siteId, setSiteId] = useState<string | null>(null);
-  const [operatorName, setOperatorName] = useState('Operator');
-  const [operatorId, setOperatorId] = useState<string | null>(null);
   const [sentReports, setSentReports] = useState<string[]>([]);
 
   useEffect(() => {
-    loadOperatorInfo();
-  }, []);
+    if (operatorId) loadSiteInfo(operatorId);
+  }, [operatorId]);
 
-  async function loadOperatorInfo() {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) return;
-
-    setOperatorId(data.user.id);
-
-    const { data: profile } = await supabase
-      .from('core_profiles')
-      .select('full_name, first_name')
-      .eq('id', data.user.id)
-      .maybeSingle();
-
-    setOperatorName(profile?.full_name || profile?.first_name || 'Operator');
-
+  async function loadSiteInfo(userId: string) {
     // Get operator's assigned site
     const { data: assignment } = await supabase
       .from('egl_operator_assignments')
       .select('site_id')
-      .eq('operator_id', data.user.id)
+      .eq('operator_id', userId)
       .eq('is_active', true)
       .maybeSingle();
 
@@ -114,7 +117,7 @@ export default function ReportScreen() {
 
   async function sendCustomReport() {
     if (!customText.trim()) {
-      Alert.alert('Erro', 'Escreva uma descricao do problema');
+      Alert.alert('Error', 'Write a description of the issue');
       return;
     }
     await doSendReport(customText.trim(), 'other');
@@ -124,7 +127,7 @@ export default function ReportScreen() {
 
   async function doSendReport(message: string, reportId: string) {
     if (!siteId) {
-      Alert.alert('Erro', 'Nenhum site atribuido. Contacte o supervisor.');
+      Alert.alert('Error', 'No site assigned. Contact your supervisor.');
       return;
     }
 
@@ -137,7 +140,7 @@ export default function ReportScreen() {
         sender_type: 'operator',
         sender_id: operatorId || undefined,
         sender_name: operatorName,
-        content: `[REPORTAR] ${message}`,
+        content: `[REPORT] ${message}`,
         source_app: 'operator',
       });
 
@@ -149,7 +152,7 @@ export default function ReportScreen() {
       }, 3000);
     } catch (err) {
       console.error('Error sending report:', err);
-      Alert.alert('Erro', 'Falha ao enviar. Tente novamente.');
+      Alert.alert('Error', 'Failed to send. Try again.');
     } finally {
       setSending(null);
     }
@@ -163,9 +166,9 @@ export default function ReportScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Reportar Problema</Text>
+          <Text style={styles.headerTitle}>Report Issue</Text>
           <Text style={styles.headerSubtitle}>
-            Toque para enviar ao supervisor
+            Tap to send to supervisor
           </Text>
         </View>
 
@@ -197,7 +200,7 @@ export default function ReportScreen() {
                   styles.reportLabel,
                   wasSent && styles.reportLabelSent,
                 ]}>
-                  {wasSent ? 'Enviado!' : report.label}
+                  {wasSent ? 'Sent!' : report.label}
                 </Text>
               </TouchableOpacity>
             );
@@ -207,10 +210,10 @@ export default function ReportScreen() {
         {/* Custom Input */}
         {showCustom && (
           <View style={styles.customSection}>
-            <Text style={styles.customTitle}>Descreva o problema</Text>
+            <Text style={styles.customTitle}>Describe the issue</Text>
             <TextInput
               style={styles.customInput}
-              placeholder="Ex: Corrente partiu, preciso de uma nova..."
+              placeholder="E.g.: Chain broke, need a new one..."
               placeholderTextColor="#9CA3AF"
               value={customText}
               onChangeText={setCustomText}
@@ -224,7 +227,7 @@ export default function ReportScreen() {
                 style={styles.cancelBtn}
                 onPress={() => { setShowCustom(false); setCustomText(''); }}
               >
-                <Text style={styles.cancelBtnText}>Cancelar</Text>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.sendBtn, !customText.trim() && styles.sendBtnDisabled]}
@@ -234,7 +237,7 @@ export default function ReportScreen() {
                 {sending === 'other' ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.sendBtnText}>Enviar</Text>
+                  <Text style={styles.sendBtnText}>Send</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -246,7 +249,7 @@ export default function ReportScreen() {
           <View style={styles.warning}>
             <Ionicons name="alert-circle" size={20} color="#F59E0B" />
             <Text style={styles.warningText}>
-              Nenhum site atribuido. Contacte o supervisor para ser vinculado a um site.
+              No site assigned. Contact your supervisor to be linked to a site.
             </Text>
           </View>
         )}

@@ -5,13 +5,14 @@ export default function LotLayout() {
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#1F2937',
+          backgroundColor: '#FFFFFF',
         },
-        headerTintColor: '#fff',
+        headerTintColor: '#101828',
         headerTitleStyle: {
           fontWeight: '600',
         },
         headerBackTitle: 'Back',
+        headerShadowVisible: false,
       }}
     >
       <Stack.Screen
@@ -31,6 +32,12 @@ export default function LotLayout() {
         options={{
           title: 'Add Note',
           presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="timeline"
+        options={{
+          title: 'Timeline',
         }}
       />
     </Stack>

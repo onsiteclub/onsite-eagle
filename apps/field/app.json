@@ -1,28 +1,28 @@
 {
   "expo": {
-    "name": "OnSite Dashboard",
-    "slug": "onsite-dashboard",
+    "name": "OnSite Field",
+    "slug": "onsite-field",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "onsite-dashboard",
+    "scheme": "onsite-field",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1F2937"
+      "backgroundColor": "#F6F7F9"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.onsiteclub.dashboard"
+      "bundleIdentifier": "com.onsiteclub.field"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1F2937"
+        "backgroundColor": "#F6F7F9"
       },
-      "package": "com.onsiteclub.dashboard"
+      "package": "com.onsiteclub.field"
     },
     "web": {
       "bundler": "metro",
@@ -31,18 +31,7 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow OnSite Dashboard to access your camera."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow OnSite Dashboard to access your photos."
-        }
-      ]
+      ["expo-camera", { "cameraPermission": "Allow OnSite Field to access your camera for photos and QR scanning." }]
     ],
     "experiments": {
       "typedRoutes": true

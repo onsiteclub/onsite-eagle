@@ -36,29 +36,28 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Protected routes - require authentication
-  if (pathname.startsWith('/account') || pathname.startsWith('/admin')) {
-    if (!user) {
-      // Redirect to / (login page)
-      return NextResponse.redirect(new URL('/', request.url))
-    }
+  const protectedPaths = ['/club', '/account', '/admin', '/app']
+  const isProtected = protectedPaths.some(p => pathname.startsWith(p))
+
+  if (isProtected && !user) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // Admin - requires admin role
-  if (pathname.startsWith('/admin')) {
-    // Check admin_users table for admin role
+  if (pathname.startsWith('/admin') && user) {
     const { data: adminUser } = await supabase
-      .from('admin_users')
+      .from('core_admin_users')
       .select('is_active, role')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .single()
 
     if (!adminUser?.is_active) {
-      return NextResponse.redirect(new URL('/account', request.url))
+      return NextResponse.redirect(new URL('/club', request.url))
     }
   }
 
-  // Update last_active_at in core_profiles
-  if (user && (pathname.startsWith('/account') || pathname.startsWith('/admin'))) {
+  // Update last_active_at in core_profiles (throttled by middleware caching)
+  if (user && isProtected) {
     await supabase
       .from('core_profiles')
       .update({ last_active_at: new Date().toISOString() })
@@ -70,7 +69,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/club/:path*',
     '/account/:path*',
     '/admin/:path*',
+    '/app/:path*',
   ],
 }

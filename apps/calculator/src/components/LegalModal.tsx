@@ -21,10 +21,6 @@ const PRIVACY_POLICY = `
 
 ## 1. Information We Collect
 
-### Information You Provide
-- Email address, name, password (encrypted)
-- Birthday, gender, trade/specialty (optional)
-
 ### Voice Data
 - Audio is processed in real-time to convert speech to text
 - Audio is NOT stored on our servers after processing
@@ -33,7 +29,8 @@ const PRIVACY_POLICY = `
 ### Usage Data
 - Calculations performed
 - App usage patterns
-- Device information
+- Device information (OS version, device model)
+- IP address (for rate limiting and security)
 - Error logs
 
 ---
@@ -42,16 +39,13 @@ const PRIVACY_POLICY = `
 
 - Provide the App's functionality
 - Process voice commands
-- Save your calculation history
 - Improve our services
-- Send communications (only if you opt-in)
 
 ---
 
 ## 3. Information Sharing
 
 We share data with:
-- **Supabase** - Authentication & database
 - **OpenAI** - Voice transcription (not retained)
 - **Vercel** - App hosting
 
@@ -61,11 +55,8 @@ We do NOT sell your personal information.
 
 ## 4. Your Rights
 
-- **Access** your data
-- **Correct** your information
-- **Delete** your account
 - **Withdraw** consent anytime
-- **Export** your data
+- **Request deletion** of your data via privacy@onsiteclub.ca
 
 ---
 
@@ -73,12 +64,24 @@ We do NOT sell your personal information.
 
 - Encryption in transit (HTTPS/TLS)
 - Encryption at rest
-- Row-level security
-- Secure authentication
 
 ---
 
-## 6. Contact Us
+## 6. Data Retention
+
+- Calculation history: stored locally on your device
+- Voice transcriptions: 30 days (if consented)
+- Error logs: 30 days
+
+---
+
+## 7. Children's Privacy
+
+This App is not intended for users under 16 years of age. We do not knowingly collect personal data from children under 16.
+
+---
+
+## 8. Contact Us
 
 **Email:** privacy@onsiteclub.ca
 
@@ -103,19 +106,11 @@ OnSite Calculator provides:
 - Unit conversions
 - Voice input for hands-free operation
 - Triangle calculations
-- Calculation history (for registered users)
+- Calculation history (stored locally on your device)
 
 ---
 
-## 2. User Accounts
-
-- Account creation is optional
-- You are responsible for your account security
-- You may delete your account at any time
-
----
-
-## 3. Acceptable Use
+## 2. Acceptable Use
 
 You agree NOT to:
 - Use the App for illegal purposes
@@ -124,7 +119,7 @@ You agree NOT to:
 
 ---
 
-## 4. Voice Feature
+## 3. Voice Feature
 
 - Voice recognition is provided "as is"
 - We do not guarantee 100% accuracy
@@ -132,7 +127,7 @@ You agree NOT to:
 
 ---
 
-## 5. Disclaimer
+## 4. Disclaimer
 
 THE APP IS PROVIDED "AS IS" WITHOUT WARRANTIES.
 
@@ -140,7 +135,7 @@ THE APP IS PROVIDED "AS IS" WITHOUT WARRANTIES.
 
 ---
 
-## 6. Limitation of Liability
+## 5. Limitation of Liability
 
 We are NOT liable for:
 - Errors in calculations
@@ -150,19 +145,19 @@ We are NOT liable for:
 
 ---
 
-## 7. Changes to Terms
+## 6. Changes to Terms
 
 We may update these Terms. Continued use constitutes acceptance.
 
 ---
 
-## 8. Governing Law
+## 7. Governing Law
 
 These Terms are governed by the laws of Ontario, Canada.
 
 ---
 
-## 9. Contact Us
+## 8. Contact Us
 
 **Email:** legal@onsiteclub.ca
 

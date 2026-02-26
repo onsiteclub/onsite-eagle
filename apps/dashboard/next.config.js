@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  transpilePackages: [
+    '@onsite/supabase',
+    '@onsite/utils',
+    '@onsite/auth',
+    '@onsite/shared',
+    '@onsite/ui',
+  ],
   images: {
     remotePatterns: [
       {

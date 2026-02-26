@@ -10,7 +10,7 @@
 
 ### O Problema
 
-Este monorepo tem **10 apps** com **3 stacks diferentes** (Next.js, Expo, Vite+Capacitor),
+Este monorepo tem **9 apps** com **3 stacks diferentes** (Next.js, Expo, Vite+Capacitor),
 **2 versoes de React** (18 e 19), e **15 packages** compartilhados. Um `npm install`
 no root afeta TODOS os apps. Um package errado quebra builds a quilometros de distancia.
 
@@ -29,7 +29,6 @@ no root afeta TODOS os apps. Um package errado quebra builds a quilometros de di
 │  │  analytics  │  │  field          │  │                   │       │
 │  │  dashboard  │  │  inspect        │  │                   │       │
 │  │  auth       │  │  operator       │  │                   │       │
-│  │  tkpr-web   │  │                 │  │                   │       │
 │  │             │  │                 │  │                   │       │
 │  │  Build:     │  │  Build:         │  │  Build:           │       │
 │  │  next build │  │  eas build      │  │  vite build       │       │
@@ -43,7 +42,7 @@ no root afeta TODOS os apps. Um package errado quebra builds a quilometros de di
 
 ---
 
-## 1. APPS NEXT.JS (5 apps)
+## 1. APPS NEXT.JS (4 apps)
 
 ### Stack Comum
 
@@ -63,7 +62,6 @@ npm run dev:monitor        # porta 3000
 npm run dev:analytics      # porta 3000 (conflito se rodar junto!)
 npm run dev:dashboard      # porta 3000
 npm run dev:auth           # porta 3000
-npm run dev:timekeeper-web # porta 3000
 
 # Build producao
 cd apps/monitor && npm run build    # ou turbo: npm run build --filter=@onsite/monitor
@@ -165,22 +163,6 @@ Hoje: **nenhum deploy automatico**. Tudo roda local em dev.
 - Stripe versao diferente do dashboard (^16.0.0 vs ^14.21.0)
 - Security headers configurados (bom!)
 
-#### timekeeper-web (`@onsite/timekeeper-web`)
-
-| Campo | Valor |
-|-------|-------|
-| Path | `apps/timekeeper-web/` |
-| Version | 0.1.0 |
-| React | ^19.0.0 |
-| next.config | Minimal (sem configs especiais) |
-| Deps especiais | `@react-google-maps/api`, `html5-qrcode`, `qrcode.react` |
-| Supabase-js | ^2.45.6 (a **mais antiga** entre todos os apps) |
-| @supabase/ssr | ^0.5.2 |
-
-**Notas:**
-- `supabase-js ^2.45.6` — mais antigo de todos, deveria ser ^2.93.3
-- next.config basicamente vazio — pode precisar de `transpilePackages` para packages @onsite
-
 ---
 
 ## 2. APPS EXPO / REACT NATIVE (4 apps)
@@ -205,7 +187,7 @@ Hoje: **nenhum deploy automatico**. Tudo roda local em dev.
 | minSdkVersion | 24 (Android 7.0) |
 | buildToolsVersion | 35.0.0 |
 | NDK | 26.1.10909125 |
-| Kotlin | 1.9.25 (timekeeper) |
+| Kotlin | 1.9.25 (timekeeper, operator) |
 
 ### Como buildar
 
@@ -273,13 +255,11 @@ Apps Next.js puxam React 19. Metro (bundler Expo) pode confundir versoes.
 | timekeeper | NAO | SIM | NAO |
 | field | SIM | NAO* | SIM |
 | inspect | SIM | NAO* | SIM |
-| operator | NAO** | NAO | NAO |
+| operator | SIM | SIM | SIM |
 
 \* Field e Inspect nao bloqueiam react-native porque nao tem conflito de versao reportado
-\** Operator NAO tem isolamento — potencial problema futuro
 
-**ATENCAO:** Operator precisa de metro.config.js com blockList! Isso foi feito na Fase 0
-do REFACTOR_PLAN mas verificar se esta ativo.
+**Operator corrigido em 2026-02-25:** metro.config.js com blockList completo (react + react-dom + react-native).
 
 ### Detalhes por App
 
@@ -350,12 +330,17 @@ do REFACTOR_PLAN mas verificar se esta ativo.
 | Version | 0.1.0 |
 | Package ID | `com.onsiteclub.operator` |
 | App name no app.json | "OnSite Operator" (correto!) |
-| newArchEnabled | **true** |
-| Android dir | NAO (nao tem prebuild) |
+| newArchEnabled | **false** (corrigido 2026-02-25) |
+| Android dir | SIM (gerado via prebuild 2026-02-25) |
 | eas.json | NAO |
 | Plugins | expo-router (apenas) |
+| Metro isolation | SIM — blockList para react, react-dom, react-native do root |
+| Redesign | v2 simplificado: 3 tabs (Pedidos, Reportar, Config) |
+| PIPELINE local | `apps/operator/PIPELINE.md` (12 erros documentados) |
 
-**tsconfig:** Nao tem aliases `@onsite/*` (diferente dos outros apps)
+**Deps:** `@onsite/shared`, `@onsite/timeline`, `@onsite/offline`
+
+**tsconfig:** Tem aliases `@onsite/*` (corrigido 2026-02-25)
 
 ---
 
@@ -549,7 +534,7 @@ turbo build --filter=@onsite/monitor
 | timekeeper | false | Correto — plugins GPS nao suportam |
 | field | true | Potencial problema com expo-camera |
 | inspect | false | OK |
-| operator | true | Potencial problema (nenhum plugin nativo ainda) |
+| operator | false | Corrigido 2026-02-25 (crashava com plugins) |
 
 ### Metro Config
 
@@ -558,9 +543,9 @@ turbo build --filter=@onsite/monitor
 | timekeeper | NAO | SIM (blockList root RN 0.76.9) |
 | field | SIM (blockList root React 19) | NAO |
 | inspect | SIM (blockList root React 19) | NAO |
-| operator | **NENHUM** | **NENHUM** |
+| operator | SIM (blockList completo) | SIM (blockList completo) |
 
-**Operator esta sem protecao!** Deveria ter o mesmo metro.config.js que os outros.
+**Operator corrigido 2026-02-25.** Tem blockList para react, react-dom E react-native.
 
 ### EAS / Build Readiness
 
@@ -569,7 +554,7 @@ turbo build --filter=@onsite/monitor
 | timekeeper | SIM | SIM | SIM |
 | field | NAO | NAO | NAO — precisa prebuild + eas.json |
 | inspect | NAO | SIM | PARCIAL — precisa eas.json |
-| operator | NAO | NAO | NAO — precisa prebuild + eas.json + metro fix |
+| operator | NAO | SIM | **SIM** — build + Metro + device funcionando (2026-02-25) |
 | calculator | N/A | NAO | PARCIAL — precisa Gradle setup |
 
 ---
@@ -590,6 +575,59 @@ turbo build --filter=@onsite/monitor
 1. `npm install` no root
 2. `cd apps/timekeeper && npx expo prebuild --clean --platform android`
 3. `npx expo run:android`
+
+### 2026-02-25 — Operator v2 Build (15 problemas, RESOLVIDO)
+
+**Resultado final: APP RODANDO no Samsung SM_G990W.**
+
+Detalhes completos: `apps/operator/PIPELINE.md` secao 6.
+
+| # | Problema | Tempo | Causa raiz | Fix |
+|---|---------|-------|-----------|-----|
+| 1 | Tela branca, rotas nao encontradas | Prevenido | babel transform-inline-env-vars | Remover plugin, so preset |
+| 2 | Crash nativo ao iniciar | Prevenido | newArchEnabled: true | Setar false |
+| 3 | TypeError: property not writable | Prevenido | React 19 misturado no bundle | blockList no metro.config.js |
+| 4 | Queries retornam null | Prevenido | .env.local com placeholder | Copiar anon key real |
+| 5 | expo prebuild: File not found icon.png | Prevenido | Sem diretorio assets/ | Criar assets/ com PNGs |
+| 6 | Push token nao registra | Prevenido | Typo expiConfig | Corrigir para expoConfig |
+| 7 | Compose Compiler requires Kotlin 1.9.25 | ~15 min | gradle.properties sem kotlinVersion | `android.kotlinVersion=1.9.25` + `$kotlinVersion` no classpath |
+| 8 | ERR_PACKAGE_PATH_NOT_EXPORTED getMinifier | ~30 min | metro-transform-worker 0.83.3 hoisted | Pin 0.81.0 como devDep na raiz |
+| 9 | metro_cache_key_1.default is not a function | ~20 min | metro-cache-key 0.83.3 API mudou | Pin 0.81.0 como devDep na raiz |
+| 10 | Unable to resolve @onsite/timeline/data | ~5 min | Metro nao suporta subpath exports | Import de `@onsite/timeline` (root) |
+| 11 | expo prebuild da raiz contamina root | ~15 min | Rodou Expo da raiz do monorepo | Deletar android/ fantasma, limpar deps |
+| 12 | Metro hanging (>5min sem output) | ~20 min | android/ fantasma na raiz + node_modules corrompido | rm -rf android/ + reinstall |
+| 13 | Metro hanging no bundling (Windows) | ~30 min | `watchFolders = [monorepoRoot]` escaneia TODO o monorepo | watchFolders so com packages usados |
+| 14 | Bundle 404 (index.bundle not found) | ~15 min | Sem `index.js` entry point no app | Criar `index.js` + mudar main pra `./index.js` |
+| 15 | Tela branca (device nao alcanca Metro) | ~10 min | Device fisico via USB precisa de tunnel | `adb reverse tcp:8081 tcp:8081` |
+
+**Fixes permanentes aplicados:**
+
+| Fix | Arquivo | Detalhe |
+|-----|---------|---------|
+| Pin metro versions | `package.json` (root) | `metro-transform-worker@0.81.0`, `metro-cache-key@0.81.0` |
+| Prevent phantom dirs | `.gitignore` (root) | `/android/`, `/ios/` |
+| watchFolders cirurgico | `apps/operator/metro.config.js` | So `packages/{shared,timeline,offline}`, nao `monorepoRoot` |
+| blockList build artifacts | `apps/operator/metro.config.js` | `.next/`, `dist/`, `build/`, `.turbo/`, `coverage/` |
+| disableHierarchicalLookup | `apps/operator/metro.config.js` | Impede Metro de subir a arvore de dirs |
+| Entry point explicito | `apps/operator/index.js` + `package.json` | `import "expo-router/entry"` + `"main": "./index.js"` |
+| Kotlin version | `apps/operator/android/gradle.properties` | `android.kotlinVersion=1.9.25` |
+
+**Comando de dev completo (2 terminais):**
+```bash
+# Terminal 1 — Metro
+cd apps/operator
+npx expo start --dev-client --localhost --clear --port 8081
+
+# Terminal 2 — USB tunnel (obrigatorio pra device fisico)
+adb reverse tcp:8081 tcp:8081
+```
+
+**Licoes aprendidas:**
+1. **watchFolders no Windows:** NUNCA usar `[monorepoRoot]` num turborepo grande. Listar so os packages que o app importa.
+2. **Entry point em monorepo:** Apps Expo PRECISAM de `index.js` explicito com `import "expo-router/entry"`. Sem isso, Metro nao encontra o bundle.
+3. **Device fisico USB:** SEMPRE rodar `adb reverse tcp:8081 tcp:8081` antes de conectar. Sem isso, 127.0.0.1 no celular aponta pro proprio celular.
+4. **`--localhost` flag:** Usar `npx expo start --localhost` pra forcar Metro a servir em localhost (nao IP de LAN).
+5. **Diagnostico:** `curl http://localhost:8081/status` verifica se Metro ta vivo. `curl -I "http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=true"` verifica se o bundle funciona.
 
 ### Problemas ja resolvidos (REFACTOR_PLAN Fases 0-8)
 
@@ -622,12 +660,6 @@ npx expo prebuild --clean --platform android
 npx expo run:android
 ```
 
-### Quero rodar o Timekeeper-Web
-```bash
-npm run dev:timekeeper-web
-# Abre http://localhost:3000
-```
-
 ### Quero rodar o Calculator (web)
 ```bash
 cd apps/calculator && npm run dev
@@ -639,6 +671,23 @@ cd apps/calculator && npm run dev
 cd apps/calculator
 npm run android:build    # build + abre Android Studio
 # No Android Studio: Run → target device
+```
+
+### Quero rodar o Operator (celular Android)
+```bash
+# Se app ja esta instalado no celular (2 terminais):
+# Terminal 1:
+cd apps/operator
+npx expo start --dev-client --localhost --clear --port 8081
+# Terminal 2:
+adb reverse tcp:8081 tcp:8081
+
+# Se e a primeira vez ou mudou plugin:
+cd apps/operator
+npx expo prebuild --clean --platform android
+npx expo run:android
+# Depois, em terminal separado:
+adb reverse tcp:8081 tcp:8081
 ```
 
 ### Quero buildar TUDO pra producao
@@ -699,6 +748,37 @@ Verificar metro.config.js — blockList precisa incluir:
 ls apps/[app]/node_modules/[dep]
 # Se nao existe, adicionar explicitamente ao package.json do app
 ```
+
+### ERR_PACKAGE_PATH_NOT_EXPORTED (metro-transform-worker)
+```
+Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: Package subpath './src/utils/getMinifier'
+is not defined by "exports" in node_modules\metro-transform-worker\package.json
+```
+**Causa:** `metro-transform-worker@0.83.3` hoisted da `@onsite/camera` → `expo@54`.
+**Fix:** `npm install metro-transform-worker@0.81.0 --save-dev` na raiz.
+
+### metro_cache_key_1.default is not a function
+**Causa:** `metro-cache-key@0.83.3` mudou API (exporta `{getCacheKey}` em vez de funcao).
+**Fix:** `npm install metro-cache-key@0.81.0 --save-dev` na raiz.
+
+### Unable to resolve "@onsite/pkg/subpath"
+**Causa:** Metro NAO suporta subpath exports do package.json (`exports: { "./data": ... }`).
+**Fix:** Importar do root: `import { fn } from '@onsite/pkg'` (sem subpath).
+**Excecao:** `@onsite/utils` — root puxa tailwind-merge (web-only). Mobile deve importar direto: `@onsite/utils/src/uuid`.
+
+### Metro trava / hanging (>5 minutos sem output)
+**Causas:** (1) Diretorio `android/` fantasma na raiz do monorepo, (2) node_modules corrompido, (3) processo Metro anterior na porta 8081.
+```bash
+# Fix completo:
+rm -rf android/              # na raiz do monorepo
+rm -rf node_modules && npm install
+cd apps/[app] && npx expo start --dev-client -c
+```
+
+### Expo prebuild da raiz contaminou root package.json
+**Sintoma:** Root package.json tem `expo`, `react`, `react-native` em `dependencies`.
+**Fix:** Remover as deps, deletar `android/` da raiz, `rm -rf node_modules && npm install`.
+**Prevencao:** NUNCA rodar `npx expo` da raiz. SEMPRE `cd apps/[app]` primeiro.
 
 ---
 

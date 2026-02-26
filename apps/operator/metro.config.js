@@ -6,14 +6,27 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// 1. Watch all files within the monorepo
-config.watchFolders = [monorepoRoot];
+// 1. Watch ONLY the packages this app actually imports (not the whole monorepo!)
+// Watching monorepoRoot on Windows causes Metro to scan .next/, .turbo/, all apps → hangs.
+config.watchFolders = [
+  path.resolve(monorepoRoot, 'packages', 'auth'),
+  path.resolve(monorepoRoot, 'packages', 'auth-ui'),
+  path.resolve(monorepoRoot, 'packages', 'tokens'),
+  path.resolve(monorepoRoot, 'packages', 'shared'),
+  path.resolve(monorepoRoot, 'packages', 'timeline'),
+  path.resolve(monorepoRoot, 'packages', 'offline'),
+  path.resolve(monorepoRoot, 'packages', 'sharing'),
+  path.resolve(monorepoRoot, 'packages', 'camera'),
+];
 
 // 2. Let Metro know where to resolve packages and in what order
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(monorepoRoot, 'node_modules'),
 ];
+
+// 3. Prevent Metro from walking up the directory tree looking for modules
+config.resolver.disableHierarchicalLookup = true;
 
 // --- REACT 18/19 ISOLATION ---
 // Root has React 19.x (Next.js apps), local has React 18.3.1 (Expo).
@@ -29,9 +42,16 @@ const rootRN = path.resolve(monorepoRoot, 'node_modules', 'react-native')
   .replace(/[\\]/g, '\\\\');
 
 config.resolver.blockList = [
+  // React version isolation
   new RegExp(`${rootReact}[\\\\/].*`),
   new RegExp(`${rootReactDom}[\\\\/].*`),
   new RegExp(`${rootRN}[\\\\/].*`),
+  // Block Next.js/Turbo build artifacts (prevents file watcher churn on Windows)
+  /.*[\\/]apps[\\/].*[\\/]\.next[\\/].*/,
+  /.*[\\/]apps[\\/].*[\\/]dist[\\/].*/,
+  /.*[\\/]apps[\\/].*[\\/]build[\\/].*/,
+  /.*[\\/]\.turbo[\\/].*/,
+  /.*[\\/]coverage[\\/].*/,
 ];
 
 config.resolver.extraNodeModules = {

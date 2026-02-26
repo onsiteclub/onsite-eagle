@@ -15,11 +15,11 @@
     "dev:inspect": "turbo dev --filter=@onsite/inspect",
     "dev:calculator": "turbo dev --filter=@onsite/calculator",
     "dev:timekeeper": "turbo dev --filter=@onsite/timekeeper",
-    "dev:timekeeper-web": "turbo dev --filter=@onsite/timekeeper-web",
     "dev:auth": "turbo dev --filter=@onsite/auth-app",
     "dev:dashboard": "turbo dev --filter=@onsite/dashboard",
     "dev:analytics": "turbo dev --filter=@onsite/analytics",
     "dev:operator": "turbo dev --filter=@onsite/operator",
+    "dev:architecture": "turbo dev --filter=@onsite/architecture",
     "clean": "turbo clean && rm -rf node_modules",
     "android": "expo run:android",
     "ios": "expo run:ios"

@@ -17,7 +17,8 @@ When you create an account, we collect:
 ### Usage Data
 We automatically collect:
 - App usage analytics (calculations performed, features used)
-- Device information (OS version, device type)
+- Device information (OS version, device model)
+- IP address (for rate limiting and security)
 - Error logs for debugging
 
 ### Voice Data
@@ -63,8 +64,11 @@ To exercise these rights, contact us at privacy@onsiteclub.ca
 ## Data Retention
 
 - Account data is retained while your account is active
+- Calculation history: 90 days
 - Voice recordings are not retained after processing
-- Analytics data is retained for 12 months
+- Voice transcriptions: 30 days (if consented)
+- Consent records: 7 years (legal requirement)
+- Error logs: 30 days
 - Deleted accounts are purged within 30 days
 
 ## Children's Privacy

@@ -1,27 +1,29 @@
+/**
+ * My Lots — Worker's assigned lots
+ *
+ * Queries egl_houses via org membership.
+ * Enterprise v3 light theme.
+ */
+
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@onsite/auth';
 import { supabase } from '../../src/lib/supabase';
-import { format } from 'date-fns';
 
-interface AssignedLot {
+interface House {
   id: string;
-  house_id: string;
+  lot_number: string;
+  address: string | null;
   status: string;
-  expected_start_date: string | null;
-  expected_end_date: string | null;
-  house: {
+  current_phase: number;
+  progress_percentage: number;
+  site_id: string;
+  site: {
     id: string;
-    lot_number: string;
-    address: string | null;
-    status: string;
-    current_phase: number;
-    progress_percentage: number;
-    site: {
-      id: string;
-      name: string;
-    };
-  };
+    name: string;
+  } | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -32,71 +34,63 @@ const STATUS_COLORS: Record<string, string> = {
   on_hold: '#8B5CF6',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  delayed: 'Delayed',
+  completed: 'Completed',
+  on_hold: 'On Hold',
+};
+
+const ACCENT = '#0F766E';
+
 export default function MyLotsScreen() {
-  const [assignments, setAssignments] = useState<AssignedLot[]>([]);
+  const { user } = useAuth();
+  const [houses, setHouses] = useState<House[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadAssignments();
-  }, []);
+    if (user) loadHouses();
+  }, [user]);
 
-  async function loadAssignments() {
+  async function loadHouses() {
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        // Not logged in - show empty state
-        setAssignments([]);
-        return;
-      }
-
-      // Load assignments with house and site details
+      // Load houses from the worker's assigned sites
+      // For now, load all houses the user has access to via org membership
       const { data, error } = await supabase
-        .from('house_assignments')
+        .from('egl_houses')
         .select(`
           id,
-          house_id,
+          lot_number,
+          address,
           status,
-          expected_start_date,
-          expected_end_date,
-          house:houses (
+          current_phase,
+          progress_percentage,
+          site_id,
+          site:egl_sites (
             id,
-            lot_number,
-            address,
-            status,
-            current_phase,
-            progress_percentage,
-            site:sites (
-              id,
-              name
-            )
+            name
           )
         `)
-        .eq('worker_id', user.id)
-        .eq('status', 'accepted')
-        .order('expected_end_date', { ascending: true });
+        .order('lot_number', { ascending: true });
 
       if (error) {
-        console.error('Error loading assignments:', error);
-        // For now, show demo data if table doesn't exist
-        setAssignments([]);
+        console.error('Error loading houses:', error);
+        setHouses([]);
         return;
       }
 
-      // Filter out any assignments where house was deleted and transform data
-      const validAssignments = (data || [])
-        .filter((a: any) => a.house)
-        .map((a: any) => ({
-          ...a,
-          house: Array.isArray(a.house) ? a.house[0] : a.house,
-        }))
-        .filter((a: any) => a.house);
-      setAssignments(validAssignments as unknown as AssignedLot[]);
+      // Normalize site from array to single object
+      const normalized = (data || []).map((h: any) => ({
+        ...h,
+        site: Array.isArray(h.site) ? h.site[0] : h.site,
+      }));
+
+      setHouses(normalized);
     } catch (error) {
-      console.error('Error loading assignments:', error);
-      setAssignments([]);
+      console.error('Error loading houses:', error);
+      setHouses([]);
     } finally {
       setLoading(false);
     }
@@ -104,18 +98,14 @@ export default function MyLotsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadAssignments();
+    await loadHouses();
     setRefreshing(false);
   }, []);
-
-  const navigateToLot = (lotId: string) => {
-    router.push(`/lot/${lotId}`);
-  };
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#10B981" />
+        <ActivityIndicator size="large" color={ACCENT} />
         <Text style={styles.loadingText}>Loading your lots...</Text>
       </View>
     );
@@ -123,21 +113,29 @@ export default function MyLotsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>My Lots</Text>
+        <Text style={styles.headerSubtitle}>
+          {houses.length} lot{houses.length !== 1 ? 's' : ''} assigned
+        </Text>
+      </View>
+
       {/* Stats Summary */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{assignments.length}</Text>
-          <Text style={styles.statLabel}>Assigned</Text>
+          <Text style={styles.statNumber}>{houses.length}</Text>
+          <Text style={styles.statLabel}>Total</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: '#F59E0B' }]}>
-            {assignments.filter(a => a.house?.status === 'in_progress').length}
+            {houses.filter(h => h.status === 'in_progress').length}
           </Text>
           <Text style={styles.statLabel}>In Progress</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: '#10B981' }]}>
-            {assignments.filter(a => a.house?.status === 'completed').length}
+            {houses.filter(h => h.status === 'completed').length}
           </Text>
           <Text style={styles.statLabel}>Completed</Text>
         </View>
@@ -145,44 +143,38 @@ export default function MyLotsScreen() {
 
       {/* Lot List */}
       <FlatList
-        data={assignments}
+        data={houses}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#10B981"
-            colors={['#10B981']}
+            tintColor={ACCENT}
+            colors={[ACCENT]}
           />
         }
         renderItem={({ item }) => {
-          const house = item.house;
-          if (!house) return null;
-
-          const statusColor = STATUS_COLORS[house.status] || STATUS_COLORS.not_started;
-          const dueDate = item.expected_end_date
-            ? format(new Date(item.expected_end_date), 'MMM d, yyyy')
-            : null;
+          const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.not_started;
 
           return (
             <TouchableOpacity
               style={styles.lotCard}
-              onPress={() => navigateToLot(house.id)}
+              onPress={() => router.push(`/lot/${item.id}`)}
               activeOpacity={0.7}
             >
               <View style={styles.lotHeader}>
                 <View style={styles.lotTitleRow}>
-                  <Text style={styles.lotNumber}>Lot {house.lot_number}</Text>
+                  <Text style={styles.lotNumber}>Lot {item.lot_number}</Text>
                   <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
                     <Text style={styles.statusText}>
-                      {house.status.replace('_', ' ')}
+                      {STATUS_LABELS[item.status] || item.status}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.siteName}>{house.site?.name || 'Unknown Site'}</Text>
-                {house.address && (
-                  <Text style={styles.address}>{house.address}</Text>
+                <Text style={styles.siteName}>{item.site?.name || 'Unknown Site'}</Text>
+                {item.address && (
+                  <Text style={styles.address}>{item.address}</Text>
                 )}
               </View>
 
@@ -190,47 +182,40 @@ export default function MyLotsScreen() {
               <View style={styles.progressSection}>
                 <View style={styles.progressInfo}>
                   <Text style={styles.progressText}>
-                    Phase {house.current_phase} of 7
+                    Phase {item.current_phase} of 7
                   </Text>
                   <Text style={styles.progressPercent}>
-                    {house.progress_percentage}%
+                    {item.progress_percentage}%
                   </Text>
                 </View>
                 <View style={styles.progressBarContainer}>
                   <View
                     style={[
                       styles.progressBarFill,
-                      { width: `${house.progress_percentage}%` }
+                      { width: `${item.progress_percentage}%` }
                     ]}
                   />
                 </View>
               </View>
 
-              {/* Due Date */}
-              {dueDate && (
-                <View style={styles.dueSection}>
-                  <Text style={styles.dueIcon}>📅</Text>
-                  <Text style={styles.dueText}>Due: {dueDate}</Text>
-                </View>
-              )}
-
-              {/* Tap indicator */}
-              <Text style={styles.tapHint}>Tap to view details →</Text>
+              <View style={styles.lotFooter}>
+                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+              </View>
             </TouchableOpacity>
           );
         }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📋</Text>
+            <Ionicons name="home-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>No Lots Assigned</Text>
             <Text style={styles.emptyText}>
-              Scan a QR code on a lot to access its details
+              Scan a site QR code in Settings to connect to your construction site
             </Text>
             <TouchableOpacity
               style={styles.scanButton}
-              onPress={() => router.push('/(tabs)/scan')}
+              onPress={() => router.push('/scanner')}
             >
-              <Text style={styles.scanButtonIcon}>📷</Text>
+              <Ionicons name="qr-code" size={20} color="#FFFFFF" />
               <Text style={styles.scanButtonText}>Scan QR Code</Text>
             </TouchableOpacity>
           </View>
@@ -243,18 +228,37 @@ export default function MyLotsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#F6F7F9',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: '#F6F7F9',
   },
   loadingText: {
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginTop: 12,
     fontSize: 14,
+  },
+  // Header
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 56,
+    paddingBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#101828',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
   },
   // Stats
   statsContainer: {
@@ -264,39 +268,34 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#374151',
   },
   statNumber: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fff',
+    color: '#101828',
   },
   statLabel: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginTop: 4,
   },
   // List
   listContent: {
-    padding: 16,
-    paddingTop: 0,
+    paddingHorizontal: 16,
     paddingBottom: 100,
   },
   lotCard: {
-    backgroundColor: '#1F2937',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#374151',
   },
   lotHeader: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   lotTitleRow: {
     flexDirection: 'row',
@@ -305,9 +304,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   lotNumber: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: '#101828',
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -318,22 +317,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '600',
-    textTransform: 'capitalize',
   },
   siteName: {
     fontSize: 14,
-    color: '#10B981',
+    color: ACCENT,
     fontWeight: '500',
     marginTop: 4,
   },
   address: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginTop: 2,
   },
   // Progress
   progressSection: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   progressInfo: {
     flexDirection: 'row',
@@ -342,64 +340,44 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 13,
-    color: '#D1D5DB',
+    color: '#6B7280',
   },
   progressPercent: {
     fontSize: 13,
-    color: '#10B981',
+    color: ACCENT,
     fontWeight: '600',
   },
   progressBarContainer: {
     height: 8,
-    backgroundColor: '#374151',
+    backgroundColor: '#E5E7EB',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#10B981',
+    backgroundColor: ACCENT,
     borderRadius: 4,
   },
-  // Due
-  dueSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  dueIcon: {
-    fontSize: 14,
-  },
-  dueText: {
-    fontSize: 13,
-    color: '#9CA3AF',
-  },
-  tapHint: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'right',
+  lotFooter: {
+    alignItems: 'flex-end',
   },
   // Empty state
   emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 80,
     paddingHorizontal: 40,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 20,
-  },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#fff',
+    color: '#101828',
+    marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
@@ -407,17 +385,14 @@ const styles = StyleSheet.create({
   scanButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#10B981',
+    backgroundColor: ACCENT,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 12,
     gap: 8,
   },
-  scanButtonIcon: {
-    fontSize: 20,
-  },
   scanButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

@@ -155,7 +155,9 @@ export async function POST(request: NextRequest) {
     }
 
     // If a material_request was detected, create an egl_material_requests row
-    if (result.material_request && result.event.event_type === 'material_request') {
+    // Check material_request object directly — AI may populate it even when
+    // event_type is "calendar" or "note" (e.g. message mentions delivery date)
+    if (result.material_request && result.material_request.material_name) {
       const mr = result.material_request;
 
       // Try to resolve house_id from lot number
@@ -170,17 +172,23 @@ export async function POST(request: NextRequest) {
         if (house) resolvedHouseId = house.id;
       }
 
-      await supabase.from('egl_material_requests').insert({
+      const { error: insertError } = await supabase.from('egl_material_requests').insert({
         site_id,
         house_id: resolvedHouseId,
+        material_type: mr.material_type || 'general',
         material_name: mr.material_name,
         quantity: mr.quantity || 1,
         unit: mr.unit || 'units',
         urgency_level: mr.urgency || 'medium',
         status: 'pending',
         requested_by_name: sender_name || 'Unknown',
+        requested_by_role: sender_type || 'supervisor',
         notes: `AI-detected from message: "${message}"`,
       });
+
+      if (insertError) {
+        console.error('[mediate] Failed to insert material request:', insertError);
+      }
     }
 
     // Trigger push notifications for event types that warrant them (fire-and-forget)

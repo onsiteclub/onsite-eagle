@@ -26,34 +26,55 @@ export function AuthProvider({ children, supabase }: AuthProviderProps) {
     error: null,
   })
 
-  // Fetch user profile from database
-  const fetchUserProfile = useCallback(async (userId: string): Promise<User | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) throw error
-      return data as User
-    } catch (error) {
-      console.error('Error fetching user profile:', error)
-      return null
+  // Fetch user profile from core_profiles + role from core_org_memberships
+  const fetchUserProfile = useCallback(async (session: Session): Promise<User> => {
+    // Fallback user from auth session data
+    const user: User = {
+      id: session.user.id,
+      email: session.user.email || '',
+      name: session.user.email?.split('@')[0] || 'User',
+      role: 'worker',
+      createdAt: session.user.created_at || new Date().toISOString(),
     }
+
+    try {
+      const { data } = await supabase
+        .from('core_profiles')
+        .select('full_name, avatar_url, phone')
+        .eq('id', session.user.id)
+        .maybeSingle()
+
+      if (data) {
+        user.name = data.full_name || user.name
+        user.avatar = data.avatar_url || undefined
+        user.phone = data.phone || undefined
+      }
+
+      // Get role from org membership (first active one)
+      const { data: membership } = await supabase
+        .from('core_org_memberships')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (membership?.role) {
+        user.role = membership.role as UserRole
+      }
+    } catch (error) {
+      console.warn('[AuthProvider] Profile fetch failed, using fallback:', error)
+    }
+
+    return user
   }, [supabase])
 
   // Handle auth state changes
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id)
-        setState({
-          user: profile,
-          loading: false,
-          error: null,
-        })
+      if (session) {
+        const profile = await fetchUserProfile(session)
+        setState({ user: profile, loading: false, error: null })
       } else {
         setState({ user: null, loading: false, error: null })
       }
@@ -61,8 +82,8 @@ export function AuthProvider({ children, supabase }: AuthProviderProps) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await fetchUserProfile(session.user.id)
+      if (event === 'SIGNED_IN' && session) {
+        const profile = await fetchUserProfile(session)
         setState({ user: profile, loading: false, error: null })
       } else if (event === 'SIGNED_OUT') {
         setState({ user: null, loading: false, error: null })
@@ -103,17 +124,19 @@ export function AuthProvider({ children, supabase }: AuthProviderProps) {
 
       if (authError) throw authError
 
-      // Create user profile
+      // Update user profile in core_profiles (trigger creates row on auth.users insert)
       if (authData.user) {
-        const { error: profileError } = await supabase.from('users').insert({
-          id: authData.user.id,
-          email: credentials.email,
-          name: credentials.name,
-          role: credentials.role,
-          phone: credentials.phone,
-        })
+        const { error: profileError } = await supabase
+          .from('core_profiles')
+          .update({
+            full_name: credentials.name,
+            phone: credentials.phone || null,
+          })
+          .eq('id', authData.user.id)
 
-        if (profileError) throw profileError
+        if (profileError) {
+          console.warn('[AuthProvider] Profile update after signup failed:', profileError)
+        }
       }
     } catch (error) {
       setState((s) => ({

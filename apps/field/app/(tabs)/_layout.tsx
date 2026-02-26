@@ -1,44 +1,39 @@
+/**
+ * Tabs Layout - OnSite Field
+ *
+ * 3 tabs: My Lots (main), Agenda, Settings
+ * Enterprise v3 theme — identical to Operator.
+ */
+
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-function TabIcon({ name, focused }: { name: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    lots: '🏠',
-    scan: '📷',
-    profile: '👤',
-  };
+const COLORS = {
+  tabBar: '#FFFFFF',
+  tabBarBorder: '#E5E7EB',
+  active: '#0F766E',
+  inactive: '#9CA3AF',
+};
 
-  return (
-    <View style={styles.tabIcon}>
-      <Text style={{ fontSize: 24 }}>{icons[name] || '📄'}</Text>
-      {focused && <View style={styles.tabIndicator} />}
-    </View>
-  );
-}
-
-export default function TabLayout() {
+export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#1F2937',
-          borderTopColor: '#374151',
-          height: 65,
-          paddingBottom: 10,
-          paddingTop: 5,
+          backgroundColor: COLORS.tabBar,
+          borderTopColor: COLORS.tabBarBorder,
+          borderTopWidth: 1,
+          height: Platform.OS === 'android' ? 64 : 84,
+          paddingBottom: Platform.OS === 'android' ? 8 : 24,
+          paddingTop: 8,
         },
-        tabBarActiveTintColor: '#10B981',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: COLORS.active,
+        tabBarInactiveTintColor: COLORS.inactive,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: '500',
-        },
-        headerStyle: {
-          backgroundColor: '#1F2937',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: '600',
         },
       }}
     >
@@ -46,39 +41,29 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'My Lots',
-          tabBarLabel: 'My Lots',
-          tabBarIcon: ({ focused }) => <TabIcon name="lots" focused={focused} />,
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="home" size={24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="scan"
+        name="agenda"
         options={{
-          title: 'Scan QR',
-          tabBarLabel: 'Scan',
-          tabBarIcon: ({ focused }) => <TabIcon name="scan" focused={focused} />,
+          title: 'Agenda',
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="calendar" size={24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="config"
         options={{
-          title: 'Profile',
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon name="profile" focused={focused} />,
+          title: 'Settings',
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="settings" size={24} color={color} />
+          ),
         }}
       />
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  tabIcon: {
-    alignItems: 'center',
-  },
-  tabIndicator: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#10B981',
-    marginTop: 2,
-  },
-});

@@ -5,7 +5,7 @@
  * Operator lives here 95% of the time.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,9 +18,10 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@onsite/auth';
 import { supabase } from '../../src/lib/supabase';
 import type { MaterialRequest, MaterialRequestStatus } from '@onsite/shared';
-import { getMaterialRequests, updateRequestStatus } from '@onsite/shared';
+import { getOperatorQueue, updateRequestStatus } from '@onsite/shared';
 import { formatDistanceToNow } from 'date-fns';
 
 const ACCENT = '#0F766E';
@@ -41,73 +42,119 @@ const STATUS_BORDER: Record<string, string> = {
 
 export default function RequestsQueue() {
   const router = useRouter();
+  const { user } = useAuth();
+  const operatorId = user?.id || null;
+  const operatorName = user?.name?.split(' ')[0] || 'Operator';
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [operatorName, setOperatorName] = useState('Operator');
+  const [siteIds, setSiteIds] = useState<string[]>([]);
+  const loadRequestsRef = useRef<() => void>();
 
+  // Load assigned sites + initial requests when user is available
+  useEffect(() => {
+    if (operatorId) loadAssignments(operatorId);
+    else setLoading(false);
+  }, [operatorId]);
+
+  // Load requests when screen gets focus
   useFocusEffect(
     useCallback(() => {
-      loadRequests();
-    }, [])
+      if (operatorId) loadRequests();
+    }, [operatorId])
   );
 
+  // Realtime subscription — reload when material requests change
   useEffect(() => {
-    loadOperator();
-  }, []);
+    if (siteIds.length === 0) return;
 
-  async function loadOperator() {
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      const { data: profile } = await supabase
-        .from('core_profiles')
-        .select('full_name, first_name')
-        .eq('id', data.user.id)
-        .maybeSingle();
-      setOperatorName(profile?.first_name || profile?.full_name?.split(' ')[0] || 'Operator');
+    const channelConfig = siteIds.length === 1
+      ? { event: '*' as const, schema: 'public', table: 'egl_material_requests', filter: `site_id=eq.${siteIds[0]}` }
+      : { event: '*' as const, schema: 'public', table: 'egl_material_requests' };
+
+    const channel = supabase
+      .channel('operator-requests')
+      .on('postgres_changes', channelConfig, (payload) => {
+        // Multi-site: check if change belongs to our sites
+        if (siteIds.length > 1) {
+          const siteId = (payload.new as any)?.site_id || (payload.old as any)?.site_id;
+          if (siteId && !siteIds.includes(siteId)) return;
+        }
+        loadRequestsRef.current?.();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [siteIds]);
+
+  async function loadAssignments(userId: string) {
+    // Load assigned site IDs for realtime filter
+    const { data: assignments } = await supabase
+      .from('egl_operator_assignments')
+      .select('site_id')
+      .eq('operator_id', userId)
+      .eq('is_active', true);
+
+    if (assignments && assignments.length > 0) {
+      setSiteIds(assignments.map((a: any) => a.site_id));
     }
+
+    // Initial load
+    await loadRequestsForOperator(userId);
   }
 
-  async function loadRequests() {
+  async function loadRequestsForOperator(opId: string) {
     try {
-      const { data, error } = await getMaterialRequests(supabase, {});
+      const { data, error } = await getOperatorQueue(supabase, opId);
 
       if (error) {
         console.error('Error loading requests:', error);
         return;
       }
 
-      // Active requests only, sorted by urgency
-      const activeStatuses = ['pending', 'acknowledged', 'in_transit'];
-      const urgencyOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-      const statusOrder: Record<string, number> = { pending: 0, acknowledged: 1, in_transit: 2 };
-
-      const active = (data || [])
-        .filter(req => activeStatuses.includes(req.status))
-        .map(req => ({
-          ...req,
-          lot_number: (req as any).house?.lot_number || null,
-          site_name: (req as any).site?.name || null,
-        }))
-        .sort((a, b) => {
-          // Sort by urgency first, then by status, then by date
-          const urgA = urgencyOrder[a.urgency_level] ?? 99;
-          const urgB = urgencyOrder[b.urgency_level] ?? 99;
-          if (urgA !== urgB) return urgA - urgB;
-          const stA = statusOrder[a.status] ?? 99;
-          const stB = statusOrder[b.status] ?? 99;
-          if (stA !== stB) return stA - stB;
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-
-      setRequests(active);
+      processRequests(data);
     } catch (err) {
       console.error('Error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+  }
+
+  async function loadRequests() {
+    if (!operatorId) return;
+    await loadRequestsForOperator(operatorId);
+  }
+
+  // Keep ref updated for realtime callback
+  loadRequestsRef.current = loadRequests;
+
+  function processRequests(data: MaterialRequest[] | null) {
+    const activeStatuses = ['pending', 'acknowledged', 'in_transit'];
+    const urgencyOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+    const statusOrder: Record<string, number> = { pending: 0, acknowledged: 1, in_transit: 2 };
+
+    const active = (data || [])
+      .filter(req => activeStatuses.includes(req.status))
+      .map(req => ({
+        ...req,
+        lot_number: (req as any).house?.lot_number || null,
+        site_name: (req as any).site?.name || null,
+      }))
+      .sort((a, b) => {
+        const urgA = urgencyOrder[a.urgency_level] ?? 99;
+        const urgB = urgencyOrder[b.urgency_level] ?? 99;
+        if (urgA !== urgB) return urgA - urgB;
+        const stA = statusOrder[a.status] ?? 99;
+        const stB = statusOrder[b.status] ?? 99;
+        if (stA !== stB) return stA - stB;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+    setRequests(active);
   }
 
   async function handleInTransit(item: MaterialRequest) {
@@ -117,12 +164,12 @@ export default function RequestsQueue() {
         status: 'in_transit' as MaterialRequestStatus,
       });
       if (error) {
-        Alert.alert('Erro', 'Falha ao atualizar status');
+        Alert.alert('Error', 'Failed to update status');
       } else {
         loadRequests();
       }
     } catch {
-      Alert.alert('Erro', 'Algo deu errado');
+      Alert.alert('Error', 'Something went wrong');
     } finally {
       setUpdatingId(null);
     }
@@ -187,7 +234,7 @@ export default function RequestsQueue() {
               ) : (
                 <>
                   <Ionicons name="car" size={16} color="#fff" />
-                  <Text style={styles.actionBtnText}>Em Andamento</Text>
+                  <Text style={styles.actionBtnText}>In Transit</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -199,7 +246,7 @@ export default function RequestsQueue() {
             disabled={isUpdating}
           >
             <Ionicons name="checkmark-circle" size={16} color="#fff" />
-            <Text style={styles.actionBtnText}>Entregue</Text>
+            <Text style={styles.actionBtnText}>Delivered</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -219,14 +266,14 @@ export default function RequestsQueue() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Pedidos</Text>
+          <Text style={styles.headerTitle}>Requests</Text>
           <Text style={styles.headerSubtitle}>
-            {requests.length} {requests.length === 1 ? 'ativo' : 'ativos'}
+            {requests.length} active
           </Text>
         </View>
         <View style={styles.syncBadge}>
-          <Ionicons name="checkmark-circle" size={14} color={ACCENT} />
-          <Text style={styles.syncText}>Synced</Text>
+          <Ionicons name="radio" size={14} color={ACCENT} />
+          <Text style={styles.syncText}>Live</Text>
         </View>
       </View>
 
@@ -241,11 +288,20 @@ export default function RequestsQueue() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="cube-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>Nenhum pedido ativo</Text>
-            <Text style={styles.emptySubtitle}>Puxe para atualizar</Text>
+            <Text style={styles.emptyTitle}>No active requests</Text>
+            <Text style={styles.emptySubtitle}>Pull to refresh</Text>
           </View>
         }
       />
+
+      {/* Camera FAB */}
+      <TouchableOpacity
+        style={styles.cameraFab}
+        onPress={() => router.push('/photo')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="camera" size={26} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -386,5 +442,21 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  cameraFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 80,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: ACCENT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 8,
   },
 });

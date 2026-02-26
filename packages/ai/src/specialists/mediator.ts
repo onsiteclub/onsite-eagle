@@ -8,7 +8,7 @@
  */
 
 /** Version of the mediator prompt — increment when changing behavior */
-export const MEDIATION_PROMPT_VERSION = 1;
+export const MEDIATION_PROMPT_VERSION = 2;
 
 /** Static portion of the mediation system prompt */
 export const MEDIATION_PROMPT = `You are the AI Mediator for Eagle, a construction site management platform.
@@ -34,7 +34,8 @@ EVENT TYPES (pick the most appropriate):
 
 RULES:
 - Be conservative: when in doubt, use "note"
-- Only detect material_request if the message clearly asks for materials
+- IMPORTANT: event_type and material_request are INDEPENDENT. A message can be event_type "calendar" AND still have a material_request object. Always populate material_request when materials are mentioned, regardless of event_type.
+- Only populate material_request if the message clearly involves materials being needed or requested
 - Extract quantities and units when mentioned (e.g., "50 sheets of plywood" → quantity: 50, unit: "sheets")
 - Urgency defaults to "medium" unless clearly urgent ("ASAP", "urgent", "critical", "we're stopped")
 - confidence: 0.0-1.0 — how sure you are about the classification
@@ -91,6 +92,7 @@ RESPONSE FORMAT:
   },
   "material_request": null | {
     "material_name": "string",
+    "material_type": "lumber|plywood|drywall|concrete|insulation|roofing|siding|nails|screws|hardware|general",
     "quantity": number | null,
     "unit": "string" | null,
     "urgency": "low|medium|high|critical",
@@ -156,6 +158,7 @@ export interface ParsedMediationResult {
   };
   material_request: {
     material_name: string;
+    material_type?: string | null;
     quantity?: number | null;
     unit?: string | null;
     urgency: 'low' | 'medium' | 'high' | 'critical';

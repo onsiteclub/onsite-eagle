@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { Stack } from 'expo-router';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { AuthProvider, useAuth } from '@onsite/auth';
 import { registerPushToken, configureForegroundHandler } from '../src/lib/pushRegistration';
 import { initQueue, useOfflineSync } from '@onsite/offline';
 import { supabase } from '../src/lib/supabase';
@@ -16,6 +18,20 @@ configureForegroundHandler();
 initQueue(AsyncStorage);
 
 export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider supabase={supabase as never}>
+        <StatusBar style="dark" />
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function AppContent() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
   const pushRegistered = useRef(false);
 
   // Auto-sync offline queue when connectivity returns
@@ -36,29 +52,26 @@ export default function RootLayout() {
     }
   }, [queueSize, isOnline]);
 
-  // Register push token once user is authenticated
+  // Navigation guard — redirect based on auth state
   useEffect(() => {
-    if (pushRegistered.current) return;
+    if (loading) return;
 
-    const checkAuthAndRegister = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        pushRegistered.current = true;
-        registerPushToken().catch(() => {});
-      }
-    };
+    const inAuthGroup = segments[0] === '(auth)';
 
-    checkAuthAndRegister();
+    if (!user && !inAuthGroup) {
+      router.replace('/(auth)/login');
+    } else if (user && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
+  }, [loading, user, segments]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session && !pushRegistered.current) {
-        pushRegistered.current = true;
-        registerPushToken().catch(() => {});
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  // Register push on login
+  useEffect(() => {
+    if (user && !pushRegistered.current) {
+      pushRegistered.current = true;
+      registerPushToken().catch(() => {});
+    }
+  }, [user]);
 
   // Handle notification taps
   useEffect(() => {
@@ -71,36 +84,59 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#0F766E" />
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen
+        name="requests/[id]"
+        options={{
+          headerShown: true,
+          title: 'Request Details',
+          headerStyle: { backgroundColor: '#FFFFFF' },
+          headerTintColor: '#101828',
+          headerTitleStyle: { fontWeight: '600' },
         }}
-      >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="requests/[id]"
-          options={{
-            headerShown: true,
-            title: 'Detalhes do Pedido',
-            headerStyle: { backgroundColor: '#FFFFFF' },
-            headerTintColor: '#101828',
-            headerTitleStyle: { fontWeight: '600' },
-          }}
-        />
-        <Stack.Screen
-          name="deliver/[id]"
-          options={{
-            headerShown: true,
-            title: 'Confirmar Entrega',
-            headerStyle: { backgroundColor: '#FFFFFF' },
-            headerTintColor: '#101828',
-            headerTitleStyle: { fontWeight: '600' },
-          }}
-        />
-      </Stack>
-    </SafeAreaProvider>
+      />
+      <Stack.Screen
+        name="deliver/[id]"
+        options={{
+          headerShown: true,
+          title: 'Confirm Delivery',
+          headerStyle: { backgroundColor: '#FFFFFF' },
+          headerTintColor: '#101828',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      />
+      <Stack.Screen
+        name="scanner"
+        options={{
+          headerShown: false,
+          presentation: 'fullScreenModal',
+        }}
+      />
+    </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F6F7F9',
+  },
+});

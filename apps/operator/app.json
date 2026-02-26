@@ -30,7 +30,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      ["expo-camera", { "cameraPermission": "Permitir acesso a camera para escanear QR codes" }]
     ],
     "experiments": {
       "typedRoutes": true

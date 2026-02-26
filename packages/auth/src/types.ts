@@ -1,8 +1,10 @@
 /**
  * Authentication and User Types
+ *
+ * Roles aligned with core_org_memberships.role in DB.
  */
 
-export type UserRole = 'worker' | 'foreman' | 'manager' | 'admin'
+export type UserRole = 'worker' | 'inspector' | 'supervisor' | 'admin' | 'owner'
 
 export interface User {
   id: string
@@ -69,7 +71,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permissions> = {
     canManageUsers: false,
     canExportData: false,
   },
-  foreman: {
+  inspector: {
+    canAssignWorkers: false,
+    canApprovePhotos: true,
+    canEditPhases: false,
+    canViewAllSites: false,
+    canManageUsers: false,
+    canExportData: false,
+  },
+  supervisor: {
     canAssignWorkers: true,
     canApprovePhotos: true,
     canEditPhases: false,
@@ -77,15 +87,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permissions> = {
     canManageUsers: false,
     canExportData: false,
   },
-  manager: {
+  admin: {
     canAssignWorkers: true,
     canApprovePhotos: true,
     canEditPhases: true,
     canViewAllSites: true,
-    canManageUsers: false,
+    canManageUsers: true,
     canExportData: true,
   },
-  admin: {
+  owner: {
     canAssignWorkers: true,
     canApprovePhotos: true,
     canEditPhases: true,

@@ -8,6 +8,7 @@ import {
   Users, Home, Plus, Upload,
   MessageSquare, Layers, Lock, Unlock, UserPlus, Loader2,
   X, Check, CalendarDays, BarChart3, DollarSign, Sparkles,
+  FileSpreadsheet, Package, Clock,
 } from 'lucide-react'
 import AddLotModal from '@/components/AddLotModal'
 import BulkDocumentUpload from '@/components/BulkDocumentUpload'
@@ -17,12 +18,17 @@ import ChatTimeline from '@/components/ChatTimeline'
 import ScheduleTab from '@/components/ScheduleTab'
 import DocumentsTab from '@/components/DocumentsTab'
 import GanttView from '@/components/GanttView'
-import PaymentsTab from '@/components/PaymentsTab'
+import PaymentSheet from '@/components/PaymentSheet'
+import WorkerSheet from '@/components/WorkerSheet'
+import ProgressSheet from '@/components/ProgressSheet'
+import MaterialSheet from '@/components/MaterialSheet'
+import HoursSheet from '@/components/HoursSheet'
 import WeeklyReport from '@/components/WeeklyReport'
-import { Calendar } from '@onsite/ui/web'
+import { Calendar, QRCode } from '@onsite/ui/web'
 import type { CalendarEvent } from '@onsite/shared'
 
-type ViewType = 'lots' | 'schedule' | 'gantt' | 'chat' | 'team' | 'documents' | 'payments' | 'reports'
+type ViewType = 'lots' | 'schedule' | 'gantt' | 'chat' | 'team' | 'documents' | 'reports'
+  | 'sheet-payments' | 'sheet-workers' | 'sheet-progress' | 'sheet-materials' | 'sheet-hours'
 
 interface TeamMember {
   id: string
@@ -82,6 +88,7 @@ export default function SiteDetail() {
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [showIssueLotModal, setShowIssueLotModal] = useState(false)
   const [selectedLotForIssue, setSelectedLotForIssue] = useState<House | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['sheets']))
 
   const handleIssueLot = (house: House) => {
     setSelectedLotForIssue(house)
@@ -98,6 +105,13 @@ export default function SiteDetail() {
         'chat': 'chat',
         'team': 'team',
         'documents': 'documents',
+        'payments': 'sheet-payments',
+        'sheet-payments': 'sheet-payments',
+        'sheet-workers': 'sheet-workers',
+        'sheet-progress': 'sheet-progress',
+        'sheet-materials': 'sheet-materials',
+        'sheet-hours': 'sheet-hours',
+        'reports': 'reports',
       }
       const mappedView = tabMapping[tab]
       if (mappedView) {
@@ -225,7 +239,18 @@ export default function SiteDetail() {
     { id: 'chat', label: 'Timeline', icon: MessageSquare, view: 'chat' },
     { id: 'team', label: 'Team', icon: Users, view: 'team' },
     { id: 'documents', label: 'Documents', icon: FileText, view: 'documents' },
-    { id: 'payments', label: 'Payments', icon: DollarSign, view: 'payments' },
+    {
+      id: 'sheets',
+      label: 'Sheets',
+      icon: FileSpreadsheet,
+      children: [
+        { id: 'sheet-payments', label: 'Payments', icon: DollarSign, view: 'sheet-payments' },
+        { id: 'sheet-workers', label: 'Workers', icon: Users, view: 'sheet-workers' },
+        { id: 'sheet-progress', label: 'Progress', icon: BarChart3, view: 'sheet-progress' },
+        { id: 'sheet-materials', label: 'Materials', icon: Package, view: 'sheet-materials' },
+        { id: 'sheet-hours', label: 'Hours', icon: Clock, view: 'sheet-hours' },
+      ],
+    },
     { id: 'reports', label: 'AI Reports', icon: Sparkles, view: 'reports' },
   ]
 
@@ -244,7 +269,11 @@ export default function SiteDetail() {
       case 'chat': return 'Site Timeline'
       case 'team': return 'Team'
       case 'documents': return 'Documents'
-      case 'payments': return 'Payment Milestones'
+      case 'sheet-payments': return 'Payment Sheet'
+      case 'sheet-workers': return 'Worker Sheet'
+      case 'sheet-progress': return 'Progress Sheet'
+      case 'sheet-materials': return 'Material Sheet'
+      case 'sheet-hours': return 'Hours Sheet'
       case 'reports': return 'AI Reports'
       default: return 'Site Detail'
     }
@@ -327,20 +356,67 @@ export default function SiteDetail() {
         {/* Menu Navigation */}
         <nav className="flex-1 p-3 overflow-auto">
           <div className="space-y-1">
-            {menuItems.map(menu => (
-              <button
-                key={menu.id}
-                onClick={() => handleMenuClick(menu)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  activeView === menu.view
-                    ? 'bg-[#007AFF]/10 text-[#007AFF]'
-                    : 'text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
-                }`}
-              >
-                <menu.icon className="w-5 h-5" />
-                <span className="font-medium text-sm">{menu.label}</span>
-              </button>
-            ))}
+            {menuItems.map(menu => {
+              if (menu.children) {
+                const isGroupActive = menu.children.some(c => activeView === c.view)
+                const isExpanded = isGroupActive || expandedGroups.has(menu.id)
+                return (
+                  <div key={menu.id}>
+                    <button
+                      onClick={() => {
+                        setExpandedGroups(prev => {
+                          const next = new Set(prev)
+                          if (next.has(menu.id)) next.delete(menu.id)
+                          else next.add(menu.id)
+                          return next
+                        })
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                        isGroupActive
+                          ? 'text-[#007AFF]'
+                          : 'text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
+                      }`}
+                    >
+                      <menu.icon className="w-5 h-5" />
+                      <span className="font-medium text-sm flex-1 text-left">{menu.label}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                    </button>
+                    {isExpanded && (
+                      <div className="ml-4 mt-0.5 space-y-0.5">
+                        {menu.children.map(child => (
+                          <button
+                            key={child.id}
+                            onClick={() => handleMenuClick(child)}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${
+                              activeView === child.view
+                                ? 'bg-[#007AFF]/10 text-[#007AFF]'
+                                : 'text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
+                            }`}
+                          >
+                            <child.icon className="w-4 h-4" />
+                            <span className="text-sm">{child.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              return (
+                <button
+                  key={menu.id}
+                  onClick={() => handleMenuClick(menu)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                    activeView === menu.view
+                      ? 'bg-[#007AFF]/10 text-[#007AFF]'
+                      : 'text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
+                  }`}
+                >
+                  <menu.icon className="w-5 h-5" />
+                  <span className="font-medium text-sm">{menu.label}</span>
+                </button>
+              )
+            })}
           </div>
         </nav>
 
@@ -414,10 +490,22 @@ export default function SiteDetail() {
               currentUserName="Supervisor"
             />
           )}
-          {activeView === 'team' && <SettingsTeamView onAddTeam={() => setShowAddTeamModal(true)} />}
+          {activeView === 'team' && <SettingsTeamView siteId={siteId} siteName={site.name} onAddTeam={() => setShowAddTeamModal(true)} />}
           {activeView === 'documents' && <DocumentsTab siteId={siteId} onBulkUpload={() => setShowBulkUploadModal(true)} />}
-          {activeView === 'payments' && (
-            <PaymentsTab siteId={siteId} siteName={site.name} />
+          {activeView === 'sheet-payments' && (
+            <PaymentSheet siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'sheet-workers' && (
+            <WorkerSheet siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'sheet-progress' && (
+            <ProgressSheet siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'sheet-materials' && (
+            <MaterialSheet siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'sheet-hours' && (
+            <HoursSheet siteId={siteId} siteName={site.name} />
           )}
           {activeView === 'reports' && (
             <WeeklyReport siteId={siteId} siteName={site.name} />
@@ -437,6 +525,7 @@ export default function SiteDetail() {
       {showAddTeamModal && (
         <AddTeamModal
           siteId={siteId}
+          siteName={site?.name || ''}
           onClose={() => setShowAddTeamModal(false)}
         />
       )}
@@ -782,141 +871,238 @@ function LotesView({
 }
 
 // Settings Views
-function SettingsTeamView({ onAddTeam }: { onAddTeam: () => void }) {
+function SettingsTeamView({ siteId, siteName, onAddTeam }: { siteId: string; siteName: string; onAddTeam: () => void }) {
+  const [members, setMembers] = useState<{ id: string; name: string; role: string; isAvailable?: boolean }[]>([])
+  const [loadingTeam, setLoadingTeam] = useState(true)
+
+  useEffect(() => {
+    loadTeamMembers()
+  }, [siteId])
+
+  async function loadTeamMembers() {
+    setLoadingTeam(true)
+    try {
+      // Load operators assigned to this site
+      const { data: operators } = await supabase
+        .from('egl_operator_assignments')
+        .select('id, operator_id, is_active, is_available')
+        .eq('site_id', siteId)
+        .eq('is_active', true)
+
+      // Load workers assigned to this site
+      const { data: workers } = await supabase
+        .from('egl_site_workers')
+        .select('id, worker_id, worker_name, is_active')
+        .eq('site_id', siteId)
+        .eq('is_active', true)
+
+      const teamMembers: typeof members = []
+
+      // Fetch operator profiles
+      if (operators && operators.length > 0) {
+        const operatorIds = operators.map((o: any) => o.operator_id)
+        const { data: profiles } = await supabase
+          .from('core_profiles')
+          .select('id, full_name, first_name')
+          .in('id', operatorIds)
+
+        for (const op of operators) {
+          const profile = profiles?.find((p: any) => p.id === (op as any).operator_id) as any
+          teamMembers.push({
+            id: (op as any).operator_id,
+            name: profile?.full_name || profile?.first_name || 'Operator',
+            role: 'operator',
+            isAvailable: (op as any).is_available !== false,
+          })
+        }
+      }
+
+      // Add workers
+      if (workers && workers.length > 0) {
+        for (const w of workers) {
+          teamMembers.push({
+            id: (w as any).worker_id,
+            name: (w as any).worker_name || 'Worker',
+            role: 'worker',
+          })
+        }
+      }
+
+      setMembers(teamMembers)
+    } catch (err) {
+      console.error('Error loading team:', err)
+    } finally {
+      setLoadingTeam(false)
+    }
+  }
+
   return (
     <div className="max-w-2xl space-y-4">
       <div className="flex justify-end">
         <button
           onClick={onAddTeam}
-          className="text-sm text-[#007AFF] hover:text-[#0056B3] hover:underline"
+          className="flex items-center gap-1.5 text-sm text-[#007AFF] hover:text-[#0056B3] hover:underline"
         >
-          Add Team Member
+          <UserPlus className="w-4 h-4" />
+          Adicionar Membro
         </button>
       </div>
       <div className="bg-white border border-[#D2D2D7] rounded-xl p-6">
-        <h3 className="font-semibold text-[#1D1D1F] mb-6">Project Team</h3>
+        <h3 className="font-semibold text-[#1D1D1F] mb-6">Equipe do Projeto</h3>
 
-        <div className="text-center py-8">
-          <Users className="w-12 h-12 text-[#86868B] mx-auto mb-3" />
-          <p className="text-[#6E6E73]">No members added yet</p>
-          <p className="text-[#86868B] text-sm mt-1">Add supervisors and workers via QR code or token</p>
-        </div>
+        {loadingTeam ? (
+          <div className="text-center py-8">
+            <Loader2 className="w-8 h-8 text-[#86868B] mx-auto mb-3 animate-spin" />
+            <p className="text-[#6E6E73]">Carregando equipe...</p>
+          </div>
+        ) : members.length === 0 ? (
+          <div className="text-center py-8">
+            <Users className="w-12 h-12 text-[#86868B] mx-auto mb-3" />
+            <p className="text-[#6E6E73]">Nenhum membro adicionado</p>
+            <p className="text-[#86868B] text-sm mt-1">Adicione operadores e workers via QR code</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {members.map((member) => (
+              <div key={member.id} className="flex items-center justify-between py-3 px-4 bg-[#F5F5F7] rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#0F766E] flex items-center justify-center text-white font-semibold text-sm">
+                    {member.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-medium text-[#1D1D1F]">{member.name}</p>
+                    <p className="text-xs text-[#86868B] capitalize">{member.role}</p>
+                  </div>
+                </div>
+                {member.role === 'operator' && (
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    member.isAvailable
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {member.isAvailable ? 'Online' : 'Offline'}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 // Add Team Member Modal
-function AddTeamModal({ siteId, onClose }: { siteId: string; onClose: () => void }) {
-  const [mode, setMode] = useState<'qr' | 'manual'>('qr')
-  const [token, setToken] = useState('')
-  const [copied, setCopied] = useState(false)
+function AddTeamModal({ siteId, siteName, onClose }: { siteId: string; siteName: string; onClose: () => void }) {
+  const [role, setRole] = useState<'operator' | 'worker'>('operator')
+  const [supervisorName, setSupervisorName] = useState('')
+  const [qrValue, setQrValue] = useState('')
 
-  // Generate a simple invite token (in production, this would be stored in DB)
-  const inviteToken = `EAGLE-${siteId.slice(0, 8).toUpperCase()}`
-  const inviteLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${inviteToken}`
-
-  const copyToken = async () => {
-    try {
-      await navigator.clipboard.writeText(inviteLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Fallback
-      const textArea = document.createElement('textarea')
-      textArea.value = inviteLink
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+  // Get current user info for QR payload
+  useEffect(() => {
+    async function init() {
+      try {
+        const { data: auth } = await supabase.auth.getUser()
+        if (auth.user) {
+          const { data: profile } = await supabase
+            .from('core_profiles')
+            .select('full_name, first_name')
+            .eq('id', auth.user.id)
+            .maybeSingle()
+          const name = (profile as any)?.full_name || (profile as any)?.first_name || 'Supervisor'
+          setSupervisorName(name)
+        } else {
+          setSupervisorName('Supervisor')
+        }
+      } catch {
+        setSupervisorName('Supervisor')
+      }
     }
-  }
+    init()
+  }, [])
+
+  // Generate QR payload whenever role or supervisor info changes
+  useEffect(() => {
+    if (!supervisorName) return
+    import('@onsite/sharing').then(({ createJoinSitePayload }) => {
+      const payload = createJoinSitePayload({
+        siteId,
+        siteName,
+        role,
+        invitedBy: '',
+        invitedByName: supervisorName,
+      })
+      setQrValue(payload)
+    }).catch((err) => {
+      console.error('[sharing] Failed to load @onsite/sharing:', err)
+      // Fallback: generate payload inline
+      setQrValue(JSON.stringify({
+        app: 'onsite-monitor',
+        action: 'join_site',
+        siteId,
+        siteName,
+        role,
+        invitedBy: '',
+        invitedByName: supervisorName,
+      }))
+    })
+  }, [siteId, siteName, role, supervisorName])
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
         <div className="p-4 border-b border-[#E5E5EA] flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#1D1D1F]">Add Team Member</h2>
+          <h2 className="text-lg font-semibold text-[#1D1D1F]">Adicionar Membro</h2>
           <button onClick={onClose} className="p-1 hover:bg-[#F5F5F7] rounded-lg transition-colors">
-            <svg className="w-5 h-5 text-[#86868B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5 text-[#86868B]" />
           </button>
         </div>
 
         <div className="p-4">
-          {/* Mode Toggle */}
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => setMode('qr')}
-              className={`flex-1 py-2 rounded-lg font-medium text-sm transition-colors ${
-                mode === 'qr' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#6E6E73]'
-              }`}
-            >
-              QR Code / Link
-            </button>
-            <button
-              onClick={() => setMode('manual')}
-              className={`flex-1 py-2 rounded-lg font-medium text-sm transition-colors ${
-                mode === 'manual' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#6E6E73]'
-              }`}
-            >
-              Manual Token
-            </button>
-          </div>
-
-          {mode === 'qr' ? (
-            <div className="text-center">
-              {/* QR Code Placeholder */}
-              <div className="w-48 h-48 bg-[#F5F5F7] rounded-xl mx-auto mb-4 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-32 h-32 bg-white rounded-lg shadow-inner flex items-center justify-center border-2 border-[#1D1D1F]">
-                    <span className="text-xs text-[#86868B]">QR Code</span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-[#6E6E73] mb-3">
-                Share this link with team members to join the project
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={inviteLink}
-                  className="flex-1 px-3 py-2 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg text-sm text-[#6E6E73]"
-                />
-                <button
-                  onClick={copyToken}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                    copied ? 'bg-[#34C759] text-white' : 'bg-[#007AFF] text-white hover:bg-[#0056B3]'
-                  }`}
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <p className="text-sm text-[#6E6E73] mb-4">
-                Enter the token provided by the team member to add them manually.
-              </p>
-              <input
-                type="text"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Enter member token..."
-                className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF] mb-4"
-              />
+          {/* Role Selector */}
+          <div className="mb-4">
+            <p className="text-sm font-medium text-[#1D1D1F] mb-2">Funcao do membro</p>
+            <div className="flex gap-2">
               <button
-                disabled={!token.trim()}
-                className="w-full py-2.5 bg-[#007AFF] text-white rounded-lg hover:bg-[#0056B3] transition-colors font-medium disabled:opacity-50"
+                onClick={() => setRole('operator')}
+                className={`flex-1 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  role === 'operator' ? 'bg-[#0F766E] text-white' : 'bg-[#F5F5F7] text-[#6E6E73]'
+                }`}
               >
-                Add Member
+                Operador
+              </button>
+              <button
+                onClick={() => setRole('worker')}
+                className={`flex-1 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  role === 'worker' ? 'bg-[#0F766E] text-white' : 'bg-[#F5F5F7] text-[#6E6E73]'
+                }`}
+              >
+                Worker
               </button>
             </div>
-          )}
+          </div>
+
+          {/* QR Code */}
+          <div className="text-center">
+            <div className="bg-white rounded-xl p-4 mx-auto mb-4 inline-block border border-[#E5E5EA]">
+              {qrValue ? (
+                <QRCode value={qrValue} size={200} level="H" />
+              ) : (
+                <div className="w-[200px] h-[200px] flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-[#86868B] animate-spin" />
+                </div>
+              )}
+            </div>
+            <p className="text-sm text-[#6E6E73] mb-1">
+              Mostre este QR para o {role === 'operator' ? 'operador' : 'worker'}
+            </p>
+            <p className="text-xs text-[#86868B]">
+              Ele deve escanear com o app OnSite no celular
+            </p>
+            <p className="text-xs text-[#86868B] mt-1">
+              Site: <span className="font-medium">{siteName}</span>
+            </p>
+          </div>
         </div>
 
         <div className="p-4 border-t border-[#E5E5EA]">
@@ -924,7 +1110,7 @@ function AddTeamModal({ siteId, onClose }: { siteId: string; onClose: () => void
             onClick={onClose}
             className="w-full py-2.5 border border-[#D2D2D7] text-[#1D1D1F] rounded-lg hover:bg-[#F5F5F7] transition-colors font-medium"
           >
-            Close
+            Fechar
           </button>
         </div>
       </div>

@@ -1,28 +1,28 @@
 {
   "expo": {
-    "name": "OnSite Worker",
-    "slug": "onsite-worker",
+    "name": "OnSite Inspect",
+    "slug": "onsite-inspect",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
-    "scheme": "onsite-worker",
+    "scheme": "onsite-inspect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#059669"
+      "backgroundColor": "#F6F7F9"
     },
     "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.onsiteclub.worker"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.onsiteclub.inspect"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#059669"
+        "backgroundColor": "#F6F7F9"
       },
-      "package": "com.onsiteclub.worker"
+      "package": "com.onsiteclub.inspect"
     },
     "web": {
       "bundler": "metro",
@@ -31,18 +31,7 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "OnSite Worker precisa acessar sua câmera para tirar fotos da obra."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "OnSite Worker precisa acessar suas fotos para enviar imagens da obra."
-        }
-      ]
+      ["expo-camera", { "cameraPermission": "Allow camera access to take site photos and scan QR codes" }]
     ],
     "experiments": {
       "typedRoutes": true

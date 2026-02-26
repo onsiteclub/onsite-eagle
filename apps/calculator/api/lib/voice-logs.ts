@@ -57,14 +57,14 @@ export async function canCollectVoice(userId: string): Promise<boolean> {
 
   try {
     const { data, error } = await supabase
-      .from('consents')
+      .from('core_consents')
       .select('granted')
       .eq('user_id', userId)
       .eq('consent_type', 'voice_training')
       .eq('granted', true)
       .limit(1);
 
-    console.log('[VoiceLogs] consents query result:', { data, error: error?.message });
+    console.log('[VoiceLogs] core_consents query result:', { data, error: error?.message });
 
     if (error) {
       console.warn('[VoiceLogs] Error checking consent:', error.message);
@@ -97,7 +97,7 @@ export async function saveVoiceLog(record: VoiceLogRecord): Promise<string | nul
 
   try {
     const { data, error } = await supabase
-      .from('voice_logs')
+      .from('core_voice_logs')
       .insert({
         ...record,
         app_name: record.app_name || 'calculator',

@@ -1,10 +1,21 @@
+/**
+ * Camera — Take phase photos for a lot
+ *
+ * Always opened from within a lot (houseId always provided via params).
+ * Queries egl_houses, inserts to egl_photos + egl_timeline.
+ * Storage bucket: egl-media.
+ * Camera overlay stays dark for legibility.
+ */
+
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
-import { CONSTRUCTION_PHASES } from '@onsite/shared';
 import { supabase } from '../src/lib/supabase';
+
+const ACCENT = '#0F766E';
 
 interface House {
   id: string;
@@ -21,35 +32,19 @@ export default function CameraScreen() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [house, setHouse] = useState<House | null>(null);
-  const [houses, setHouses] = useState<House[]>([]);
-  const [selectedHouseId, setSelectedHouseId] = useState<string | null>(params.houseId || null);
   const cameraRef = useRef<CameraView>(null);
 
-  // Load houses if no houseId provided
   useEffect(() => {
-    if (params.houseId) {
-      loadHouse(params.houseId);
-    } else {
-      loadAllHouses();
-    }
+    if (params.houseId) loadHouse(params.houseId);
   }, [params.houseId]);
 
   async function loadHouse(id: string) {
     const { data } = await supabase
-      .from('houses')
+      .from('egl_houses')
       .select('id, lot_number, site_id')
       .eq('id', id)
       .single();
     if (data) setHouse(data);
-  }
-
-  async function loadAllHouses() {
-    const { data } = await supabase
-      .from('houses')
-      .select('id, lot_number, site_id')
-      .order('lot_number')
-      .limit(50);
-    if (data) setHouses(data);
   }
 
   if (!permission) {
@@ -59,24 +54,19 @@ export default function CameraScreen() {
   if (!permission.granted) {
     return (
       <View style={styles.permissionContainer}>
+        <Ionicons name="camera-outline" size={64} color="#D1D5DB" />
         <Text style={styles.permissionText}>
-          Precisamos de permissao da camera para tirar fotos da obra
+          We need camera permission to take construction photos
         </Text>
         <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-          <Text style={styles.permissionButtonText}>Permitir Camera</Text>
+          <Text style={styles.permissionButtonText}>Allow Camera</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   async function takePhoto() {
-    if (!cameraRef.current || isCapturing) return;
-
-    const targetHouseId = selectedHouseId || house?.id;
-    if (!targetHouseId) {
-      Alert.alert('Selecione um Lote', 'Escolha o lote antes de tirar a foto.');
-      return;
-    }
+    if (!cameraRef.current || isCapturing || !house) return;
 
     setIsCapturing(true);
     try {
@@ -86,22 +76,21 @@ export default function CameraScreen() {
       });
 
       if (photo) {
-        const lotNumber = house?.lot_number || houses.find(h => h.id === targetHouseId)?.lot_number;
         Alert.alert(
-          'Foto Capturada',
-          `Lote: ${lotNumber}\nFase: ${CONSTRUCTION_PHASES[selectedPhase - 1]?.name}`,
+          'Photo Captured',
+          `Lot: ${house.lot_number}\nPhase: ${selectedPhase}`,
           [
-            { text: 'Tirar Outra', style: 'cancel' },
+            { text: 'Retake', style: 'cancel' },
             {
-              text: 'Enviar',
-              onPress: () => uploadPhoto(photo.uri, targetHouseId),
+              text: 'Upload',
+              onPress: () => uploadPhoto(photo.uri, house.id),
             },
           ]
         );
       }
     } catch (error) {
-      console.error('Erro ao capturar foto:', error);
-      Alert.alert('Erro', 'Falha ao capturar foto');
+      console.error('Error capturing photo:', error);
+      Alert.alert('Error', 'Failed to capture photo');
     } finally {
       setIsCapturing(false);
     }
@@ -110,44 +99,37 @@ export default function CameraScreen() {
   async function uploadPhoto(uri: string, houseId: string) {
     setIsUploading(true);
     try {
-      // Read file as base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Generate unique filename
       const timestamp = Date.now();
       const filename = `${houseId}/${selectedPhase}/${timestamp}.jpg`;
 
-      // Decode base64 to Uint8Array
       const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
-        .from('phase-photos')
+        .from('egl-media')
         .upload(filename, bytes, {
           contentType: 'image/jpeg',
           upsert: false,
         });
 
-      if (uploadError) {
-        throw uploadError;
-      }
+      if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: urlData } = supabase.storage
-        .from('phase-photos')
+        .from('egl-media')
         .getPublicUrl(filename);
 
       const photoUrl = urlData.publicUrl;
 
-      // Create phase_photos record
+      // Create egl_photos record
       const { error: photoError } = await supabase
-        .from('phase_photos')
+        .from('egl_photos')
         .insert({
           house_id: houseId,
           phase_id: selectedPhase.toString(),
@@ -156,109 +138,72 @@ export default function CameraScreen() {
         });
 
       if (photoError) {
-        console.error('Erro ao salvar registro da foto:', photoError);
+        console.error('Error saving photo record:', photoError);
       }
 
       // Create timeline event
       await supabase
-        .from('timeline_events')
+        .from('egl_timeline')
         .insert({
           house_id: houseId,
           event_type: 'photo',
-          title: `Foto da Fase ${selectedPhase}`,
-          description: `Foto enviada para ${CONSTRUCTION_PHASES[selectedPhase - 1]?.name}`,
-          source: 'worker_app',
+          title: `Phase ${selectedPhase} Photo`,
+          description: `Photo uploaded for phase ${selectedPhase}`,
+          source: 'field',
         });
 
       Alert.alert(
-        'Sucesso!',
-        'Foto enviada para validacao por IA.',
-        [
-          { text: 'OK', onPress: () => router.back() },
-        ]
+        'Success!',
+        'Photo uploaded for AI validation.',
+        [{ text: 'OK', onPress: () => router.back() }]
       );
-
     } catch (error) {
-      console.error('Erro no upload:', error);
-      Alert.alert('Erro', 'Falha ao enviar foto. Tente novamente.');
+      console.error('Upload error:', error);
+      Alert.alert('Error', 'Failed to upload photo. Try again.');
     } finally {
       setIsUploading(false);
     }
   }
 
-  const targetHouse = house || houses.find(h => h.id === selectedHouseId);
-
   return (
     <View style={styles.container}>
       {isUploading ? (
         <View style={styles.uploadingContainer}>
-          <ActivityIndicator size="large" color="#10B981" />
-          <Text style={styles.uploadingText}>Enviando foto...</Text>
+          <ActivityIndicator size="large" color={ACCENT} />
+          <Text style={styles.uploadingText}>Uploading photo...</Text>
         </View>
       ) : (
         <CameraView style={styles.camera} ref={cameraRef}>
           <View style={styles.overlay}>
-            {/* Top section - House & Phase selection */}
+            {/* Top — Lot info + Phase selector */}
             <View style={styles.topSection}>
-              {/* House selector (if not pre-selected) */}
-              {!params.houseId && houses.length > 0 && (
-                <View style={styles.selector}>
-                  <Text style={styles.selectorLabel}>Lote:</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={styles.selectorButtons}>
-                      {houses.slice(0, 10).map((h) => (
-                        <TouchableOpacity
-                          key={h.id}
-                          style={[
-                            styles.selectorButton,
-                            selectedHouseId === h.id && styles.selectorButtonActive,
-                          ]}
-                          onPress={() => setSelectedHouseId(h.id)}
-                        >
-                          <Text
-                            style={[
-                              styles.selectorButtonText,
-                              selectedHouseId === h.id && styles.selectorButtonTextActive,
-                            ]}
-                          >
-                            {h.lot_number}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* Show selected house if pre-selected */}
               {house && (
-                <View style={styles.selectedHouse}>
-                  <Text style={styles.selectedHouseText}>Lote {house.lot_number}</Text>
+                <View style={styles.lotInfo}>
+                  <Ionicons name="home" size={16} color={ACCENT} />
+                  <Text style={styles.lotInfoText}>Lot {house.lot_number}</Text>
                 </View>
               )}
 
-              {/* Phase selector */}
               <View style={styles.selector}>
-                <Text style={styles.selectorLabel}>Fase:</Text>
+                <Text style={styles.selectorLabel}>Phase:</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.selectorButtons}>
-                    {CONSTRUCTION_PHASES.map((phase) => (
+                    {Array.from({ length: 7 }, (_, i) => i + 1).map((phase) => (
                       <TouchableOpacity
-                        key={phase.id}
+                        key={phase}
                         style={[
                           styles.selectorButton,
-                          selectedPhase === phase.id && styles.selectorButtonActive,
+                          selectedPhase === phase && styles.selectorButtonActive,
                         ]}
-                        onPress={() => setSelectedPhase(phase.id)}
+                        onPress={() => setSelectedPhase(phase)}
                       >
                         <Text
                           style={[
                             styles.selectorButtonText,
-                            selectedPhase === phase.id && styles.selectorButtonTextActive,
+                            selectedPhase === phase && styles.selectorButtonTextActive,
                           ]}
-                          numberOfLines={1}
                         >
-                          {phase.id}. {phase.name}
+                          Phase {phase}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -270,16 +215,13 @@ export default function CameraScreen() {
             {/* Bottom controls */}
             <View style={styles.controls}>
               <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
-                <Text style={styles.closeButtonText}>Cancelar</Text>
+                <Ionicons name="close" size={28} color="#fff" />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.captureButton,
-                  (!targetHouse) && styles.captureButtonDisabled,
-                ]}
+                style={[styles.captureButton, !house && styles.captureButtonDisabled]}
                 onPress={takePhoto}
-                disabled={isCapturing || !targetHouse}
+                disabled={isCapturing || !house}
               >
                 {isCapturing ? (
                   <ActivityIndicator color="#fff" />
@@ -306,20 +248,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: '#F6F7F9',
     padding: 20,
   },
   permissionText: {
-    color: '#fff',
+    color: '#101828',
     fontSize: 16,
     textAlign: 'center',
+    marginTop: 16,
     marginBottom: 20,
+    lineHeight: 22,
   },
   permissionButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: ACCENT,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   permissionButtonText: {
     color: '#fff',
@@ -335,12 +279,23 @@ const styles = StyleSheet.create({
   },
   topSection: {
     backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingTop: 8,
+    paddingTop: 50,
     paddingBottom: 12,
+  },
+  lotInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    gap: 8,
+  },
+  lotInfoText: {
+    color: ACCENT,
+    fontSize: 16,
+    fontWeight: '600',
   },
   selector: {
     paddingHorizontal: 16,
-    marginBottom: 8,
   },
   selectorLabel: {
     color: '#9CA3AF',
@@ -355,28 +310,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
   selectorButtonActive: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
   },
   selectorButtonText: {
     color: '#fff',
     fontSize: 12,
   },
   selectorButtonTextActive: {
-    fontWeight: '600',
-  },
-  selectedHouse: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  selectedHouseText: {
-    color: '#10B981',
-    fontSize: 16,
     fontWeight: '600',
   },
   controls: {
@@ -389,22 +335,22 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   closeButton: {
-    padding: 10,
-    width: 80,
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   captureButton: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+    backgroundColor: `${ACCENT}50`,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#10B981',
+    borderColor: ACCENT,
   },
   captureButtonDisabled: {
     opacity: 0.4,
@@ -413,19 +359,19 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#10B981',
+    backgroundColor: ACCENT,
   },
   placeholder: {
-    width: 80,
+    width: 48,
   },
   uploadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: '#F6F7F9',
   },
   uploadingText: {
-    color: '#fff',
+    color: '#101828',
     fontSize: 16,
     marginTop: 16,
   },

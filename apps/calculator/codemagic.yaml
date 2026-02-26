@@ -1,8 +1,134 @@
 # codemagic.yaml
-# Configuração para build iOS do OnSite Calculator
+# Configuração para build iOS e Android do OnSite Calculator
 # Documentação: https://docs.codemagic.io/yaml/yaml-getting-started/
 
 workflows:
+
+  # ─────────────────────────────────────────────
+  # ANDROID - Google Play Release (AAB)
+  # ─────────────────────────────────────────────
+  android-release:
+    name: Android Google Play Release
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      android_signing:
+        - onsite_calculator_keystore
+      groups:
+        - supabase_credentials
+        - google_play_credentials
+      vars:
+        PACKAGE_NAME: "ca.onsiteclub.calculator"
+      node: 18
+      java: 17
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+
+    scripts:
+      # 1. Instalar dependências Node
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      # 2. Rodar testes
+      - name: Run tests
+        script: |
+          npx vitest run
+
+      # 3. Build do projeto web
+      - name: Build web app
+        script: |
+          npm run build
+
+      # 4. Sincronizar com Capacitor
+      - name: Sync Capacitor Android
+        script: |
+          npx cap sync android
+
+      # 5. Build AAB (release)
+      - name: Build Android AAB
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+
+      # 6. Build APK (release) para distribuição direta
+      - name: Build Android APK
+        script: |
+          cd android
+          ./gradlew assembleRelease
+
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/mapping/release/mapping.txt
+
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+
+  # ─────────────────────────────────────────────
+  # ANDROID - Debug Build (APK)
+  # ─────────────────────────────────────────────
+  android-debug:
+    name: Android Debug Build
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      groups:
+        - supabase_credentials
+      vars:
+        PACKAGE_NAME: "ca.onsiteclub.calculator"
+      node: 18
+      java: 17
+
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Run tests
+        script: |
+          npx vitest run
+
+      - name: Build web app
+        script: |
+          npm run build
+
+      - name: Sync Capacitor Android
+        script: |
+          npx cap sync android
+
+      - name: Build Android APK (Debug)
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+
+  # ─────────────────────────────────────────────
+  # iOS - TestFlight
+  # ─────────────────────────────────────────────
   ios-testflight:
     name: iOS TestFlight Build
     max_build_duration: 60
@@ -15,6 +141,8 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: ca.onsiteclub.calculator
+      groups:
+        - supabase_credentials
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
@@ -61,7 +189,9 @@ workflows:
         script: |
           cd ios/App
           LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" || echo 0)
-          agvtool new-version -all $((LATEST_BUILD + 1))
+          NEW_BUILD=$((LATEST_BUILD + 2))
+          echo "Latest TestFlight build: $LATEST_BUILD → New build: $NEW_BUILD"
+          agvtool new-version -all $NEW_BUILD
 
       # 7. Build do app iOS
       - name: Build iOS app
@@ -83,13 +213,17 @@ workflows:
         beta_groups:
           - Internal Testers
 
-  # Build apenas para teste (sem publicar)
+  # ─────────────────────────────────────────────
+  # iOS - Debug Build
+  # ─────────────────────────────────────────────
   ios-debug:
     name: iOS Debug Build
     max_build_duration: 60
     instance_type: mac_mini_m1
 
     environment:
+      groups:
+        - supabase_credentials
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
