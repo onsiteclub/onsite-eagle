@@ -338,7 +338,7 @@ const RUNTIME_COLORS = { nextjs: C.blue, expo: C.green, capacitor: C.indigo, unk
 
 function mergeRows(rows, liveApps) {
   if (!liveApps?.length) return rows;
-  const liveMap = new Map(liveApps.map(a => [a.slug, a]));
+  const liveMap = new Map(liveApps.map(a => [a.app_slug, a]));
   const merged = rows.map(row => ({
     ...row,
     apps: row.apps.map(app => {
@@ -351,7 +351,7 @@ function mergeRows(rows, liveApps) {
   // Auto-add apps found in scan but not in ROWS
   const newApps = [];
   for (const [slug, live] of liveMap) {
-    if (slug === "architecture") continue;
+    if (!slug || slug === "architecture") continue;
     newApps.push({
       id: slug, name: slug.charAt(0).toUpperCase() + slug.slice(1), sub: "auto-detected", color: RUNTIME_COLORS[live.runtime] || C.textMuted,
       deps: live.deps?.map(d => d.replace("@onsite/", "")) || [], desc: `App detectado: ${live.runtime}`, tech: `${live.deps?.length || 0} pkgs`,
