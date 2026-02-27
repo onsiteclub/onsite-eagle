@@ -217,14 +217,14 @@ async function getMetrics() {
 
   const [profiles, entries, geofences, errors, subscriptions] = await Promise.all([
     supabase.from('core_profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('app_timekeeper_entries').select('*', { count: 'exact', head: true }),
-    supabase.from('app_timekeeper_geofences').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    supabase.from('tmk_entries').select('*', { count: 'exact', head: true }),
+    supabase.from('tmk_geofences').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     supabase.from('log_errors').select('*', { count: 'exact', head: true })
       .gte('occurred_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-    supabase.from('billing_subscriptions').select('status'),
+    supabase.from('bil_subscriptions').select('status'),
   ]);
 
-  const { data: entriesData } = await supabase.from('app_timekeeper_entries').select('type').limit(1000);
+  const { data: entriesData } = await supabase.from('tmk_entries').select('type').limit(1000);
   const auto = entriesData?.filter(s => s.type === 'automatic').length || 0;
   const total = entriesData?.length || 1;
   const automationRate = Math.round((auto / total) * 100);
@@ -260,7 +260,7 @@ async function lookupUserByRefCode(decoded: DecodedRef) {
   const dateStr = `${currentYear}-${String(decoded.exportMonth).padStart(2, '0')}-${String(decoded.exportDay).padStart(2, '0')}`;
 
   const { data: entries, count } = await supabase
-    .from('app_timekeeper_entries')
+    .from('tmk_entries')
     .select('*', { count: 'exact' })
     .eq('user_id', user.id)
     .gte('entry_at', `${dateStr}T00:00:00`)
@@ -335,7 +335,7 @@ async function getSessionsTrend(days: number = 14) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const { data } = await supabase
-    .from('app_timekeeper_entries')
+    .from('tmk_entries')
     .select('created_at')
     .gte('created_at', since);
 

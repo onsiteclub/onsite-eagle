@@ -17,7 +17,7 @@ export async function getConversations(): Promise<ArgusConversation[]> {
   const supabase = createClient();
 
   const { data, error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .select('*')
     .eq('archived', false)
     .order('updated_at', { ascending: false });
@@ -37,7 +37,7 @@ export async function getStarredConversations(): Promise<ArgusConversation[]> {
   const supabase = createClient();
 
   const { data, error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .select('*')
     .eq('starred', true)
     .eq('archived', false)
@@ -58,7 +58,7 @@ export async function getConversation(id: string): Promise<ArgusConversation | n
   const supabase = createClient();
 
   const { data, error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .select('*')
     .eq('id', id)
     .single();
@@ -85,7 +85,7 @@ export async function createConversation(
     : [];
 
   const { data, error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .insert({
       user_id: userId,
       title: initialMessage ? generateTitle(initialMessage) : 'New Conversation',
@@ -115,7 +115,7 @@ export async function addMessage(
 
   // First get current messages
   const { data: conversation, error: fetchError } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .select('messages')
     .eq('id', conversationId)
     .single();
@@ -130,7 +130,7 @@ export async function addMessage(
 
   // Update conversation
   const { error: updateError } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .update({
       messages: updatedMessages,
       updated_at: new Date().toISOString(),
@@ -155,7 +155,7 @@ export async function updateTitle(
   const supabase = createClient();
 
   const { error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .update({ title, updated_at: new Date().toISOString() })
     .eq('id', conversationId);
 
@@ -177,7 +177,7 @@ export async function toggleStar(
   const supabase = createClient();
 
   const { error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .update({ starred, updated_at: new Date().toISOString() })
     .eq('id', conversationId);
 
@@ -198,7 +198,7 @@ export async function archiveConversation(
   const supabase = createClient();
 
   const { error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .update({ archived: true, updated_at: new Date().toISOString() })
     .eq('id', conversationId);
 
@@ -219,7 +219,7 @@ export async function deleteConversation(
   const supabase = createClient();
 
   const { error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .delete()
     .eq('id', conversationId);
 
@@ -266,7 +266,7 @@ export async function searchConversations(
 
   // Note: For better search, consider using Supabase Full Text Search
   const { data, error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .select('*')
     .eq('archived', false)
     .order('updated_at', { ascending: false });
@@ -304,16 +304,16 @@ export async function getConversationStats(): Promise<{
 
   const [total, starred, thisWeek] = await Promise.all([
     supabase
-      .from('argus_conversations')
+      .from('core_ai_conversations')
       .select('id', { count: 'exact', head: true })
       .eq('archived', false),
     supabase
-      .from('argus_conversations')
+      .from('core_ai_conversations')
       .select('id', { count: 'exact', head: true })
       .eq('starred', true)
       .eq('archived', false),
     supabase
-      .from('argus_conversations')
+      .from('core_ai_conversations')
       .select('id', { count: 'exact', head: true })
       .eq('archived', false)
       .gte('created_at', weekAgo),

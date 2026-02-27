@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, Hash, Layers } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@onsite/logger'
 
 interface AddLotModalProps {
   isOpen: boolean
@@ -159,12 +160,11 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
       const chunkSize = 50
       let created = 0
 
-      console.log('[AddLotModal] Creating lots for site:', siteId)
-      console.log('[AddLotModal] Lots to create:', lotsToCreate.length)
+      logger.info('EAGLE', 'Creating lots for site', { siteId, count: lotsToCreate.length })
 
       for (let i = 0; i < lotsToCreate.length; i += chunkSize) {
         const chunk = lotsToCreate.slice(i, i + chunkSize)
-        console.log('[AddLotModal] Inserting chunk:', chunk.length, 'lots')
+        logger.debug('EAGLE', 'Inserting chunk', { chunkSize: chunk.length })
 
         const { data: insertedData, error: insertError } = await supabase
           .from('egl_houses')
@@ -178,7 +178,7 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
         }
 
         const insertedCount = insertedData?.length ?? 0
-        console.log('[AddLotModal] Inserted:', insertedCount, 'lots')
+        logger.debug('EAGLE', 'Inserted lots', { insertedCount })
 
         if (insertedCount === 0) {
           console.error('[AddLotModal] Insert returned empty - RLS may be blocking')
@@ -234,7 +234,7 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
       }
     } else {
       // Use actual count from database
-      console.log('[AddLotModal] Syncing total_lots to actual count:', count)
+      logger.info('EAGLE', 'Syncing total_lots to actual count', { count: count ?? 0 })
       await supabase
         .from('egl_sites')
         .update({ total_lots: count || 0 })

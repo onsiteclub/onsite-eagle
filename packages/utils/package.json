@@ -9,7 +9,8 @@
     "./cn": "./src/cn.ts",
     "./format": "./src/format.ts",
     "./auth": "./src/auth.ts",
-    "./export": "./src/export.ts"
+    "./export": "./src/export.ts",
+    "./uuid": "./src/uuid.ts"
   },
   "dependencies": {
     "clsx": "^2.1.0",

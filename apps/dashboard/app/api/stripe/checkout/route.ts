@@ -13,7 +13,7 @@ export async function POST() {
 
     // Get or create Stripe customer
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('core_profiles')
       .select('stripe_customer_id, email, first_name, last_name')
       .eq('id', user.id)
       .single()
@@ -34,7 +34,7 @@ export async function POST() {
 
       // Save to profile
       await supabase
-        .from('profiles')
+        .from('core_profiles')
         .update({ stripe_customer_id: customerId })
         .eq('id', user.id)
     }

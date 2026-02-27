@@ -39,7 +39,7 @@ export async function updateSubscriptionStatus(
   }
   
   const { error } = await supabase
-    .from('profiles')
+    .from('core_profiles')
     .update(updateData)
     .eq('id', userId);
     
@@ -58,7 +58,7 @@ export async function getProfileByStripeCustomerId(stripeCustomerId: string) {
   const supabase = createAdminClient();
   
   const { data, error } = await supabase
-    .from('profiles')
+    .from('core_profiles')
     .select('*')
     .eq('stripe_customer_id', stripeCustomerId)
     .single();
@@ -78,7 +78,7 @@ export async function getProfileById(userId: string) {
   const supabase = createAdminClient();
   
   const { data, error } = await supabase
-    .from('profiles')
+    .from('core_profiles')
     .select('*')
     .eq('id', userId)
     .single();

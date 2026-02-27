@@ -273,7 +273,84 @@ apps/auth/
 
 ---
 
-## 10. Historico de Erros
+## 10. Deploy Vercel — Passo a Passo
+
+### 10.1 Criar Projeto na Vercel
+
+1. Abrir [vercel.com/new](https://vercel.com/new)
+2. Importar repositorio `onsite-eagle`
+3. Em **Root Directory**, clicar Edit e selecionar: `apps/auth`
+4. Framework Preset: **Next.js** (auto-detectado)
+5. Build Command: deixar default (`turbo build`)
+6. Clicar **Deploy**
+
+> Nota: O `vercel.json` local (`{ "framework": "nextjs" }`) e compativel e pode ficar.
+
+### 10.2 Environment Variables
+
+Em **Settings > Environment Variables**, adicionar para Production + Preview:
+
+| Variavel | Tipo | Valor |
+|----------|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Plain | `https://dbasazrdbtigrdntaehb.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Plain | *(anon key do projeto)* |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret | *(service role key)* |
+| `STRIPE_SECRET_KEY` | Secret | *(Stripe secret key)* |
+| `STRIPE_WEBHOOK_SECRET` | Secret | *(Stripe webhook signing secret)* |
+| `STRIPE_PRICE_CALCULATOR` | Plain | *(Price ID do Calculator Pro)* |
+| `STRIPE_PRICE_TIMEKEEPER` | Plain | *(Price ID do Timekeeper Pro)* |
+| `NEXT_PUBLIC_AUTH_URL` | Plain | `https://auth.onsiteclub.ca` |
+| `NEXT_PUBLIC_CALCULATOR_URL` | Plain | `https://calculator.onsiteclub.ca` |
+| `NEXT_PUBLIC_TIMEKEEPER_SCHEME` | Plain | *(deep link scheme)* |
+| `CHECKOUT_JWT_SECRET` | Secret | *(min 32 chars, mesma secret nos apps client)* |
+
+> Dica: Use **Shared Environment Variables** no nivel do Team para as variaveis Supabase.
+
+### 10.3 Custom Domain
+
+1. Settings > Domains > Add Domain
+2. Adicionar: `auth.onsiteclub.ca`
+3. No DNS, criar CNAME: `auth → cname.vercel-dns.com`
+
+### 10.4 Stripe Webhook
+
+Apos deploy, configurar webhook no Stripe Dashboard:
+- URL: `https://auth.onsiteclub.ca/api/webhooks/stripe`
+- Eventos: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`, `invoice.paid`, `charge.refunded`
+
+### 10.5 Ignored Build Step
+
+Settings > Build & Deployment > Ignored Build Step:
+```
+npx turbo-ignore
+```
+
+### 10.6 Verificacao Pos-Deploy
+
+```
+[ ] Home page carrega (/)
+[ ] /checkout/calculator com JWT valido redireciona para Stripe
+[ ] /manage mostra status de assinatura
+[ ] /delete-account funciona (login required)
+[ ] /r/CODE redireciona corretamente (short codes)
+[ ] Stripe webhook processa eventos (testar com Stripe CLI)
+[ ] Custom domain com HTTPS ativo
+```
+
+---
+
+## 11. Historico de Erros
+
+### Sessao: 2026-02-27 — Build Fix para Deploy
+
+#### Erro 4: Prerender falha em /delete-account
+| Campo | Detalhe |
+|-------|---------|
+| **Data** | 2026-02-27 |
+| **Sintoma** | `@supabase/ssr: Your project's URL and API key are required` durante `next build` |
+| **Causa Raiz** | DeleteAccountClient.tsx chama `createClient()` no corpo do componente. SSR prerender executava sem env vars |
+| **Fix** | Adicionado `export const dynamic = 'force-dynamic'` no page.tsx wrapper |
+| **Arquivos** | `app/delete-account/page.tsx` |
 
 ### Sessao: 2026-01-18 — Schema Migration
 

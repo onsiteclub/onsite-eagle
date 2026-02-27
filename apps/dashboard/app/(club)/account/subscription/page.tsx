@@ -13,7 +13,7 @@ export default async function SubscriptionPage() {
   if (!user) redirect('/')
 
   const { data: subscription } = await supabase
-    .from('billing_subscriptions')
+    .from('bil_subscriptions')
     .select('*')
     .eq('user_id', user.id)
     .eq('app_name', 'timekeeper')

@@ -38,9 +38,9 @@ export default function CommercePage() {
       const supabase = createClient();
 
       const [products, subs, payments, mrr] = await Promise.all([
-        supabase.from('app_shop_products').select('is_active'),
-        supabase.from('billing_subscriptions').select('status'),
-        supabase.from('payment_history').select('amount, status, paid_at'),
+        supabase.from('shp_products').select('is_active'),
+        supabase.from('bil_subscriptions').select('status'),
+        supabase.from('bil_payments').select('amount, status, paid_at'),
         supabase.from('v_mrr').select('*').single(),
       ]);
 

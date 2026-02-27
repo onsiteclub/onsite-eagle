@@ -22,7 +22,7 @@ export default function PendingPage() {
       }
 
       const { data: adminUser } = await supabase
-        .from('admin_users')
+        .from('core_admin_users')
         .select('approved')
         .eq('user_id', user.id)
         .single();

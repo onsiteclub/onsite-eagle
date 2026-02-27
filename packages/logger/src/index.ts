@@ -4,7 +4,8 @@ export type LogTag =
   | 'ENTER' | 'EXIT' | 'HEARTBEAT' | 'WATCHDOG' | 'SESSION'
   | 'SYNC' | 'AI' | 'VOICE' | 'REPORT' | 'ERROR' | 'BOOT' | 'AUTH'
   | 'GPS' | 'DB' | 'UI' | 'NOTIFY'
-  | 'PHOTO' | 'EAGLE' | 'INSPECTION' | 'MATERIAL' | 'OPERATOR' | 'STRIPE';
+  | 'PHOTO' | 'EAGLE' | 'INSPECTION' | 'MATERIAL' | 'OPERATOR' | 'STRIPE'
+  | 'USECASE' | 'ENGINE' | 'SDK' | 'EFFECT' | 'STORE' | 'RECOVERY' | 'DAY_SUMMARY';
 
 export interface LogEntry {
   timestamp: string;

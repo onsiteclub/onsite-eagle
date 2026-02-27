@@ -20,7 +20,7 @@ export async function addMessageWithResponse(
 
   // Get current messages
   const { data: conversation, error: fetchError } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .select('messages, title')
     .eq('id', conversationId)
     .single();
@@ -45,7 +45,7 @@ export async function addMessageWithResponse(
 
   // Update conversation
   const { error: updateError } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .update({
       messages: updatedMessages,
       title: newTitle,
@@ -72,7 +72,7 @@ export async function createConversationWithResponse(
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
-    .from('argus_conversations')
+    .from('core_ai_conversations')
     .insert({
       user_id: userId,
       title: generateTitle(userMessage.content),

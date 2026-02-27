@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [supabase] = useState(() => createClient())
 
   return (
-    <AuthProvider supabase={supabase}>
+    <AuthProvider supabase={supabase} emailRedirectTo={`${window.location.origin}/auth/callback`}>
       <AuthFlowWrapper supabase={supabase} />
     </AuthProvider>
   )

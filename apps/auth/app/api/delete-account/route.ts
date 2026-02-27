@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     // 1. Cancel any active subscriptions in Stripe (optional - they'll fail anyway without user)
     // For now, we just mark them as canceled in our database
     const { error: subError } = await adminClient
-      .from('billing_subscriptions')
+      .from('bil_subscriptions')
       .update({
         status: 'canceled',
         updated_at: new Date().toISOString()

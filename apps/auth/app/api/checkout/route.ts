@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user already has an active subscription
     const { data: existingSubscription } = await supabase
-      .from('billing_subscriptions')
+      .from('bil_subscriptions')
       .select('stripe_customer_id, status')
       .eq('user_id', user.id)
       .eq('app_name', app)

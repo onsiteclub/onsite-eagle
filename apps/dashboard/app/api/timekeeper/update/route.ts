@@ -31,7 +31,7 @@ export async function PATCH(request: NextRequest) {
 
     // Fetch current entry to save original value
     const { data: currentEntry } = await supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('*')
       .eq('id', id)
       .eq('user_id', user.id)
@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update entry
     const { data: updated, error } = await supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .update(updateData)
       .eq('id', id)
       .eq('user_id', user.id)

@@ -136,6 +136,22 @@ export interface QueuedEffect {
   executed_at: string | null;
 }
 
+// ─── Active Tracking State (UI-facing) ────────────────────
+
+/**
+ * Simplified tracking state for UI / voice AI consumption.
+ * Derived from ActiveTracking but with friendlier field names.
+ */
+export interface ActiveTrackingState {
+  status: TrackingStatus;
+  session_id: string | null;
+  fence_id: string | null;
+  fence_name: string | null;
+  enter_at: string | null;
+  exit_at: string | null;
+  pause_seconds: number;
+}
+
 // ─── Sync ──────────────────────────────────────────────────
 
 export interface SyncStats {

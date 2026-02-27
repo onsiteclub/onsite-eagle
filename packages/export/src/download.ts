@@ -38,6 +38,6 @@ export function downloadBuffer(
   filename: string,
   mimeType: string = 'application/octet-stream'
 ): void {
-  const blob = new Blob([buffer], { type: mimeType });
+  const blob = new Blob([buffer as BlobPart], { type: mimeType });
   downloadBlob(blob, filename);
 }

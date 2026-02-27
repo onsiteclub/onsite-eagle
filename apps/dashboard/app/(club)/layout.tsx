@@ -25,7 +25,7 @@ export default async function ClubLayout({
 
   // Fetch subscription data
   const { data: subscription } = await supabase
-    .from('billing_subscriptions')
+    .from('bil_subscriptions')
     .select('*')
     .eq('user_id', user.id)
     .eq('app_name', 'timekeeper')

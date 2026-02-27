@@ -59,7 +59,7 @@ export default function LotsScreen() {
     try {
       // Load houses assigned to this worker via house_assignments
       const { data, error } = await supabase
-        .from('houses')
+        .from('egl_houses')
         .select(`
           id,
           lot_number,

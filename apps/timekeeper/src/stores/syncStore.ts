@@ -445,7 +445,7 @@ async function uploadLocations(userId: string): Promise<{ count: number; errors:
         logger.info('sync', `[SYNC:geofences] UPSERT ATTEMPT - ${location.name}`, { payload });
 
         const { data, error, status, statusText } = await supabase
-          .from('app_timekeeper_geofences')
+          .from('tmk_geofences')
           .upsert(payload)
           .select();
 
@@ -527,7 +527,7 @@ async function uploadRecords(userId: string): Promise<{ count: number; errors: s
         logger.info('sync', `[SYNC:entries] UPSERT ATTEMPT - ${record.location_name}`, { payload });
 
         const { data, error, status, statusText } = await supabase
-          .from('app_timekeeper_entries')
+          .from('tmk_entries')
           .upsert(payload)
           .select();
 
@@ -638,7 +638,7 @@ async function downloadLocations(userId: string): Promise<{ count: number; error
 
   try {
     const { data, error } = await supabase
-      .from('app_timekeeper_geofences')
+      .from('tmk_geofences')
       .select('*')
       .eq('user_id', userId);
 
@@ -706,7 +706,7 @@ async function downloadRecords(userId: string): Promise<{ count: number; errors:
 
   try {
     const { data, error } = await supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('*')
       .eq('user_id', userId);
 

@@ -16,12 +16,10 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const origin = url.origin
 
+  // PKCE flow uses 'code', token flow uses 'token_hash' + 'type'
+  const code = url.searchParams.get('code')
   const type = url.searchParams.get('type') as EmailOtpType | null
-
-  // Prefer the correct param name (token_hash). Keep fallback to legacy "code" just in case.
-  const token_hash =
-    url.searchParams.get('token_hash') ??
-    url.searchParams.get('code')
+  const token_hash = url.searchParams.get('token_hash')
 
   // Optional: allow caller to specify next. Default for recovery is /reset-password
   const nextParam =
@@ -29,9 +27,10 @@ export async function GET(request: NextRequest) {
     (type === 'recovery' ? '/reset-password' : '/')
 
   // Anti open-redirect: only allow internal paths
-  const nextPath = nextParam.startsWith('/') ? nextParam : '/reset-password'
+  const nextPath = nextParam.startsWith('/') ? nextParam : '/'
 
-  if (!type || !token_hash) {
+  // Need at least one auth method
+  if (!code && (!type || !token_hash)) {
     return NextResponse.redirect(new URL('/?error=missing_token', origin))
   }
 
@@ -62,12 +61,23 @@ export async function GET(request: NextRequest) {
     }
   )
 
-  const { error } = await supabase.auth.verifyOtp({ type, token_hash })
+  let error: Error | null = null
+
+  if (code) {
+    // PKCE flow: exchange authorization code for session
+    const result = await supabase.auth.exchangeCodeForSession(code)
+    error = result.error
+  } else if (type && token_hash) {
+    // Token flow: verify OTP token
+    const result = await supabase.auth.verifyOtp({ type, token_hash })
+    error = result.error
+  }
 
   if (error) {
     console.error('Auth callback error:', {
       message: error.message,
       type,
+      hasCode: Boolean(code),
       hasTokenHash: Boolean(token_hash),
       nextPath,
     })

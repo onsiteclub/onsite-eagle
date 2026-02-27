@@ -60,7 +60,7 @@ export async function createAccessToken(ownerName?: string): Promise<{
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000);
 
     const { error } = await supabase
-      .from('pending_tokens')
+      .from('core_pending_tokens')
       .insert({
         owner_id: user.id,
         token,
@@ -90,7 +90,7 @@ export async function getMyGrants(): Promise<AccessGrant[]> {
     if (!user) return [];
 
     const { data, error } = await supabase
-      .from('access_grants')
+      .from('core_access_grants')
       .select('*')
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
@@ -116,7 +116,7 @@ export async function revokeGrant(grantId: string): Promise<boolean> {
     if (!user) return false;
 
     const { error } = await supabase
-      .from('access_grants')
+      .from('core_access_grants')
       .update({
         status: 'revoked',
         revoked_at: new Date().toISOString(),
@@ -158,7 +158,7 @@ export async function redeemToken(token: string): Promise<{
 
     // Find the pending token
     const { data: pendingToken, error: fetchError } = await supabase
-      .from('pending_tokens')
+      .from('core_pending_tokens')
       .select('*')
       .eq('token', token)
       .single();
@@ -181,7 +181,7 @@ export async function redeemToken(token: string): Promise<{
 
     // Check if grant already exists
     const { data: existingGrant } = await supabase
-      .from('access_grants')
+      .from('core_access_grants')
       .select('id, status')
       .eq('owner_id', tokenData.owner_id)
       .eq('viewer_id', user.id)
@@ -195,7 +195,7 @@ export async function redeemToken(token: string): Promise<{
 
       // Re-activate previously revoked grant
       const { error: updateError } = await supabase
-        .from('access_grants')
+        .from('core_access_grants')
         .update({
           token: token,
           status: 'active',
@@ -212,7 +212,7 @@ export async function redeemToken(token: string): Promise<{
     } else {
       // Create new grant (IMMEDIATE ACCESS - no approval needed)
       const { error: insertError } = await supabase
-        .from('access_grants')
+        .from('core_access_grants')
         .insert({
           owner_id: tokenData.owner_id,
           viewer_id: user.id,
@@ -230,7 +230,7 @@ export async function redeemToken(token: string): Promise<{
 
     // Delete the used token
     await supabase
-      .from('pending_tokens')
+      .from('core_pending_tokens')
       .delete()
       .eq('id', tokenData.id);
 
@@ -256,7 +256,7 @@ export async function unlinkWorker(grantId: string): Promise<boolean> {
     if (!user) return false;
 
     const { error } = await supabase
-      .from('access_grants')
+      .from('core_access_grants')
       .update({
         status: 'revoked',
         revoked_at: new Date().toISOString(),
@@ -286,7 +286,7 @@ export async function updateGrantLabel(ownerId: string, label: string): Promise<
     if (!user) return false;
 
     const { error } = await supabase
-      .from('access_grants')
+      .from('core_access_grants')
       .update({ label })
       .eq('owner_id', ownerId)
       .eq('viewer_id', user.id)
@@ -314,7 +314,7 @@ export async function getGrantedAccess(): Promise<AccessGrant[]> {
     if (!user) return [];
 
     const { data, error } = await supabase
-      .from('access_grants')
+      .from('core_access_grants')
       .select('*')
       .eq('viewer_id', user.id)
       .eq('status', 'active')
@@ -343,7 +343,7 @@ export async function getSharedRecords(ownerId: string): Promise<RecordRow[]> {
 
     // RLS will automatically filter based on active grants
     const { data, error } = await supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('*')
       .eq('user_id', ownerId)
       .order('entry_at', { ascending: false })

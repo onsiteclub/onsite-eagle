@@ -26,9 +26,9 @@ export default async function AdminAnalyticsPage() {
     { count: totalEntries },
   ] = await Promise.all([
     supabase.from('core_profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('billing_subscriptions').select('status, stripe_price_id'),
-    supabase.from('app_calculator_calculations').select('*', { count: 'exact', head: true }),
-    supabase.from('app_timekeeper_entries').select('*', { count: 'exact', head: true }),
+    supabase.from('bil_subscriptions').select('status, stripe_price_id'),
+    supabase.from('ccl_calculations').select('*', { count: 'exact', head: true }),
+    supabase.from('tmk_entries').select('*', { count: 'exact', head: true }),
   ])
 
   const activeSubs = subscriptions?.filter(s => s.status === 'active' || s.status === 'trialing').length ?? 0

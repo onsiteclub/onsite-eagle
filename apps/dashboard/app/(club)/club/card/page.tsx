@@ -30,7 +30,7 @@ export default async function DigitalCardPage() {
   // Career stats
   const [hoursResult, photosResult] = await Promise.all([
     supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('duration_minutes')
       .eq('user_id', user.id)
       .is('deleted_at', null),

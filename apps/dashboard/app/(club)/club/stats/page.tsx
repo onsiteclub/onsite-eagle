@@ -15,7 +15,7 @@ export default async function StatsPage() {
 
   const [hoursResult, photosResult, calcsResult, monthlyResult, streakResult] = await Promise.all([
     supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('duration_minutes')
       .eq('user_id', user.id)
       .is('deleted_at', null),
@@ -24,11 +24,11 @@ export default async function StatsPage() {
       .select('id', { count: 'exact', head: true })
       .eq('uploaded_by', user.id),
     supabase
-      .from('app_calculator_calculations')
+      .from('ccl_calculations')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id),
     supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('entry_at, duration_minutes')
       .eq('user_id', user.id)
       .is('deleted_at', null)

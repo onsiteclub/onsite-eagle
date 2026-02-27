@@ -25,7 +25,8 @@ type LogCategory =
   | 'pingpong'
   | 'permissions'
   | 'settings'
-  | 'grants';     // QR code device linking
+  | 'grants'      // QR code device linking
+  | 'push';       // Push notifications
 
 
 export interface LogEntry {
@@ -73,6 +74,7 @@ const categoryColor: Record<LogCategory, string> = {
   permissions: '\x1b[36m', // cyan
   settings: '\x1b[37m',    // white
   grants: '\x1b[94m',      // light blue (QR code linking)
+  push: '\x1b[31m',        // red (push notifications)
 };
 
 // In-memory log storage

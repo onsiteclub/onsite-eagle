@@ -113,7 +113,7 @@ export async function saveCalculation(
     };
 
     const { data, error } = await supabase
-      .from('app_calculator_calculations')
+      .from('ccl_calculations')
       .insert(record)
       .select('id')
       .single();

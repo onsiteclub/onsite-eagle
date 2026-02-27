@@ -60,7 +60,7 @@ export function addDataSheet(
   data: Record<string, unknown>[],
   columns?: ColumnDef[]
 ): Worksheet {
-  const cols = columns ?? Object.keys(data[0] || {}).map(key => ({
+  const cols: ColumnDef[] = columns ?? Object.keys(data[0] || {}).map(key => ({
     header: key,
     key,
   }));

@@ -17,7 +17,7 @@ export async function GET(
 
   // 1. Busca código no Supabase
   const { data, error } = await supabase
-    .from('checkout_codes')
+    .from('bil_checkout_codes')
     .select('*')
     .eq('code', code)
     .single();
@@ -48,7 +48,7 @@ export async function GET(
 
   // 5. Marca como usado (IMPORTANTE: fazer antes do redirect)
   const { error: updateError } = await supabase
-    .from('checkout_codes')
+    .from('bil_checkout_codes')
     .update({ used: true })
     .eq('code', code);
 

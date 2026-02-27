@@ -6,7 +6,7 @@
  *
  * Flow: Operator (worker) generates QR → Monitor (supervisor) scans → Immediate access
  *
- * Tables: pending_tokens, access_grants (both have RLS)
+ * Tables: core_pending_tokens, core_access_grants (both have RLS)
  */
 
 import type {
@@ -41,7 +41,7 @@ export async function createAccessToken(
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000);
 
   const { error } = await supabase
-    .from('pending_tokens')
+    .from('core_pending_tokens')
     .insert({
       owner_id: user.id,
       token,
@@ -65,7 +65,7 @@ export async function getMyGrants(
   if (!user) return [];
 
   const { data, error } = await supabase
-    .from('access_grants')
+    .from('core_access_grants')
     .select('*')
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false });
@@ -85,7 +85,7 @@ export async function revokeGrant(
   if (!user) return false;
 
   const { error } = await supabase
-    .from('access_grants')
+    .from('core_access_grants')
     .update({
       status: 'revoked',
       revoked_at: new Date().toISOString(),
@@ -123,7 +123,7 @@ export async function redeemToken(
 
   // Find the pending token
   const { data: pendingToken, error: fetchError } = await supabase
-    .from('pending_tokens')
+    .from('core_pending_tokens')
     .select('*')
     .eq('token', token)
     .single();
@@ -146,7 +146,7 @@ export async function redeemToken(
 
   // Check if grant already exists
   const { data: existingGrant } = await supabase
-    .from('access_grants')
+    .from('core_access_grants')
     .select('id, status')
     .eq('owner_id', tokenData.owner_id)
     .eq('viewer_id', user.id)
@@ -160,7 +160,7 @@ export async function redeemToken(
 
     // Re-activate previously revoked grant
     const { error: updateError } = await supabase
-      .from('access_grants')
+      .from('core_access_grants')
       .update({
         token,
         status: 'active',
@@ -176,7 +176,7 @@ export async function redeemToken(
   } else {
     // Create new grant (IMMEDIATE ACCESS — no approval needed)
     const { error: insertError } = await supabase
-      .from('access_grants')
+      .from('core_access_grants')
       .insert({
         owner_id: tokenData.owner_id,
         viewer_id: user.id,
@@ -193,7 +193,7 @@ export async function redeemToken(
 
   // Delete the used token
   await supabase
-    .from('pending_tokens')
+    .from('core_pending_tokens')
     .delete()
     .eq('id', tokenData.id);
 
@@ -216,7 +216,7 @@ export async function getGrantedAccess(
   if (!user) return [];
 
   const { data, error } = await supabase
-    .from('access_grants')
+    .from('core_access_grants')
     .select('*')
     .eq('viewer_id', user.id)
     .eq('status', 'active')
@@ -237,7 +237,7 @@ export async function unlinkWorker(
   if (!user) return false;
 
   const { error } = await supabase
-    .from('access_grants')
+    .from('core_access_grants')
     .update({
       status: 'revoked',
       revoked_at: new Date().toISOString(),
@@ -384,7 +384,7 @@ export async function updateGrantLabel(
   if (!user) return false;
 
   const { error } = await supabase
-    .from('access_grants')
+    .from('core_access_grants')
     .update({ label })
     .eq('owner_id', ownerId)
     .eq('viewer_id', user.id)

@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { logger } from '@onsite/logger';
 
 /**
  * Stripe client instance
@@ -69,11 +70,10 @@ export async function createCheckoutSession({
   customerId?: string;
   returnRedirect?: string;
 }): Promise<Stripe.Checkout.Session> {
-  console.log('[Stripe] createCheckoutSession called with:', { app, userId, userEmail, returnRedirect });
-  console.log('[Stripe] STRIPE_SECRET_KEY configured:', !!process.env.STRIPE_SECRET_KEY);
+  logger.info('STRIPE', 'createCheckoutSession called', { app, userId, userEmail, returnRedirect, secretConfigured: !!process.env.STRIPE_SECRET_KEY });
 
   const appConfig = getAppConfig(app);
-  console.log('[Stripe] App config:', JSON.stringify(appConfig));
+  logger.debug('STRIPE', 'App config resolved', { appConfig });
 
   if (!appConfig || !appConfig.priceId) {
     console.error('[Stripe] Invalid app config - missing priceId for:', app);
@@ -128,16 +128,16 @@ export async function createCheckoutSession({
     sessionConfig.customer_email = userEmail;
   }
 
-  console.log('[Stripe] Creating session with config:', JSON.stringify({
+  logger.debug('STRIPE', 'Creating session with config', {
     mode: sessionConfig.mode,
     priceId: appConfig.priceId,
     success_url: sessionConfig.success_url,
     cancel_url: sessionConfig.cancel_url,
-  }));
+  });
 
   try {
     const session = await stripe.checkout.sessions.create(sessionConfig);
-    console.log('[Stripe] Session created successfully:', session.id);
+    logger.info('STRIPE', 'Session created successfully', { sessionId: session.id });
     return session;
   } catch (error) {
     console.error('[Stripe] Session creation failed:', error);

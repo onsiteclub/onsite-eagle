@@ -17,9 +17,11 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 interface AuthProviderProps {
   children: React.ReactNode
   supabase: SupabaseClient
+  /** URL to redirect after email confirmation (e.g. https://myapp.com/auth/callback) */
+  emailRedirectTo?: string
 }
 
-export function AuthProvider({ children, supabase }: AuthProviderProps) {
+export function AuthProvider({ children, supabase, emailRedirectTo }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>({
     user: null,
     loading: true,
@@ -131,6 +133,7 @@ export function AuthProvider({ children, supabase }: AuthProviderProps) {
         password: credentials.password,
         options: {
           data: userMetadata,
+          emailRedirectTo,
         },
       })
 

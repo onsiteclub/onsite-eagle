@@ -50,7 +50,7 @@ export async function updateSession(request: NextRequest) {
   if (user && isAuthPage && !request.nextUrl.pathname.includes('/pending')) {
     // Check if user is approved
     const { data: adminUser } = await supabase
-      .from('admin_users')
+      .from('core_admin_users')
       .select('approved')
       .eq('user_id', user.id)
       .single();

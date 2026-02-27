@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { logger } from '@onsite/logger'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
     }
   } catch (e) {
     // Table might not exist yet, continue
-    console.log('egl_documents table not available:', e)
+    logger.info('EAGLE', 'egl_documents table not available', { error: String(e) })
   }
 
   // 1b. Fetch LINKED documents (from bulk upload system)
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (e) {
-      console.log('v_house_documents view not available:', e)
+      logger.info('EAGLE', 'v_house_documents view not available', { error: String(e) })
     }
   }
 

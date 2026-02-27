@@ -11,7 +11,7 @@ export async function POST() {
     }
 
     const { error } = await supabase
-      .from('profiles')
+      .from('core_profiles')
       .update({
         device_id: null,
         device_model: null,

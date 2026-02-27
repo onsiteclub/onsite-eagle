@@ -268,6 +268,68 @@ apps/dashboard/
 
 ---
 
-## 10. Historico de Erros
+## 10. Deploy Vercel — Passo a Passo
+
+### 10.1 Criar Projeto na Vercel
+
+1. Abrir [vercel.com/new](https://vercel.com/new)
+2. Importar repositorio `onsite-eagle`
+3. Em **Root Directory**, clicar Edit e selecionar: `apps/dashboard`
+4. Framework Preset: **Next.js** (auto-detectado)
+5. Build Command: deixar default (`turbo build`)
+6. Clicar **Deploy**
+
+### 10.2 Environment Variables
+
+Em **Settings > Environment Variables**, adicionar para Production + Preview:
+
+| Variavel | Tipo | Valor |
+|----------|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Plain | `https://dbasazrdbtigrdntaehb.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Plain | *(anon key do projeto)* |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret | *(service role key)* |
+| `STRIPE_SECRET_KEY` | Secret | *(Stripe secret key)* |
+| `STRIPE_PRICE_ID` | Plain | *(Stripe price ID)* |
+| `STRIPE_WEBHOOK_SECRET` | Secret | *(Stripe webhook signing secret)* |
+| `OPENAI_API_KEY` | Secret | *(OpenAI key)* |
+| `NEXT_PUBLIC_APP_URL` | Plain | `https://app.onsiteclub.ca` |
+| `TRIAL_PERIOD_DAYS` | Plain | `180` |
+
+> Dica: Use **Shared Environment Variables** no nivel do Team para as variaveis Supabase.
+
+### 10.3 Custom Domain
+
+1. Settings > Domains > Add Domain
+2. Adicionar: `app.onsiteclub.ca`
+3. No DNS, criar CNAME: `app → cname.vercel-dns.com`
+
+### 10.4 Stripe Webhook
+
+Apos deploy, configurar webhook no Stripe Dashboard:
+- URL: `https://app.onsiteclub.ca/api/webhooks/stripe`
+- Eventos: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`
+
+### 10.5 Ignored Build Step
+
+Settings > Build & Deployment > Ignored Build Step:
+```
+npx turbo-ignore
+```
+
+### 10.6 Verificacao Pos-Deploy
+
+```
+[ ] Login page carrega (/)
+[ ] OAuth callback funciona (/auth/callback)
+[ ] Dashboard /club carrega apos login
+[ ] Subscription page mostra status Stripe
+[ ] Timekeeper export gera XLSX/PDF
+[ ] Custom domain com HTTPS ativo
+[ ] Stripe webhook recebe eventos (testar com Stripe CLI)
+```
+
+---
+
+## 11. Historico de Erros
 
 *(Nenhum erro documentado ainda. Adicionar conforme surgirem.)*

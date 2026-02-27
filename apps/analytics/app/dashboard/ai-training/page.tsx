@@ -35,9 +35,9 @@ export default function AITrainingPage() {
 
       const [profiles, entries, voice, calcs] = await Promise.all([
         supabase.from('core_profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('app_timekeeper_entries').select('*', { count: 'exact', head: true }),
-        supabase.from('voice_logs').select('*', { count: 'exact', head: true }),
-        supabase.from('app_calculator_calculations').select('*', { count: 'exact', head: true }),
+        supabase.from('tmk_entries').select('*', { count: 'exact', head: true }),
+        supabase.from('core_voice_logs').select('*', { count: 'exact', head: true }),
+        supabase.from('ccl_calculations').select('*', { count: 'exact', head: true }),
       ]);
 
       setStats({

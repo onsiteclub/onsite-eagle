@@ -40,10 +40,10 @@ export default function ReportsPage() {
 
       const [users, entries, voice, payments, subs, logs] = await Promise.all([
         supabase.from('core_profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('app_timekeeper_entries').select('*', { count: 'exact', head: true }),
-        supabase.from('voice_logs').select('*', { count: 'exact', head: true }),
-        supabase.from('payment_history').select('*', { count: 'exact', head: true }),
-        supabase.from('billing_subscriptions').select('status').eq('status', 'active'),
+        supabase.from('tmk_entries').select('*', { count: 'exact', head: true }),
+        supabase.from('core_voice_logs').select('*', { count: 'exact', head: true }),
+        supabase.from('bil_payments').select('*', { count: 'exact', head: true }),
+        supabase.from('bil_subscriptions').select('status').eq('status', 'active'),
         supabase.from('app_logs').select('*', { count: 'exact', head: true }),
       ]);
 

@@ -1,18 +1,25 @@
 import * as SQLite from 'expo-sqlite';
 import { logger } from '@onsite/logger';
 
+// ─── Re-export V1 database module ────────────────────────────
+// The V1 module (database/index.ts) provides the original SQLite
+// database used by stores (recordStore, locationStore, syncStore, etc).
+// Re-exporting here ensures that imports from '../lib/database' resolve
+// to both V1 and V2 APIs.
+export * from './database/index';
+
 const DB_NAME = 'timekeeper_v2.db';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
-/** Get the database instance. Must call initDatabase() first. */
+/** Get the V2 database instance. Must call initDatabaseV2() first. */
 export function getDb(): SQLite.SQLiteDatabase {
-  if (!_db) throw new Error('Database not initialized. Call initDatabase() first.');
+  if (!_db) throw new Error('Database not initialized. Call initDatabaseV2() first.');
   return _db;
 }
 
-/** Initialize the database and run migrations. */
-export async function initDatabase(): Promise<void> {
+/** Initialize the V2 database and run migrations. */
+export async function initDatabaseV2(): Promise<void> {
   _db = await SQLite.openDatabaseAsync(DB_NAME);
 
   await _db.execAsync('PRAGMA journal_mode = WAL;');

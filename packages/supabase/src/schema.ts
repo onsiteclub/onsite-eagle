@@ -838,42 +838,48 @@ export const TABLE_NAMES = {
   ref_trades: 'ref_trades',
   ref_provinces: 'ref_provinces',
   ref_units: 'ref_units',
+  ref_eagle_phases: 'ref_eagle_phases',
+  ref_eagle_phase_items: 'ref_eagle_phase_items',
+  ref_material_types: 'ref_material_types',
 
-  // Identity
+  // Core / Identity
   core_profiles: 'core_profiles',
   core_devices: 'core_devices',
   core_consents: 'core_consents',
+  core_access_grants: 'core_access_grants',
+  core_pending_tokens: 'core_pending_tokens',
+  core_admin_users: 'core_admin_users',
+  core_admin_logs: 'core_admin_logs',
+  core_ai_conversations: 'core_ai_conversations',
+  core_voice_logs: 'core_voice_logs',
 
   // Timekeeper
-  app_timekeeper_projects: 'app_timekeeper_projects',
-  app_timekeeper_geofences: 'app_timekeeper_geofences',
-  app_timekeeper_entries: 'app_timekeeper_entries',
+  tmk_entries: 'tmk_entries',
+  tmk_geofences: 'tmk_geofences',
+  tmk_projects: 'tmk_projects',
 
   // Calculator
-  consents: 'consents',
-  voice_logs: 'voice_logs',
-  calculations: 'calculations',
+  ccl_calculations: 'ccl_calculations',
+  ccl_templates: 'ccl_templates',
 
   // Shop
-  categories: 'categories',
-  app_shop_products: 'app_shop_products',
-  app_shop_product_variants: 'app_shop_product_variants',
-  app_shop_orders: 'app_shop_orders',
-  app_shop_order_items: 'app_shop_order_items',
-  app_shop_carts: 'app_shop_carts',
+  shp_products: 'shp_products',
+  shp_variants: 'shp_variants',
+  shp_categories: 'shp_categories',
+  shp_orders: 'shp_orders',
+  shp_order_items: 'shp_order_items',
+  shp_carts: 'shp_carts',
 
   // Billing
-  billing_products: 'billing_products',
-  billing_subscriptions: 'billing_subscriptions',
-  payment_history: 'payment_history',
-  checkout_codes: 'checkout_codes',
+  bil_products: 'bil_products',
+  bil_subscriptions: 'bil_subscriptions',
+  bil_payments: 'bil_payments',
+  bil_checkout_codes: 'bil_checkout_codes',
 
-  // Debug
+  // Logs
   log_errors: 'log_errors',
   log_events: 'log_events',
   log_locations: 'log_locations',
-  log_voice: 'log_voice',
-  app_logs: 'app_logs',
 
   // Analytics
   agg_user_daily: 'agg_user_daily',
@@ -884,27 +890,7 @@ export const TABLE_NAMES = {
   int_voice_patterns: 'int_voice_patterns',
   int_behavior_patterns: 'int_behavior_patterns',
 
-  // Admin
-  admin_users: 'admin_users',
-  admin_logs: 'admin_logs',
-
   // Rewards
   blades_transactions: 'blades_transactions',
-
-  // ARGUS
-  argus_conversations: 'argus_conversations',
-
-  // Views
-  v_churn_risk: 'v_churn_risk',
-  v_user_health: 'v_user_health',
-  v_revenue_by_province: 'v_revenue_by_province',
-  v_voice_adoption_by_trade: 'v_voice_adoption_by_trade',
 } as const;
-
-// Legacy aliases for backwards compatibility
-export type Profile = CoreProfile;
-export type Location = TimekeeperGeofence;
-export type TimeEntry = TimekeeperEntry;
-export type ErrorLog = LogError;
-export type LocationAudit = LogLocation;
 export type AnalyticsDaily = AggUserDaily;

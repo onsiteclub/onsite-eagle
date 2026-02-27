@@ -165,7 +165,7 @@ async function handleCheckoutCompleted(
   };
 
   const { error } = await supabase
-    .from('billing_subscriptions')
+    .from('bil_subscriptions')
     .upsert(subscriptionData, {
       onConflict: 'user_id,app_name',
     });
@@ -202,7 +202,7 @@ async function handleCheckoutCompleted(
   };
 
   const { error: historyError } = await supabase
-    .from('payment_history')
+    .from('bil_payments')
     .insert(paymentHistoryData);
 
   if (historyError) {
@@ -227,7 +227,7 @@ async function handleSubscriptionUpdated(
   if (!app || !userId) {
     // Try to find by subscription ID
     const { data: existingSub } = await supabase
-      .from('billing_subscriptions')
+      .from('bil_subscriptions')
       .select('user_id, app_name')
       .eq('stripe_subscription_id', subscription.id)
       .single();
@@ -239,7 +239,7 @@ async function handleSubscriptionUpdated(
 
     // Update using found record
     const { error } = await supabase
-      .from('billing_subscriptions')
+      .from('bil_subscriptions')
       .update({
         status: subscription.status,
         current_period_start: safeTimestampToISO(subscription.current_period_start),
@@ -259,7 +259,7 @@ async function handleSubscriptionUpdated(
   }
 
   const { error } = await supabase
-    .from('billing_subscriptions')
+    .from('bil_subscriptions')
     .update({
       status: subscription.status,
       current_period_start: safeTimestampToISO(subscription.current_period_start),
@@ -287,7 +287,7 @@ async function handleSubscriptionDeleted(
   subscription: Stripe.Subscription
 ) {
   const { error } = await supabase
-    .from('billing_subscriptions')
+    .from('bil_subscriptions')
     .update({
       status: 'canceled',
       updated_at: new Date().toISOString(),
@@ -317,7 +317,7 @@ async function handlePaymentFailed(
   }
 
   const { error } = await supabase
-    .from('billing_subscriptions')
+    .from('bil_subscriptions')
     .update({
       status: 'past_due',
       updated_at: new Date().toISOString(),
@@ -350,7 +350,7 @@ async function handleInvoicePaid(
 
   // Find the subscription record to get user_id and app_name
   const { data: existingSub } = await supabase
-    .from('billing_subscriptions')
+    .from('bil_subscriptions')
     .select('user_id, app_name')
     .eq('stripe_subscription_id', subscriptionId)
     .single();
@@ -386,7 +386,7 @@ async function handleInvoicePaid(
   };
 
   const { error } = await supabase
-    .from('payment_history')
+    .from('bil_payments')
     .insert(paymentHistoryData);
 
   if (error) {
@@ -413,7 +413,7 @@ async function handleChargeRefunded(
 
   // Update payment_history where stripe_payment_intent_id matches
   const { error, count } = await supabase
-    .from('payment_history')
+    .from('bil_payments')
     .update({ status: 'refunded' })
     .eq('stripe_payment_intent_id', paymentIntentId);
 

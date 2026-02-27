@@ -15,14 +15,14 @@ export default async function CalculatorAppPage() {
 
   const [{ data: calculations }, { count: totalCount }] = await Promise.all([
     supabase
-      .from('app_calculator_calculations')
+      .from('ccl_calculations')
       .select('*')
       .eq('user_id', user.id)
       .gte('created_at', thirtyDaysAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(50),
     supabase
-      .from('app_calculator_calculations')
+      .from('ccl_calculations')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id),
   ])

@@ -19,7 +19,7 @@ export default async function TimekeeperAppPage() {
   if (!coreProfile) redirect('/')
 
   const { data: subscription } = await supabase
-    .from('billing_subscriptions')
+    .from('bil_subscriptions')
     .select('*')
     .eq('user_id', user.id)
     .eq('app_name', 'timekeeper')
@@ -37,14 +37,14 @@ export default async function TimekeeperAppPage() {
 
   const [{ data: entries }, { data: geofences }] = await Promise.all([
     supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('*')
       .eq('user_id', user.id)
       .is('deleted_at', null)
       .gte('entry_at', ninetyDaysAgo.toISOString())
       .order('entry_at', { ascending: false }),
     supabase
-      .from('app_timekeeper_geofences')
+      .from('tmk_geofences')
       .select('*')
       .eq('user_id', user.id)
       .is('deleted_at', null)

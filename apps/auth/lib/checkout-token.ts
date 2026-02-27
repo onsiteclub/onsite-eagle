@@ -14,6 +14,8 @@
  * - jti: unique token ID (for anti-replay)
  */
 
+import { logger } from '@onsite/logger';
+
 const JWT_SECRET = process.env.CHECKOUT_JWT_SECRET;
 
 export interface CheckoutTokenPayload {
@@ -75,8 +77,7 @@ async function verifySignature(data: string, signature: string, secret: string):
  * @returns Validation result with user data if valid, or error if invalid
  */
 export async function validateCheckoutToken(token: string): Promise<TokenValidationResult> {
-  console.log('[JWT] Starting token validation');
-  console.log('[JWT] SECRET configured:', !!JWT_SECRET, 'length:', JWT_SECRET?.length);
+  logger.debug('AUTH', 'Starting JWT token validation', { secretConfigured: !!JWT_SECRET, secretLength: JWT_SECRET?.length });
 
   if (!JWT_SECRET) {
     console.error('[JWT] CHECKOUT_JWT_SECRET is not configured');
@@ -95,9 +96,9 @@ export async function validateCheckoutToken(token: string): Promise<TokenValidat
 
     // 2. Verify signature
     const dataToVerify = `${header}.${payload}`;
-    console.log('[JWT] Verifying signature...');
+    logger.debug('AUTH', 'Verifying JWT signature');
     const isValid = await verifySignature(dataToVerify, signature, JWT_SECRET);
-    console.log('[JWT] Signature valid:', isValid);
+    logger.debug('AUTH', 'JWT signature verification result', { isValid });
 
     if (!isValid) {
       return { valid: false, error: 'Invalid signature' };
@@ -105,11 +106,11 @@ export async function validateCheckoutToken(token: string): Promise<TokenValidat
 
     // 3. Decode payload
     const decodedPayload: CheckoutTokenPayload = JSON.parse(base64urlDecode(payload));
-    console.log('[JWT] Decoded payload:', JSON.stringify(decodedPayload));
+    logger.debug('AUTH', 'JWT decoded payload', { payload: decodedPayload });
 
     // 4. Verify expiration
     const now = Math.floor(Date.now() / 1000);
-    console.log('[JWT] Checking expiration - now:', now, 'exp:', decodedPayload.exp, 'diff:', decodedPayload.exp - now);
+    logger.debug('AUTH', 'Checking JWT expiration', { now, exp: decodedPayload.exp, diff: decodedPayload.exp - now });
     if (decodedPayload.exp < now) {
       return { valid: false, error: 'Token expired' };
     }

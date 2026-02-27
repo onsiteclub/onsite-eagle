@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
           // Update or insert billing_subscriptions
           await supabase
-            .from('billing_subscriptions')
+            .from('bil_subscriptions')
             .upsert({
               user_id: userId,
               app_name: 'timekeeper',
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
             : 'none'
 
           await supabase
-            .from('billing_subscriptions')
+            .from('bil_subscriptions')
             .update({
               status,
               trial_end: subscription.trial_end
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
 
         if (userId) {
           await supabase
-            .from('billing_subscriptions')
+            .from('bil_subscriptions')
             .update({
               status: 'canceled',
               canceled_at: new Date().toISOString(),
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
           if (userId) {
             await supabase
-              .from('billing_subscriptions')
+              .from('bil_subscriptions')
               .update({
                 status: 'active',
                 has_payment_method: true,
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
           if (userId) {
             await supabase
-              .from('billing_subscriptions')
+              .from('bil_subscriptions')
               .update({
                 status: 'past_due',
               })

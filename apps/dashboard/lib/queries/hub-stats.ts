@@ -9,7 +9,7 @@ export async function getWeeklyStats(supabase: SupabaseClient, userId: string) {
   const [hoursResult, photosResult, calcsResult] = await Promise.all([
     // Timekeeper hours this week
     supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('duration_minutes, entry_at, exit_at')
       .eq('user_id', userId)
       .gte('entry_at', weekAgoISO)
@@ -24,7 +24,7 @@ export async function getWeeklyStats(supabase: SupabaseClient, userId: string) {
 
     // Calculations this week
     supabase
-      .from('app_calculator_calculations')
+      .from('ccl_calculations')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .gte('created_at', weekAgoISO),
@@ -60,14 +60,14 @@ export async function getAppStats(supabase: SupabaseClient, userId: string) {
   ] = await Promise.all([
     // Timekeeper total
     supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .is('deleted_at', null),
 
     // Calculator total
     supabase
-      .from('app_calculator_calculations')
+      .from('ccl_calculations')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
 
@@ -84,7 +84,7 @@ export async function getAppStats(supabase: SupabaseClient, userId: string) {
 
     // Shop orders
     supabase
-      .from('app_shop_orders')
+      .from('shp_orders')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
   ])
@@ -110,7 +110,7 @@ export interface ActivityItem {
 export async function getRecentActivity(supabase: SupabaseClient, userId: string): Promise<ActivityItem[]> {
   const [entriesRes, photosRes, calcsRes] = await Promise.all([
     supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('id, entry_at, geofence_name, duration_minutes')
       .eq('user_id', userId)
       .is('deleted_at', null)
@@ -123,7 +123,7 @@ export async function getRecentActivity(supabase: SupabaseClient, userId: string
       .order('created_at', { ascending: false })
       .limit(3),
     supabase
-      .from('app_calculator_calculations')
+      .from('ccl_calculations')
       .select('id, calculation_type, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })

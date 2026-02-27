@@ -20,7 +20,7 @@ export async function getNextBadges(
   // Get user stats for progress calculation
   const [hoursRes, photosRes, calcsRes] = await Promise.all([
     supabase
-      .from('app_timekeeper_entries')
+      .from('tmk_entries')
       .select('duration_minutes')
       .eq('user_id', userId)
       .is('deleted_at', null),
@@ -29,7 +29,7 @@ export async function getNextBadges(
       .select('id', { count: 'exact', head: true })
       .eq('uploaded_by', userId),
     supabase
-      .from('app_calculator_calculations')
+      .from('ccl_calculations')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
   ])

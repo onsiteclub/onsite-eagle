@@ -9,17 +9,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@onsite/supabase/client';
 import { AuthProvider, useAuth } from '@onsite/auth';
 import { AuthFlow } from '@onsite/auth-ui/web';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
 export default function LoginPage() {
-  const [supabase] = useState(() =>
-    createClient(supabaseUrl, supabaseAnonKey)
-  );
+  const [supabase] = useState(() => createClient());
 
   return (
     <AuthProvider supabase={supabase}>
@@ -28,7 +23,7 @@ export default function LoginPage() {
   );
 }
 
-function LoginFlow({ supabase }: { supabase: ReturnType<typeof createClient> }) {
+function LoginFlow({ supabase }: { supabase: ReturnType<typeof createClient>}) {
   const { user, loading } = useAuth();
   const router = useRouter();
 

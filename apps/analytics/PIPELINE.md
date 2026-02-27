@@ -264,6 +264,64 @@ apps/analytics/
 
 ---
 
-## 10. Historico de Erros
+## 10. Deploy Vercel — Passo a Passo
 
-*(Nenhum erro documentado ainda. Adicionar conforme surgirem.)*
+### 10.1 Criar Projeto na Vercel
+
+1. Abrir [vercel.com/new](https://vercel.com/new)
+2. Importar repositorio `onsite-eagle`
+3. Em **Root Directory**, clicar Edit e selecionar: `apps/analytics`
+4. Framework Preset: **Next.js** (auto-detectado)
+5. Build Command: deixar default (`turbo build`)
+6. Clicar **Deploy**
+
+### 10.2 Environment Variables
+
+Em **Settings > Environment Variables**, adicionar para Production + Preview:
+
+| Variavel | Tipo | Valor |
+|----------|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Plain | `https://dbasazrdbtigrdntaehb.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Plain | *(anon key do projeto)* |
+| `OPENAI_API_KEY` | Secret | *(OpenAI key para Teletraan9)* |
+
+> Dica: Use **Shared Environment Variables** no nivel do Team para as variaveis Supabase.
+
+### 10.3 Custom Domain
+
+1. Settings > Domains > Add Domain
+2. Adicionar: `analytics.onsiteclub.ca`
+3. No DNS, criar CNAME: `analytics → cname.vercel-dns.com`
+
+### 10.4 Ignored Build Step
+
+Settings > Build & Deployment > Ignored Build Step:
+```
+npx turbo-ignore
+```
+
+### 10.5 Verificacao Pos-Deploy
+
+```
+[ ] URL principal redireciona para /auth/login
+[ ] Login funciona (usuario precisa estar em admin_users)
+[ ] /auth/pending aparece para usuarios nao aprovados
+[ ] /dashboard/overview carrega com KPIs
+[ ] Teletraan9 AI responde no chat
+[ ] Custom domain com HTTPS ativo
+```
+
+---
+
+## 11. Historico de Erros
+
+### Sessao: 2026-02-27 — Build Fix para Deploy
+
+#### Erro 1: Prerender falha em /auth/login
+| Campo | Detalhe |
+|-------|---------|
+| **Data** | 2026-02-27 |
+| **Sintoma** | `@supabase/ssr: Your project's URL and API key are required` durante `next build` |
+| **Causa Raiz** | page.tsx era `'use client'` com `createClient()` no corpo. SSR prerender executava sem env vars |
+| **Fix** | Split: page.tsx virou server component com `dynamic = 'force-dynamic'`, logica movida para LoginClient.tsx |
+| **Arquivos** | `app/auth/login/page.tsx` (reescrito), `app/auth/login/LoginClient.tsx` (criado) |

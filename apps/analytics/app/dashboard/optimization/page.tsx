@@ -38,7 +38,7 @@ export default function OptimizationPage() {
 
       // Entry methods breakdown
       const { data: entries } = await supabase
-        .from('app_timekeeper_entries')
+        .from('tmk_entries')
         .select('entry_method');
 
       if (entries) {
@@ -54,7 +54,7 @@ export default function OptimizationPage() {
 
       // Voice success rate
       const { data: voiceLogs } = await supabase
-        .from('voice_logs')
+        .from('core_voice_logs')
         .select('was_successful');
 
       if (voiceLogs) {

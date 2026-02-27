@@ -5,6 +5,8 @@ export { ProgressBar, ProgressBarCompact } from './ProgressBar'
 export { LotCard } from './LotCard'
 export { UserBadge, UserBadgeInline } from './UserBadge'
 export { QRCode } from './QRCode'
+export { QRScanner } from './QRScanner'
+export type { QRScannerProps } from './QRScanner'
 
 // Re-export shared types
 export * from '../shared/types'

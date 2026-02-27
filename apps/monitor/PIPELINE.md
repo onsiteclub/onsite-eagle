@@ -185,6 +185,56 @@ apps/monitor/
 
 ---
 
-## 9. Historico de Erros
+## 9. Deploy Vercel — Passo a Passo
+
+### 9.1 Criar Projeto na Vercel
+
+1. Abrir [vercel.com/new](https://vercel.com/new)
+2. Importar repositorio `onsite-eagle`
+3. Em **Root Directory**, clicar Edit e selecionar: `apps/monitor`
+4. Framework Preset: **Next.js** (auto-detectado)
+5. Build Command: deixar default (`turbo build`)
+6. Clicar **Deploy**
+
+### 9.2 Environment Variables
+
+Em **Settings > Environment Variables**, adicionar para Production + Preview:
+
+| Variavel | Tipo | Valor |
+|----------|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Plain | `https://dbasazrdbtigrdntaehb.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Plain | *(anon key do projeto)* |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret | *(service role key)* |
+| `OPENAI_API_KEY` | Secret | *(OpenAI key)* |
+
+> Dica: Use **Shared Environment Variables** no nivel do Team para as variaveis Supabase.
+
+### 9.3 Custom Domain
+
+1. Settings > Domains > Add Domain
+2. Adicionar: `monitor.onsiteclub.ca`
+3. No DNS, criar CNAME: `monitor → cname.vercel-dns.com`
+
+### 9.4 Ignored Build Step
+
+Settings > Build & Deployment > Ignored Build Step:
+```
+npx turbo-ignore
+```
+Isso pula o build se nenhum arquivo relevante mudou.
+
+### 9.5 Verificacao Pos-Deploy
+
+```
+[ ] URL principal carrega (login page)
+[ ] Login com Supabase funciona
+[ ] API /api/validate-photo retorna 401 (sem auth = correto)
+[ ] OpenAI integration responde
+[ ] Custom domain com HTTPS ativo
+```
+
+---
+
+## 10. Historico de Erros
 
 *(Nenhum erro documentado ainda. Adicionar conforme surgirem.)*
