@@ -79,6 +79,87 @@ export type RuntimeGroup = {
   apps: AppRegistryRow[];
 };
 
+// ─── Portal Types ───
+
+export interface SchemaTable {
+  table_name: string;
+  col_count: number;
+  row_estimate: number;
+  prefix: string;
+}
+
+export interface SchemaPolicy {
+  tablename: string;
+  policyname: string;
+  cmd: string;
+  qual: string | null;
+}
+
+export interface SchemaGroup {
+  prefix: string;
+  tables: SchemaTable[];
+  policyCount: number;
+}
+
+export interface HealthFinding {
+  severity: 'critical' | 'warning' | 'info';
+  category: 'rls' | 'naming' | 'docs' | 'orphan' | 'drift';
+  title: string;
+  description: string;
+  suggestion: string;
+  table?: string;
+  package?: string;
+  doc?: string;
+}
+
+export interface DocEntry {
+  relativePath: string;
+  title: string;
+  category: string;
+  headings: string[];
+  wordCount: number;
+  lineCount: number;
+  modifiedAt: string;
+  tableRefs: string[];
+}
+
+export interface MigrationEntry {
+  filename: string;
+  name: string;
+  date: string | null;
+  lineCount: number;
+  statements: {
+    createTable: number;
+    alterTable: number;
+    createPolicy: number;
+    dropPolicy: number;
+    createFunction: number;
+    createView: number;
+    createIndex: number;
+  };
+  tablesCreated: string[];
+  tablesAltered: string[];
+}
+
+export interface DepGraph {
+  nodes: { id: string; type: 'app' | 'package'; name: string; runtime?: string; layer?: string }[];
+  edges: { from: string; to: string; type: string }[];
+  orphans: string[];
+  hubs: { id: string; consumers: number }[];
+}
+
+export interface PkgEntry {
+  slug: string;
+  name: string;
+  version: string;
+  layer: string;
+  internalDeps: string[];
+  externalDeps: string[];
+  hasReadme: boolean;
+  hasSrc: boolean;
+  exports: string[];
+}
+
 // ─── Static Fallback Data ───
 export const RUNTIME_LABELS: Record<string, { label: string; version: string; color: string }> = {
   nextjs:    { label: 'NEXT.JS',    version: 'React 19',      color: '#2563EB' },

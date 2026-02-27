@@ -11,6 +11,7 @@ export type {
   AuthFlowCallbacks,
   AuthFlowProps,
   AuthScreenMode,
+  SignupProfile,
 } from './types';
 
 // Native components
@@ -25,4 +26,5 @@ export {
   AuthButton,
   ErrorBanner,
   SuccessBanner,
+  SelectInput,
 } from './native';

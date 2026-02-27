@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@onsite/auth": "*",
+    "@onsite/auth-ui": "*",
     "@onsite/supabase": "*",
     "@onsite/utils": "*",
     "@onsite/hooks": "*",

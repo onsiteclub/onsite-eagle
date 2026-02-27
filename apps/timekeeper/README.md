@@ -1,359 +1,291 @@
+<!--
+  @ai-rules
+  1. NUNCA delete entradas de "Historico de Evolucao" — apenas ADICIONE novas com data.
+  2. NUNCA delete entradas de "Decisoes de Arquitetura" — apenas ADICIONE.
+  3. Ao fazer mudancas significativas (features, refactors, migracoes),
+     SEMPRE adicione uma entrada ao Historico de Evolucao.
+  4. Mantenha a tabela Tech Stack atualizada — atualize versoes quando mudarem.
+  5. Este arquivo descreve O QUE o app e e COMO evoluiu.
+     Para build/deploy, veja PIPELINE.md.
+-->
+
 # OnSite Timekeeper
 
-📍 Mobile time tracking app based on geofencing. Workers register work locations, and the app automatically detects entry/exit via GPS, recording hours worked in an offline-first architecture.
+> App mobile de ponto automatico por geofencing. Workers registram locais de trabalho e o app detecta entrada/saida via GPS, registrando horas em arquitetura offline-first.
 
-## Features
+## 1. Identidade
 
-- ✅ **Automatic Geofencing** - detects entry/exit from work locations
-- ✅ **Offline-first** - works without internet, syncs later
-- ✅ **Notification-based UI** - action buttons directly in notification bar
-- ✅ **3 ways to add locations** - current GPS, address search, map tap
-- ✅ **Calendar View** - week/month view with session details
-- ✅ **Export Reports** - share via WhatsApp, Email, or save as file
-- ✅ **Auto-Report Reminders** - weekly/bi-weekly/monthly notifications
-- ✅ **Favorite Contact** - one-tap send to supervisor
-- ✅ **Day Detail Modal** - view, select, and batch export sessions
-- ✅ **DevMonitor** - debug console for development
+| Campo | Valor |
+|-------|-------|
+| **Nome** | OnSite Timekeeper |
+| **Diretorio** | `apps/timekeeper` |
+| **Proposito** | Auto clock-in/out por geofencing GPS. Worker registra locais de trabalho, app detecta quando chega/sai automaticamente. Suporta manual entry, reports com export (WhatsApp/email/PDF), timeline AI-mediated, agenda do site, e integracao com Eagle (lotes). Offline-first com SQLite + sync bidirecional para Supabase. |
+| **Audiencia** | Trabalhadores de construcao (todas as funcoes) |
+| **Plataforma** | Android (iOS no roadmap) |
+| **Bundle ID** | `com.onsiteclub.timekeeper` |
+| **Porta Dev** | 8081 (Metro) + `adb reverse tcp:8081 tcp:8081` |
+| **CI/CD** | Nenhum configurado ainda |
 
-## Stack
+## 2. Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Mobile** | React Native + Expo (SDK 52) |
-| **Navigation** | Expo Router (file-based) |
-| **State** | Zustand |
-| **Local Database** | SQLite (expo-sqlite) |
-| **Cloud Database** | Supabase (PostgreSQL) |
-| **Auth** | Supabase Auth |
-| **Maps** | react-native-maps (Google Maps) |
-| **Geofencing** | expo-location + expo-task-manager |
-| **Notifications** | expo-notifications |
+| Camada | Tecnologia | Versao |
+|--------|------------|--------|
+| Framework | Expo SDK | ~52.0.0 |
+| React | React | 18.3.1 |
+| React Native | RN | 0.76.0 (local, isolado do root 0.76.9) |
+| Navigation | Expo Router | ~4.0.0 |
+| State | Zustand | ^5.0.2 |
+| Local DB | expo-sqlite | ~15.1.2 |
+| Cloud DB | Supabase JS | ^2.49.2 |
+| Location | expo-location | ~18.0.4 |
+| Background | expo-task-manager | ~12.0.3 |
+| Maps | react-native-maps | 1.18.0 |
+| Notifications | expo-notifications | ~0.29.11 |
+| Camera | expo-camera | ~16.0.18 |
+| QR Code | react-native-qrcode-svg | ^6.3.21 |
+| Dates | date-fns | ^4.1.0 |
+| Animation | react-native-reanimated | ~3.16.1 |
+| Storage | AsyncStorage | 1.23.1 |
 
-## Setup
+## 3. Telas / Rotas
 
-### 1. Clone and install
+### Auth
 
-```bash
-git clone https://github.com/your-username/onsite-timekeeper.git
-cd onsite-timekeeper
-npm install
-```
+| Rota | Descricao |
+|------|-----------|
+| `(auth)/login` | Login com email/senha |
+| `(auth)/register` | Cadastro |
 
-### 2. Configure Supabase
+### Tabs (8 tabs)
 
-1. Create a project at [Supabase](https://supabase.com)
-2. Go to **SQL Editor** and run `supabase/migrations/001_create_tables.sql`
-3. Go to **Authentication > Providers** and enable **Email**
-4. Copy credentials from **Settings > API**
+| Tab | Rota | Descricao |
+|-----|------|-----------|
+| Home | `(tabs)/index` | Timer principal + sessoes do dia + manual entry |
+| Reports | `(tabs)/reports` | Calendario (semana/mes) + export |
+| Timeline | `(tabs)/timeline` | Chat AI-mediated via @onsite/timeline |
+| Plans | `(tabs)/plans` | Agenda do site via @onsite/agenda |
+| Lots | `(tabs)/lots` | Lotes de construcao (integracao Eagle) |
+| Map | `(tabs)/map` | Mapa de geofences/locais |
+| Team | `(tabs)/team` | QR sharing de horas |
+| Settings | `(tabs)/settings` | Config + avatar + sign out |
 
-### 3. Configure environment variables
+### Modals / Screens
 
-Create a `.env` file at root:
+| Rota | Descricao |
+|------|-----------|
+| `add-location` | Criar geofence (GPS/endereco/mapa) |
+| `day-detail` | Breakdown do dia |
+| `manual-entry` | Entrada manual de sessao |
+| `voice` | Comandos de voz |
+| `share-qr` | QR code para compartilhar horas |
+| `scan-qr` | Scanner QR para acessar horas compartilhadas |
+| `lot-scan` | Scanner QR de lote |
 
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
-```
+### Lot Detail Stack
 
-### 4. Run the app
+| Rota | Descricao |
+|------|-----------|
+| `lot/[id]/index` | Overview do lote |
+| `lot/[id]/documents` | Documentos (plantas, RSO, red lines) |
+| `lot/[id]/notes` | Notas (Eagle timeline) |
 
-```bash
-# Development
-npx expo start
+## 4. Packages Internos
 
-# Android
-npx expo run:android
+| Package | Imports | Proposito |
+|---------|---------|-----------|
+| `@onsite/agenda` | Agenda functions | Eventos do site (calendario) |
+| `@onsite/auth-ui` | Auth components | UI de login/register |
+| `@onsite/media` | Media functions | Upload de fotos |
+| `@onsite/offline` | Offline queue | Queue para sync offline |
+| `@onsite/shared` | Types | Interfaces compartilhadas |
+| `@onsite/timeline` | Timeline functions | Chat WhatsApp-style no lote |
+| `@onsite/tokens` | Design tokens | Cores, espacamento |
+| `@onsite/ui` | UI components | Componentes base (QR code, etc.) |
 
-# iOS
-npx expo run:ios
-```
+## 5. Fluxo de Dados
 
-## Available Scripts
-
-```bash
-npm start          # Start Expo
-npm run android    # Open on Android
-npm run ios        # Open on iOS
-npm run web        # Open in browser
-
-# Validation (run before push)
-npx tsc --noEmit   # Check TypeScript errors
-npx expo-doctor    # Check Expo configuration
-```
-
-## CI/CD Pipeline
-
-The project uses GitHub Actions for automatic validation and APK build.
-
-```
-Push/Manual → Checks (typecheck + doctor) → Build APK → Download
-                    ~2 min                    ~12 min
-```
-
-**How to use:**
-1. Go to **Actions** on GitHub
-2. Select **"Build Android APK"**
-3. Click **"Run workflow"**
-4. Download APK from **Artifacts**
-
-**Skip CI for docs/WIP commits:**
-```bash
-git commit -m "docs: update readme [skip ci]"
-```
-
-📖 [Full Pipeline Documentation](docs/PIPELINE.md)
-
-## Project Structure
+### Arquitetura Offline-First
 
 ```
-onsite-timekeeper/
-├── app/                          # Expo Router (screens)
-│   ├── (auth)/                   # Auth screens
-│   │   ├── _layout.tsx
-│   │   ├── login.tsx
-│   │   └── register.tsx
-│   ├── (tabs)/                   # Main tabs
-│   │   ├── _layout.tsx
-│   │   ├── index.tsx             # Home/Dashboard
-│   │   ├── map.tsx               # Map + manage locations
-│   │   └── settings.tsx          # Settings + Auto-Report
-│   ├── _layout.tsx               # Root layout + notification handler
-│   └── index.tsx
-├── src/
-│   ├── components/
-│   │   ├── DevMonitor.tsx        # Debug console
-│   │   ├── ErrorBoundary.tsx     # Error handling
-│   │   └── ui/
-│   │       └── Button.tsx
-│   ├── constants/
-│   │   └── colors.ts
-│   ├── lib/
-│   │   ├── backgroundTasks.ts    # TaskManager
-│   │   ├── database.ts           # SQLite CRUD
-│   │   ├── geocoding.ts          # Nominatim API
-│   │   ├── location.ts           # GPS + Geofencing
-│   │   ├── logger.ts             # Structured logging
-│   │   ├── notifications.ts      # Expo Notifications + Report Reminders
-│   │   ├── reports.ts            # Report text generation
-│   │   ├── supabase.ts           # Supabase client
-│   │   └── sync.ts               # Sync engine
-│   ├── screens/
-│   │   └── home/
-│   │       ├── index.tsx         # Home screen UI
-│   │       ├── hooks.ts          # Home logic + export handlers
-│   │       ├── styles.ts         # Home styles
-│   │       └── helpers.ts        # Date utilities
-│   └── stores/
-│       ├── authStore.ts          # Authentication state
-│       ├── locationStore.ts      # Locations + geofencing
-│       ├── recordStore.ts        # Work sessions (records)
-│       ├── settingsStore.ts      # User preferences + Auto-Report
-│       ├── syncStore.ts          # Sync orchestration
-│       └── workSessionStore.ts   # Active session UI state
-├── docs/
-│   ├── PIPELINE.md               # CI/CD documentation
-│   ├── DATA_ARCHITECTURE.md      # Database schema docs
-│   ├── BACKGROUND_SYSTEM.md      # Geofencing docs
-│   └── REPORT_SYSTEM.md          # Report system docs
-├── supabase/
-│   └── migrations/
-│       └── 001_create_tables.sql
-├── .github/
-│   └── workflows/
-│       └── build.yml             # GitHub Actions
-├── app.json
-├── eas.json
-├── package.json
-└── tsconfig.json
+SQLite (local, source of truth)
+  ↕ Sync bidirecional
+Supabase (cloud, backup)
 ```
 
-## Geofencing Flow
+**Principio:** App funciona 100% offline. Sync acontece quando ha conexao. Conflitos resolvidos por timestamp (last-write-wins).
+
+### Tracking Engine (Core)
 
 ```
-┌─────────────┐     ┌──────────────────────────┐     ┌─────────────────┐
-│   ENTRY     │────▶│  Notification (X min)    │────▶│  Auto-start     │
-│  (geofence) │     │  [▶️ Start] [😴 Skip]    │     │  (on timeout)   │
-└─────────────┘     └──────────────────────────┘     └─────────────────┘
-
-┌─────────────┐     ┌──────────────────────────┐     ┌─────────────────┐
-│   EXIT      │────▶│  Notification (X sec)    │────▶│  Auto-stop      │
-│  (geofence) │     │  [✔ OK] [⏸️ Pause]       │     │  (on timeout)   │
-└─────────────┘     └──────────────────────────┘     └─────────────────┘
-
-┌─────────────┐     ┌──────────────────────────┐     ┌─────────────────┐
-│   RETURN    │────▶│  Notification (X min)    │────▶│  Auto-resume    │
-│  (paused)   │     │  [▶️ Resume] [⏹️ Stop]   │     │  (on timeout)   │
-└─────────────┘     └──────────────────────────┘     └─────────────────┘
+Worker entra na geofence ──→ GPS event
+  → Tracking Engine avalia confidence score
+  → Se confiavel: IDLE → TRACKING (cria sessao no SQLite)
+  → Worker sai da geofence → EXIT_PENDING (cooldown 30s)
+  → Se nao re-entrar em 30s → Fecha sessao (IDLE)
+  → Sync: upload para Supabase quando online
 ```
 
-**Timer values configurable in Settings:**
-- Entry timeout: 1-10 minutes
-- Exit timeout: 10-60 seconds
-- Return timeout: 1-10 minutes
-- Pause limit: 15-60 minutes
+**Regra critica:** O Tracking Engine e o UNICO modulo que decide quando iniciar/parar sessoes.
 
-## Report System
+### Tabelas Supabase (leitura)
 
-### Export Methods
+| Tabela | Uso |
+|--------|-----|
+| `tmk_entries` | Sessoes de trabalho (via sync) |
+| `tmk_geofences` | Locais de trabalho (via sync) |
+| `tmk_projects` | Projetos |
+| `egl_sites` | Sites (via integracao Lots) |
+| `egl_houses` | Lotes (via integracao Lots) |
+| `egl_documents` | Documentos do lote |
+| `egl_timeline` | Timeline do lote |
+| `core_profiles` | Perfil do worker |
 
-| Method | Description |
-|--------|-------------|
-| **Share** | Opens system share sheet (WhatsApp, Telegram, etc.) |
-| **File** | Creates `.txt` file for download |
-| **Favorite** | Direct send to configured WhatsApp/Email contact |
+### Tabelas Supabase (escrita)
 
-### Auto-Report Reminder
+| Tabela | Uso |
+|--------|-----|
+| `tmk_entries` | Upload de sessoes (sync) |
+| `tmk_geofences` | Upload de locais (sync) |
+| `egl_timeline` | Notas no lote |
 
-Configure in **Settings > Auto-Report**:
-- Set favorite contact (WhatsApp or Email)
-- Enable reminder (Weekly/Bi-weekly/Monthly)
-- Choose day and time (e.g., Friday 18:00)
+### Storage
 
-When triggered, notification appears with **[Send Now]** and **[Later]** buttons.
+| Bucket | Uso |
+|--------|-----|
+| `core-avatars` | Avatar do usuario |
+| `egl-media` | Fotos de lotes |
 
-📖 [Full Report System Documentation](docs/REPORT_SYSTEM.md)
+### SQLite Local (11 tabelas)
 
-## Sync Architecture
+Source of truth offline. Inclui: sessions, geofences, settings, sync_queue, aggregates, etc. Migrations automaticas ao iniciar app.
+
+### Zustand Stores
+
+| Store | Proposito |
+|-------|-----------|
+| Auth | Estado de autenticacao |
+| Location | Geofences e GPS atual |
+| Records | Sessoes e timer |
+| Sync | Estado de sincronizacao |
+| Settings | Preferencias do usuario |
+
+### QR Code Sharing
 
 ```
-┌──────────────┐          ┌──────────────┐
-│   SQLite     │◀────────▶│   Supabase   │
-│   (local)    │   Sync   │   (cloud)    │
-│              │          │              │
-│  - locations │          │  - locations │
-│  - records   │          │  - records   │
-│  - analytics │          │  - analytics │
-└──────────────┘          └──────────────┘
-       │
-       │ Source of Truth
-       ▼
-┌──────────────┐
-│   Zustand    │
-│   (state)    │
-└──────────────┘
-       │
-       ▼
-┌──────────────┐
-│     UI       │
-└──────────────┘
+Worker A: "Compartilhar Horas"
+  → Cria pending_token (5 min TTL)
+  → Exibe QR code
+Manager: "Escanear QR"
+  → Le token via lookup_pending_token()
+  → Cria access_grant (status='active')
+  → RLS concede SELECT em entries + geofences
 ```
 
-**Sync triggers:**
-- App initialization (if online)
-- After creating location
-- After finishing session
-- Manual sync button
-- Midnight cleanup
+### Report Export
 
-📖 [Full Data Architecture Documentation](docs/DATA_ARCHITECTURE.md)
-
-## Database Schema
-
-### locations
-| Field | Type | Description |
-|-------|------|-------------|
-| id | UUID | Primary key |
-| user_id | UUID | FK → auth.users |
-| name | TEXT | Location name |
-| latitude | REAL | Latitude |
-| longitude | REAL | Longitude |
-| radius | INTEGER | Radius in meters (default: 100) |
-| color | TEXT | Hex color (default: #3B82F6) |
-| status | TEXT | 'active' \| 'deleted' \| 'pending_delete' |
-| created_at | TEXT | Creation timestamp |
-| synced_at | TEXT | Last sync timestamp |
-
-### records
-| Field | Type | Description |
-|-------|------|-------------|
-| id | UUID | Primary key |
-| user_id | UUID | FK → auth.users |
-| location_id | UUID | FK → locations |
-| location_name | TEXT | Location name (cached) |
-| entry_at | TEXT | Entry timestamp |
-| exit_at | TEXT | Exit timestamp (null = active) |
-| pause_minutes | INTEGER | Total break time |
-| type | TEXT | 'automatic' \| 'manual' |
-| manually_edited | INTEGER | If adjusted by user |
-| edit_reason | TEXT | Reason for adjustment |
-
-## DevMonitor
-
-Floating button (🔧) available in development:
-
-- **Logs**: Real-time with level filters
-- **Stats**: Table counts, sync status
-- **Actions**: Force sync, purge deleted, reset database
-
-## Required Permissions
-
-### Android
-- ACCESS_FINE_LOCATION
-- ACCESS_COARSE_LOCATION
-- ACCESS_BACKGROUND_LOCATION
-- FOREGROUND_SERVICE
-- FOREGROUND_SERVICE_LOCATION
-
-### iOS
-- NSLocationWhenInUseUsageDescription
-- NSLocationAlwaysAndWhenInUseUsageDescription
-- UIBackgroundModes: location
-
-## Build
-
-```bash
-# EAS Build (production)
-npx eas build --platform android
-npx eas build --platform ios
-
-# Local build
-npx expo run:android --variant release
-npx expo run:ios --configuration Release
-
-# Via GitHub Actions (recommended)
-# Go to Actions > Build Android APK > Run workflow
+```
+Worker seleciona periodo → Agrega sessoes
+  → Gera HTML → Compartilha via:
+     - WhatsApp (mensagem formatada)
+     - Email (com tabela HTML)
+     - PDF (via print system)
+     - Favorite contact (1 tap)
 ```
 
-## Troubleshooting
+### Conexao com Outros Apps
 
-### Geofencing not detecting entry/exit
-1. Check "Always" permission for location
-2. Disable battery optimization for the app
-3. Check if radius is large enough (min 50m)
+```
+Monitor (supervisor) ──[atribui lotes]──→ egl_houses ──→ Timekeeper (tab Lots)
+Timekeeper ──[horas por geofence]──→ tmk_entries ──→ Dashboard (chart + export)
+Timekeeper ──[QR share]──→ access_grants ──→ Manager ve horas no Dashboard
+Field (worker) ──[fotos]──→ egl_timeline ──→ Timekeeper (timeline no lote)
+```
 
-### Sync not working
-1. Check internet connection
-2. Verify Supabase environment variables
-3. Use DevMonitor to see error logs
+### 5-Sphere Data Architecture
 
-### TypeScript errors on build
-1. Run `npx tsc --noEmit` locally
-2. Fix listed errors
-3. Push again
+| Esfera | Dados | Proposito |
+|--------|-------|-----------|
+| Identity | Perfil, trade, devices | Quem sao os workers |
+| Business | Horas, sessoes, locais | Valor gerado |
+| Product | Features usadas, onboarding | Engajamento |
+| Debug | Erros, sync failures, GPS accuracy | Saude tecnica |
+| Metadata | Timestamps, versoes, configs | Contexto |
 
-### Logger category error
-Valid categories: `boot`, `database`, `session`, `geofence`, `notification`, `sync`, `record`
+## 6. Decisoes de Arquitetura
 
-## Documentation
+1. **Pre-2026: Offline-first com SQLite** — SQLite e source of truth, Supabase e backup. Worker pode estar em area sem sinal. Sync bidirecional quando online. Conflitos por timestamp.
 
-| Document | Description |
-|----------|-------------|
-| [PIPELINE.md](docs/PIPELINE.md) | CI/CD workflow and validation |
-| [DATA_ARCHITECTURE.md](docs/DATA_ARCHITECTURE.md) | Database schema and sync |
-| [BACKGROUND_SYSTEM.md](docs/BACKGROUND_SYSTEM.md) | Geofencing and background tasks |
-| [REPORT_SYSTEM.md](docs/REPORT_SYSTEM.md) | Report generation and sharing |
+2. **Pre-2026: Tracking Engine como sole decision maker** — NENHUM outro modulo pode iniciar/parar sessoes. Previne race conditions e estados inconsistentes. Manual entry e excecao controlada.
 
-## Contributing
+3. **Pre-2026: Cooldown de 30 segundos** — Quando worker sai da geofence, espera 30s antes de fechar sessao. Previne splits por GPS bounce. Se re-entrar em 30s, sessao continua.
 
-1. Run `npx tsc --noEmit` before each push
-2. Test on Expo Go / dev build
-3. Use descriptive commits (feat/fix/docs/refactor)
-4. Use `[skip ci]` for docs/WIP commits
+4. **Pre-2026: Effects Queue (FIFO)** — Eventos de geofence sao enfileirados e processados em ordem. Previne race conditions quando multiplos eventos GPS chegam simultaneamente.
 
-## License
+5. **Pre-2026: Confidence scoring** — GPS events sao avaliados por accuracy. Events com accuracy muito baixa sao descartados para evitar falsos positivos de entrada/saida.
 
-MIT © OnSite Club
+6. **Pre-2026: Zustand (nao Redux/Context)** — State management leve e performante para React Native. 5 stores independentes: auth, location, records, sync, settings.
 
----
+7. **Pre-2026: newArchEnabled: false** — New Architecture do React Native desabilitada por instabilidade com plugins de location/background.
 
-*Last updated: January 2025*
+8. **Pre-2026: 3 formas de adicionar local** — GPS atual, busca por endereco, tap no mapa. Cobertura para todas as situacoes de campo.
+
+9. **2025-01: Location carousel acima do form** — Timer expandido para 57% da tela. Selecao de local mais acessivel.
+
+10. **2025-02: Integracao Eagle (tab Lots)** — Workers podem ver lotes atribuidos, documentos (plantas, RSO), e timeline dentro do Timekeeper. Conecta horas com contexto de obra.
+
+11. **Pre-2026: No PII in logs** — Privacidade: sem emails, coordenadas exatas, ou dados pessoais em logs de debug. Compliance com LGPD/PIPEDA.
+
+12. **Pre-2026: 5-Sphere Data Architecture** — Identity, Business, Product, Debug, Metadata. Cada tipo de dado tem proposito claro e destino no analytics.
+
+## 7. Historico de Evolucao
+
+### Pre-2026 — v1: Foundation
+- Geofencing automatico com expo-location
+- Tracking Engine com state machine (IDLE/TRACKING/EXIT_PENDING)
+- SQLite offline-first com sync bidirecional
+- Manual entry, reports, export (WhatsApp/email/PDF)
+- Mapa de geofences com react-native-maps
+- Notification-based UI (action buttons na notification bar)
+- Auto-report reminders (semanal/quinzenal/mensal)
+- Favorite contact (1 tap para enviar report)
+
+### 2025-01 — v2.0: UX Redesign
+- Manual entry redesign: native date/time pickers, break input
+- Melhorias de input para reducao de erros
+
+### 2025-01 — v2.1: Location & Timer
+- Location carousel movido acima do form
+- Timer expandido para 57% da tela
+- Layout simplificado e mais acessivel
+
+### 2025-02 — Geofence Reliability
+- Flags notifyOnEnter/notifyOnExit setados explicitamente
+- Debug logging para troubleshooting de eventos
+- Verification apos start do geofencing
+
+### 2025-02 — Layout Fix
+- Removido flex ratios fixas que causavam overlap
+- Auto-height para acomodar conteudo variavel
+
+### 2025-02 — Exit Flow Investigation
+- Identificados 5 blocos criticos que impediam auto-stop
+- 9 checkpoints documentados no fluxo de saida
+- Fixes parciais aplicados
+
+### 2025-02 — GPS Analysis
+- Investigacao de ping-pong events (entrada/saida rapida)
+- Analise de accuracy margins e boundary proximity
+- Cooldown de 30s validado como solucao
+
+### 2025-02 — Avatar System
+- Setup completo: bucket core-avatars, RLS policies
+- Upload UI na tab Settings
+
+### 2025-02 — Eagle Integration
+- Tab Lots para ver lotes de construcao
+- Rota lot/[id] com documents e notes
+- Conecta horas (Timekeeper) com contexto de obra (Eagle)
+
+### 2025-02 — Auth Expansion
+- Tela de register adicionada (alem de login)
+- Auth flow completo com @onsite/auth-ui

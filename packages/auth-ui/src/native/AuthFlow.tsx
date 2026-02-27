@@ -37,6 +37,7 @@ try {
 
 export function AuthFlow({
   appName,
+  logo,
   icon,
   subtitle,
   footer,
@@ -45,6 +46,7 @@ export function AuthFlow({
   defaultRole = 'worker',
   icons,
   legal,
+  trades,
   initialScreen = 'login',
   onSignIn,
   onSignUp,
@@ -105,6 +107,7 @@ export function AuthFlow({
           <LoginScreen
             appName={appName}
             icon={icon}
+            logo={logo}
             subtitle={subtitle}
             footer={footer}
             showForgotPassword={showForgotPassword && !!handleForgotPassword}
@@ -121,8 +124,10 @@ export function AuthFlow({
           <SignupScreen
             appName={appName}
             icon={icon}
+            logo={logo}
             icons={icons}
             legal={legal}
+            trades={trades}
             onSignUp={handleSignUp}
             onSwitchToLogin={() => setScreen('login')}
             onEmailSent={() => setScreen('email-sent')}
@@ -134,6 +139,7 @@ export function AuthFlow({
           <ForgotScreen
             appName={appName}
             icon={icon}
+            logo={logo}
             icons={icons}
             onSubmit={handleForgotPassword}
             onBack={() => setScreen('login')}
@@ -145,6 +151,7 @@ export function AuthFlow({
             <LoginScreen
               appName={appName}
               icon={icon}
+              logo={logo}
               subtitle="Check your email to verify your account, then sign in below."
               footer={footer}
               showForgotPassword={false}

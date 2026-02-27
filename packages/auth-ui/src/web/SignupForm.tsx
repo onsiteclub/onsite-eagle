@@ -1,18 +1,20 @@
 /**
- * SignupForm — Web registration form.
+ * SignupForm — Web registration form with expanded profile fields.
  */
 
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import type { SignupProfile } from '../types';
 
 export interface SignupFormProps {
   icons?: { eyeOpen?: React.ReactNode; eyeClosed?: React.ReactNode };
   legal?: { termsUrl: string; privacyUrl: string };
+  trades?: Array<{ id: string; name: string }>;
   onSignUp: (
     email: string,
     password: string,
-    profile: { name: string }
+    profile: SignupProfile
   ) => Promise<{ needsConfirmation?: boolean }>;
   onSwitchToLogin?: () => void;
   onEmailSent?: () => void;
@@ -22,24 +24,31 @@ export interface SignupFormProps {
 export function SignupForm({
   icons,
   legal,
+  trades,
   onSignUp,
   onSwitchToLogin,
   onEmailSent,
   onSuccess,
 }: SignupFormProps) {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [trade, setTrade] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | 'undeclared' | ''>('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const trimmedName = name.trim();
+    const trimFirst = firstName.trim();
+    const trimLast = lastName.trim();
     const trimmedEmail = email.trim().toLowerCase();
 
-    if (!trimmedName) { setError('Please enter your name'); return; }
+    if (!trimFirst) { setError('Please enter your first name'); return; }
+    if (!trimLast) { setError('Please enter your last name'); return; }
     if (!trimmedEmail || !trimmedEmail.includes('@')) { setError('Please enter a valid email'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
 
@@ -47,7 +56,15 @@ export function SignupForm({
     setError(null);
 
     try {
-      const result = await onSignUp(trimmedEmail, password, { name: trimmedName });
+      const profile: SignupProfile = {
+        firstName: trimFirst,
+        lastName: trimLast,
+        name: `${trimFirst} ${trimLast}`,
+        dateOfBirth: dateOfBirth || undefined,
+        trade: trade || undefined,
+        gender: gender || undefined,
+      };
+      const result = await onSignUp(trimmedEmail, password, profile);
       if (result?.needsConfirmation) {
         onEmailSent?.();
       } else {
@@ -61,44 +78,62 @@ export function SignupForm({
     }
   }
 
+  const inputClass = "w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-600 focus:border-transparent text-[#101828] bg-white";
+  const selectClass = "w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-600 focus:border-transparent text-[#101828] bg-white appearance-none";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
           {error}
         </div>
       )}
 
-      <input
-        type="text"
-        required
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-600 focus:border-transparent text-[#101828] bg-white"
-        placeholder="Full name"
-        autoFocus
-        autoComplete="name"
-        disabled={loading}
-      />
+      {/* Name row */}
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          required
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          className={inputClass}
+          placeholder="First name"
+          autoFocus
+          autoComplete="given-name"
+          disabled={loading}
+        />
+        <input
+          type="text"
+          required
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+          className={inputClass}
+          placeholder="Last name"
+          autoComplete="family-name"
+          disabled={loading}
+        />
+      </div>
 
+      {/* Email */}
       <input
         type="email"
         required
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-600 focus:border-transparent text-[#101828] bg-white"
+        className={inputClass}
         placeholder="Email"
         autoComplete="email"
         disabled={loading}
       />
 
+      {/* Password */}
       <div className="relative">
         <input
           type={showPw ? 'text' : 'password'}
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-600 focus:border-transparent text-[#101828] bg-white"
+          className={`${inputClass} pr-12`}
           placeholder="Password (min 6 characters)"
           autoComplete="new-password"
           disabled={loading}
@@ -110,6 +145,63 @@ export function SignupForm({
         >
           {showPw ? (icons?.eyeClosed ?? 'Hide') : (icons?.eyeOpen ?? 'Show')}
         </button>
+      </div>
+
+      {/* Date of birth */}
+      <div>
+        <label className="block text-sm font-medium text-[#374151] mb-1 ml-1">Date of birth</label>
+        <input
+          type="date"
+          value={dateOfBirth}
+          onChange={(e) => setDateOfBirth(e.target.value)}
+          className={inputClass}
+          disabled={loading}
+        />
+      </div>
+
+      {/* Gender + Trade row */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-[#374151] mb-1 ml-1">Gender</label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value as typeof gender)}
+            className={selectClass}
+            disabled={loading}
+          >
+            <option value="">Select...</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="undeclared">Prefer not to say</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[#374151] mb-1 ml-1">
+            Trade <span className="text-[#9CA3AF] font-normal">(optional)</span>
+          </label>
+          {trades && trades.length > 0 ? (
+            <select
+              value={trade}
+              onChange={(e) => setTrade(e.target.value)}
+              className={selectClass}
+              disabled={loading}
+            >
+              <option value="">Select...</option>
+              {trades.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={trade}
+              onChange={(e) => setTrade(e.target.value)}
+              className={inputClass}
+              placeholder="e.g. Carpenter"
+              disabled={loading}
+            />
+          )}
+        </div>
       </div>
 
       {legal && (

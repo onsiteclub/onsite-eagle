@@ -2,44 +2,32 @@
  * AuthFlow — Web auth orchestrator.
  *
  * Full login/signup/forgot flow in a centered card.
- * Auto-wires to @onsite/auth's useAuth() if inside AuthProvider.
+ * Pass callbacks (onSignIn, onSignUp, etc.) explicitly.
+ * Optionally pass `user` and `authLoading` to handle redirect/loading states.
  */
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
 import { ForgotForm } from './ForgotForm';
 import type { AuthFlowProps, AuthScreenMode } from '../types';
 
-// Try to dynamically access useAuth
-let useAuthHook: (() => {
-  signIn: (c: { email: string; password: string }) => Promise<void>;
-  signUp: (c: { email: string; password: string; name: string; role: string }) => Promise<void>;
-  user: unknown;
-  loading: boolean;
-}) | null = null;
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const authModule = require('@onsite/auth');
-  useAuthHook = authModule.useAuth;
-} catch {
-  // Fine — not in AuthProvider context
-}
-
 export function AuthFlow({
   appName,
+  logo,
   icon,
   subtitle,
   footer = 'OnSite Club — Built for the trades',
   showSignup = false,
   showForgotPassword = true,
-  defaultRole = 'worker',
   icons,
   legal,
+  trades,
   initialScreen = 'login',
+  user,
+  authLoading,
   onSignIn,
   onSignUp,
   onForgotPassword,
@@ -47,44 +35,14 @@ export function AuthFlow({
 }: AuthFlowProps) {
   const [screen, setScreen] = useState<AuthScreenMode>(initialScreen);
 
-  // Try to get auth context
-  const authContext = useMemo(() => {
-    if (!useAuthHook) return null;
-    try {
-      return useAuthHook();
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const handleSignIn = onSignIn ?? (authContext
-    ? async (email: string, password: string) => {
-        await authContext.signIn({ email, password });
-      }
-    : undefined);
-
-  const handleSignUp = onSignUp ?? (authContext
-    ? async (email: string, password: string, profile: { name: string }) => {
-        await authContext.signUp({
-          email,
-          password,
-          name: profile.name,
-          role: defaultRole,
-        });
-        return { needsConfirmation: false };
-      }
-    : undefined);
-
-  const handleForgotPassword = onForgotPassword;
-
-  if (!handleSignIn) {
+  if (!onSignIn) {
     throw new Error(
-      '[@onsite/auth-ui] AuthFlow requires either an AuthProvider ancestor or onSignIn callback.'
+      '[@onsite/auth-ui] AuthFlow requires onSignIn callback.'
     );
   }
 
-  // Loading state from auth context
-  if (authContext?.loading) {
+  // Loading state
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-[#F6F7F9] flex items-center justify-center">
         <svg className="animate-spin h-8 w-8 text-[#0F766E]" viewBox="0 0 24 24">
@@ -96,7 +54,7 @@ export function AuthFlow({
   }
 
   // Already authenticated
-  if (authContext?.user) return null;
+  if (user) return null;
 
   const modeSubtitle =
     screen === 'login' ? (subtitle ?? 'Sign in to your account') :
@@ -109,13 +67,19 @@ export function AuthFlow({
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-8 border border-gray-200">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-[#0F766E] mb-4">
-            {icon ?? (
-              <span className="text-white text-2xl font-bold">
-                {appName.charAt(0).toUpperCase()}
-              </span>
-            )}
-          </div>
+          {logo ? (
+            <div className="flex justify-center mb-4">
+              {logo}
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-[#0F766E] mb-4">
+              {icon ?? (
+                <span className="text-white text-2xl font-bold">
+                  {appName.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-[#101828]">OnSite {appName}</h1>
           <p className="text-[#667085] text-sm mt-1">{modeSubtitle}</p>
         </div>
@@ -123,30 +87,31 @@ export function AuthFlow({
         {/* Forms */}
         {screen === 'login' && (
           <LoginForm
-            showForgotPassword={showForgotPassword && !!handleForgotPassword}
-            showSignup={showSignup && !!handleSignUp}
+            showForgotPassword={showForgotPassword && !!onForgotPassword}
+            showSignup={showSignup && !!onSignUp}
             icons={icons}
-            onSignIn={handleSignIn}
+            onSignIn={onSignIn}
             onForgotPassword={() => setScreen('forgot-password')}
             onSwitchToSignup={() => setScreen('signup')}
             onSuccess={onSuccess}
           />
         )}
 
-        {screen === 'signup' && handleSignUp && (
+        {screen === 'signup' && onSignUp && (
           <SignupForm
             icons={icons}
             legal={legal}
-            onSignUp={handleSignUp}
+            trades={trades}
+            onSignUp={onSignUp}
             onSwitchToLogin={() => setScreen('login')}
             onEmailSent={() => setScreen('email-sent')}
             onSuccess={onSuccess}
           />
         )}
 
-        {screen === 'forgot-password' && handleForgotPassword && (
+        {screen === 'forgot-password' && onForgotPassword && (
           <ForgotForm
-            onSubmit={handleForgotPassword}
+            onSubmit={onForgotPassword}
             onBack={() => setScreen('login')}
           />
         )}
@@ -160,7 +125,7 @@ export function AuthFlow({
               showForgotPassword={false}
               showSignup={false}
               icons={icons}
-              onSignIn={handleSignIn}
+              onSignIn={onSignIn}
               onSuccess={onSuccess}
             />
           </div>

@@ -117,21 +117,50 @@ export function AuthProvider({ children, supabase }: AuthProviderProps) {
     setState((s) => ({ ...s, loading: true, error: null }))
 
     try {
+      const userMetadata: Record<string, string> = {
+        full_name: credentials.name,
+      }
+      if (credentials.firstName) userMetadata.first_name = credentials.firstName
+      if (credentials.lastName) userMetadata.last_name = credentials.lastName
+      if (credentials.gender) userMetadata.gender = credentials.gender
+      if (credentials.dateOfBirth) userMetadata.date_of_birth = credentials.dateOfBirth
+      if (credentials.trade) userMetadata.trade = credentials.trade
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: credentials.email,
         password: credentials.password,
+        options: {
+          data: userMetadata,
+        },
       })
 
       if (authError) throw authError
 
       // Update user profile in core_profiles (trigger creates row on auth.users insert)
       if (authData.user) {
+        const profileUpdate: Record<string, unknown> = {
+          full_name: credentials.name,
+          phone: credentials.phone || null,
+        }
+
+        if (credentials.firstName) profileUpdate.first_name = credentials.firstName
+        if (credentials.lastName) profileUpdate.last_name = credentials.lastName
+        if (credentials.dateOfBirth) profileUpdate.date_of_birth = credentials.dateOfBirth
+        if (credentials.gender) profileUpdate.gender = credentials.gender
+
+        // Trade: if it looks like a UUID, set trade_id; otherwise trade_other
+        if (credentials.trade) {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credentials.trade)
+          if (isUuid) {
+            profileUpdate.trade_id = credentials.trade
+          } else {
+            profileUpdate.trade_other = credentials.trade
+          }
+        }
+
         const { error: profileError } = await supabase
           .from('core_profiles')
-          .update({
-            full_name: credentials.name,
-            phone: credentials.phone || null,
-          })
+          .update(profileUpdate)
           .eq('id', authData.user.id)
 
         if (profileError) {

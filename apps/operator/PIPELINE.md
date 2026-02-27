@@ -1,3 +1,13 @@
+<!--
+  @ai-rules
+  1. NUNCA delete entradas de "Sessao de Build" ou "Historico de Erros" — apenas ADICIONE novas com data.
+  2. NUNCA delete entradas de "Troubleshooting Rapido" — apenas ADICIONE novas linhas.
+  3. Ao corrigir um erro de build, SEMPRE adicione ao historico com:
+     data, sintoma, causa raiz, fix, e arquivos alterados.
+  4. Mantenha as secoes na ordem. Nao reorganize.
+  5. Este arquivo e a UNICA FONTE DE VERDADE para build e deploy deste app.
+-->
+
 # OnSite Operator — Pipeline & Build Guide
 
 > Device: Samsung SM_G990W (Android) — cabo USB direto

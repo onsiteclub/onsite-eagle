@@ -18,17 +18,21 @@ import ChatTimeline from '@/components/ChatTimeline'
 import ScheduleTab from '@/components/ScheduleTab'
 import DocumentsTab from '@/components/DocumentsTab'
 import GanttView from '@/components/GanttView'
-import PaymentSheet from '@/components/PaymentSheet'
-import WorkerSheet from '@/components/WorkerSheet'
+import VistaSheet from '@/components/VistaSheet'
+import ManagementSheet from '@/components/ManagementSheet'
 import ProgressSheet from '@/components/ProgressSheet'
-import MaterialSheet from '@/components/MaterialSheet'
+import AdminSheet from '@/components/AdminSheet'
+import FramersSheet from '@/components/FramersSheet'
+import SteelPostsSheet from '@/components/SteelPostsSheet'
+import FrameCheckSheet from '@/components/FrameCheckSheet'
 import HoursSheet from '@/components/HoursSheet'
 import WeeklyReport from '@/components/WeeklyReport'
 import { Calendar, QRCode } from '@onsite/ui/web'
 import type { CalendarEvent } from '@onsite/shared'
 
 type ViewType = 'lots' | 'schedule' | 'gantt' | 'chat' | 'team' | 'documents' | 'reports'
-  | 'sheet-payments' | 'sheet-workers' | 'sheet-progress' | 'sheet-materials' | 'sheet-hours'
+  | 'sheet-vista' | 'sheet-management' | 'sheet-progress' | 'sheet-adm'
+  | 'sheet-framers' | 'sheet-steel-posts' | 'sheet-frame-check' | 'sheet-hours'
 
 interface TeamMember {
   id: string
@@ -105,11 +109,19 @@ export default function SiteDetail() {
         'chat': 'chat',
         'team': 'team',
         'documents': 'documents',
-        'payments': 'sheet-payments',
-        'sheet-payments': 'sheet-payments',
-        'sheet-workers': 'sheet-workers',
+        'vista': 'sheet-vista',
+        'sheet-vista': 'sheet-vista',
+        'management': 'sheet-management',
+        'sheet-management': 'sheet-management',
         'sheet-progress': 'sheet-progress',
-        'sheet-materials': 'sheet-materials',
+        'adm': 'sheet-adm',
+        'sheet-adm': 'sheet-adm',
+        'framers': 'sheet-framers',
+        'sheet-framers': 'sheet-framers',
+        'steel-posts': 'sheet-steel-posts',
+        'sheet-steel-posts': 'sheet-steel-posts',
+        'frame-check': 'sheet-frame-check',
+        'sheet-frame-check': 'sheet-frame-check',
         'sheet-hours': 'sheet-hours',
         'reports': 'reports',
       }
@@ -244,10 +256,13 @@ export default function SiteDetail() {
       label: 'Sheets',
       icon: FileSpreadsheet,
       children: [
-        { id: 'sheet-payments', label: 'Payments', icon: DollarSign, view: 'sheet-payments' },
-        { id: 'sheet-workers', label: 'Workers', icon: Users, view: 'sheet-workers' },
+        { id: 'sheet-vista', label: 'Overview', icon: DollarSign, view: 'sheet-vista' },
+        { id: 'sheet-management', label: 'Management', icon: Layers, view: 'sheet-management' },
         { id: 'sheet-progress', label: 'Progress', icon: BarChart3, view: 'sheet-progress' },
-        { id: 'sheet-materials', label: 'Materials', icon: Package, view: 'sheet-materials' },
+        { id: 'sheet-adm', label: 'ADM', icon: Shield, view: 'sheet-adm' },
+        { id: 'sheet-framers', label: 'Framers', icon: Users, view: 'sheet-framers' },
+        { id: 'sheet-steel-posts', label: 'Steel Posts', icon: Package, view: 'sheet-steel-posts' },
+        { id: 'sheet-frame-check', label: 'Frame Check', icon: FileText, view: 'sheet-frame-check' },
         { id: 'sheet-hours', label: 'Hours', icon: Clock, view: 'sheet-hours' },
       ],
     },
@@ -269,11 +284,14 @@ export default function SiteDetail() {
       case 'chat': return 'Site Timeline'
       case 'team': return 'Team'
       case 'documents': return 'Documents'
-      case 'sheet-payments': return 'Payment Sheet'
-      case 'sheet-workers': return 'Worker Sheet'
-      case 'sheet-progress': return 'Progress Sheet'
-      case 'sheet-materials': return 'Material Sheet'
-      case 'sheet-hours': return 'Hours Sheet'
+      case 'sheet-vista': return 'Overview'
+      case 'sheet-management': return 'Management'
+      case 'sheet-progress': return 'Progress'
+      case 'sheet-adm': return 'ADM'
+      case 'sheet-framers': return 'Framers'
+      case 'sheet-steel-posts': return 'Steel Posts'
+      case 'sheet-frame-check': return 'Frame Check'
+      case 'sheet-hours': return 'Hours'
       case 'reports': return 'AI Reports'
       default: return 'Site Detail'
     }
@@ -492,17 +510,26 @@ export default function SiteDetail() {
           )}
           {activeView === 'team' && <SettingsTeamView siteId={siteId} siteName={site.name} onAddTeam={() => setShowAddTeamModal(true)} />}
           {activeView === 'documents' && <DocumentsTab siteId={siteId} onBulkUpload={() => setShowBulkUploadModal(true)} />}
-          {activeView === 'sheet-payments' && (
-            <PaymentSheet siteId={siteId} siteName={site.name} />
+          {activeView === 'sheet-vista' && (
+            <VistaSheet siteId={siteId} siteName={site.name} />
           )}
-          {activeView === 'sheet-workers' && (
-            <WorkerSheet siteId={siteId} siteName={site.name} />
+          {activeView === 'sheet-management' && (
+            <ManagementSheet siteId={siteId} siteName={site.name} />
           )}
           {activeView === 'sheet-progress' && (
             <ProgressSheet siteId={siteId} siteName={site.name} />
           )}
-          {activeView === 'sheet-materials' && (
-            <MaterialSheet siteId={siteId} siteName={site.name} />
+          {activeView === 'sheet-adm' && (
+            <AdminSheet siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'sheet-framers' && (
+            <FramersSheet siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'sheet-steel-posts' && (
+            <SteelPostsSheet siteId={siteId} siteName={site.name} />
+          )}
+          {activeView === 'sheet-frame-check' && (
+            <FrameCheckSheet siteId={siteId} siteName={site.name} />
           )}
           {activeView === 'sheet-hours' && (
             <HoursSheet siteId={siteId} siteName={site.name} />

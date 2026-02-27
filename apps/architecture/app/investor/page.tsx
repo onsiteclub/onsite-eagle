@@ -5,7 +5,8 @@ const C = {
   amber: '#F5A623', amberDark: '#D4891A', amberBg: '#FEF9ED',
   dark: '#1A1A1A', green: '#2BA84A', blue: '#2563EB', purple: '#7C3AED',
   text: '#1A1A1A', textSec: '#5C5C5C', textMuted: '#9CA3AF',
-  supabase: '#3ECF8E', teal: '#0D9488',
+  supabase: '#3ECF8E', supabaseBg: '#ECFDF5', teal: '#0D9488', cyan: '#0891B2',
+  red: '#DC2626', pink: '#DB2777', indigo: '#4F46E5', amberLight: '#FCC747',
 };
 
 const fnt = "'JetBrains Mono', monospace";

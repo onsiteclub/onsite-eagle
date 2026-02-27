@@ -5,6 +5,7 @@
  * No signup — operators are pre-registered by supervisors.
  */
 
+import { Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthFlow } from '@onsite/auth-ui';
 
@@ -12,7 +13,13 @@ export default function Login() {
   return (
     <AuthFlow
       appName="Operator"
-      icon={<Ionicons name="cube" size={32} color="#fff" />}
+      logo={
+        <Image
+          source={require('../../assets/onsite-club-logo.png')}
+          style={{ height: 56, width: 140 }}
+          resizeMode="contain"
+        />
+      }
       showSignup={false}
       showForgotPassword={false}
       subtitle="Sign in with your account to continue"

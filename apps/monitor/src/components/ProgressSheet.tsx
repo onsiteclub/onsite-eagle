@@ -1,8 +1,9 @@
 'use client'
 
 /**
- * Progress Sheet — Lot x Phase matrix showing completion status.
- * Based on the "Management" tab of the Avalon CONTROL.xlsx
+ * Progress Sheet — Lot × 4 trades (Framing/Roofing/Backing/Inspection) in %.
+ * Mirrors Avalon CONTROL "Progress" tab exactly.
+ * Simplified from generic N-phase matrix to exactly 4 trade columns.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -14,133 +15,154 @@ interface ProgressSheetProps {
   siteName: string
 }
 
-interface Phase {
-  id: string
-  name: string
-  order_index: number
-}
-
 interface LotProgress {
   lot_number: string
   house_id: string
-  house_status: string
-  phases: Record<string, { status: string; actual_end_date: string | null }>
+  model: string
+  framing: number
+  roofing: number
+  backing: number
+  inspection: number
 }
 
-const PHASE_STATUS_ICONS: Record<string, { symbol: string; color: string }> = {
-  completed: { symbol: '\u2705', color: '#34C759' },
-  in_progress: { symbol: '\uD83D\uDD35', color: '#007AFF' },
-  blocked: { symbol: '\uD83D\uDD34', color: '#FF3B30' },
-  inspection: { symbol: '\uD83D\uDFE1', color: '#FF9500' },
-  pending: { symbol: '\u26AA', color: '#D1D5DB' },
-  skipped: { symbol: '\u2796', color: '#8E8E93' },
+// Color coding: 0=empty, 1-49=red, 50-99=yellow, 100=green
+function getProgressColor(value: number): string {
+  if (value <= 0) return '#D1D5DB'
+  if (value < 50) return '#FF3B30'
+  if (value < 100) return '#FF9500'
+  return '#34C759'
+}
+
+function getProgressBg(value: number): string {
+  if (value <= 0) return 'transparent'
+  if (value < 50) return '#FF3B30' + '15'
+  if (value < 100) return '#FF9500' + '15'
+  return '#34C759' + '15'
 }
 
 export default function ProgressSheet({ siteId, siteName }: ProgressSheetProps) {
   const [loading, setLoading] = useState(true)
-  const [phases, setPhases] = useState<Phase[]>([])
-  const [lots, setLots] = useState<LotProgress[]>([])
+  const [rows, setRows] = useState<LotProgress[]>([])
 
   const loadData = useCallback(async () => {
     setLoading(true)
 
-    const { data: phaseData } = await supabase
-      .from('ref_eagle_phases')
-      .select('id, name, order_index')
-      .order('order_index')
-    setPhases(phaseData || [])
-
     const { data: houses } = await supabase
       .from('egl_houses')
-      .select('id, lot_number, status')
+      .select('id, lot_number, address')
       .eq('site_id', siteId)
       .order('lot_number')
 
     if (!houses?.length) {
-      setLots([])
+      setRows([])
       setLoading(false)
       return
     }
 
     const houseIds = houses.map(h => h.id)
+
+    // Get schedules
     const { data: schedules } = await supabase
       .from('egl_schedules')
       .select('id, house_id')
       .in('house_id', houseIds)
 
     const scheduleIds = (schedules || []).map(s => s.id)
+    const scheduleToHouse = new Map((schedules || []).map(s => [s.id, s.house_id]))
+
+    // Get schedule phases
     const { data: spData } = await supabase
       .from('egl_schedule_phases')
-      .select('schedule_id, phase_id, status, actual_end_date')
+      .select('schedule_id, phase_id, status')
       .in('schedule_id', scheduleIds)
 
-    const scheduleToHouse = new Map(
-      (schedules || []).map(s => [s.id, s.house_id])
-    )
+    // Get phase definitions with trade_category for direct mapping
+    const { data: phaseDefs } = await supabase
+      .from('ref_eagle_phases')
+      .select('id, trade_category')
 
-    const housePhaseMap = new Map<string, Record<string, { status: string; actual_end_date: string | null }>>()
-    for (const sp of (spData || [])) {
-      const houseId = scheduleToHouse.get(sp.schedule_id)
-      if (!houseId) continue
-      if (!housePhaseMap.has(houseId)) housePhaseMap.set(houseId, {})
-      housePhaseMap.get(houseId)![sp.phase_id] = {
-        status: sp.status,
-        actual_end_date: sp.actual_end_date,
+    // Map phase_id → trade using trade_category (set by migration, no guessing)
+    const phaseToTrade = new Map<string, 'framing' | 'roofing' | 'backing' | 'inspection'>()
+    for (const p of phaseDefs || []) {
+      const tc = p.trade_category as string | null
+      if (tc === 'framing' || tc === 'roofing' || tc === 'backing' || tc === 'inspection') {
+        phaseToTrade.set(p.id, tc)
       }
     }
 
-    const result: LotProgress[] = houses.map(h => ({
-      lot_number: h.lot_number,
-      house_id: h.id,
-      house_status: h.status || 'not_started',
-      phases: housePhaseMap.get(h.id) || {},
-    }))
+    // Group phases by house and trade
+    const houseTradeMap = new Map<string, { framing: string[]; roofing: string[]; backing: string[]; inspection: string[] }>()
 
-    setLots(result)
+    for (const h of houses) {
+      houseTradeMap.set(h.id, { framing: [], roofing: [], backing: [], inspection: [] })
+    }
+
+    for (const sp of spData || []) {
+      const houseId = scheduleToHouse.get(sp.schedule_id)
+      if (!houseId) continue
+      const trades = houseTradeMap.get(houseId)
+      if (!trades) continue
+
+      const trade = phaseToTrade.get(sp.phase_id)
+      if (trade) {
+        trades[trade].push(sp.status)
+      }
+    }
+
+    // Calculate percentage per trade
+    const calcPct = (statuses: string[]): number => {
+      if (!statuses.length) return 0
+      const completed = statuses.filter(s => s === 'completed').length
+      return Math.round((completed / statuses.length) * 100)
+    }
+
+    const lotRows: LotProgress[] = houses.map(h => {
+      const trades = houseTradeMap.get(h.id) || { framing: [], roofing: [], backing: [], inspection: [] }
+      return {
+        lot_number: h.lot_number,
+        house_id: h.id,
+        model: h.address || '',
+        framing: calcPct(trades.framing),
+        roofing: calcPct(trades.roofing),
+        backing: calcPct(trades.backing),
+        inspection: calcPct(trades.inspection),
+      }
+    })
+
+    setRows(lotRows)
     setLoading(false)
   }, [siteId])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  useEffect(() => { loadData() }, [loadData])
+
+  // Summary stats
+  const avgFraming = rows.length ? Math.round(rows.reduce((s, r) => s + r.framing, 0) / rows.length) : 0
+  const avgRoofing = rows.length ? Math.round(rows.reduce((s, r) => s + r.roofing, 0) / rows.length) : 0
+  const avgBacking = rows.length ? Math.round(rows.reduce((s, r) => s + r.backing, 0) / rows.length) : 0
+  const avgInspection = rows.length ? Math.round(rows.reduce((s, r) => s + r.inspection, 0) / rows.length) : 0
+  const completed100 = rows.filter(r => r.framing === 100 && r.roofing === 100 && r.backing === 100 && r.inspection === 100).length
 
   const handleExport = () => {
-    if (lots.length === 0) return
-
-    const headers = ['Lot', 'Status', ...phases.map(p => p.name)]
-    const csvRows = lots.map(lot => [
-      lot.lot_number,
-      lot.house_status,
-      ...phases.map(p => {
-        const ph = lot.phases[p.id]
-        if (!ph) return ''
-        if (ph.status === 'completed' && ph.actual_end_date) {
-          return new Date(ph.actual_end_date).toLocaleDateString()
-        }
-        return ph.status.toUpperCase()
-      }),
+    if (!rows.length) return
+    const headers = ['Lot', 'Model / Elevation', 'Framing', 'Roofing', 'Backing', 'Inspection']
+    const csvRows = rows.map(r => [
+      r.lot_number, r.model, r.framing, r.roofing, r.backing, r.inspection,
     ])
-
     const csv = [
       `Progress Sheet - ${siteName}`,
-      `Exported: ${new Date().toLocaleDateString()}`,
+      `${rows.length} lots, ${completed100} fully complete`,
       '',
       headers.join(','),
       ...csvRows.map(r => r.map(c => `"${c}"`).join(',')),
     ].join('\n')
-
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `progress-sheet-${siteName.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `progress-${siteName.replace(/\s+/g, '-').toLowerCase()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
-
-  const completed = lots.filter(l => l.house_status === 'completed').length
-  const inProgress = lots.filter(l => l.house_status === 'in_progress').length
-  const blocked = lots.filter(l => l.house_status === 'delayed').length
 
   if (loading) {
     return (
@@ -150,70 +172,89 @@ export default function ProgressSheet({ siteId, siteName }: ProgressSheetProps) 
     )
   }
 
-  if (lots.length === 0) {
+  if (!rows.length) {
     return (
       <div className="text-center py-20 bg-white rounded-xl border border-[#D2D2D7]">
         <AlertTriangle className="w-12 h-12 text-[#86868B] mx-auto mb-4" />
         <p className="text-lg font-semibold text-[#1D1D1F]">No lots found</p>
+        <p className="text-sm text-[#86868B] mt-1">Add lots to see progress.</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
+      {/* Summary */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-[#86868B]">
-          {lots.length} lots | {completed} completed | {inProgress} in progress | {blocked} delayed
-        </p>
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 bg-[#007AFF] text-white text-sm font-medium rounded-lg hover:bg-[#0056B3] transition"
-        >
-          <Download className="w-4 h-4" />
-          Export CSV
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-sm font-semibold text-[#1D1D1F]">{rows.length} lots</span>
+          <span className="text-xs font-medium text-[#34C759]">{completed100} fully complete</span>
+          <span className="text-xs text-[#86868B]">
+            Avg: Framing {avgFraming}% | Roofing {avgRoofing}% | Backing {avgBacking}% | Inspection {avgInspection}%
+          </span>
+        </div>
+        <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 bg-[#007AFF] text-white text-sm font-medium rounded-lg hover:bg-[#0056B3] transition">
+          <Download className="w-4 h-4" />Export CSV
         </button>
       </div>
 
+      {/* Table */}
       <div className="bg-white rounded-xl border border-[#D2D2D7] overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="bg-[#F5F5F7] border-b border-[#D2D2D7]">
-              <th className="text-left text-xs font-semibold text-[#86868B] uppercase px-3 py-3 sticky left-0 bg-[#F5F5F7] z-10">
-                Lot
-              </th>
-              {phases.map(p => (
-                <th key={p.id} className="text-center text-xs font-semibold text-[#86868B] uppercase px-2 py-3 min-w-[80px]">
-                  {p.name}
-                </th>
-              ))}
+              <th className="text-left text-xs font-semibold text-[#86868B] uppercase px-3 py-3 sticky left-0 bg-[#F5F5F7] z-10 min-w-[60px]">Lot</th>
+              <th className="text-left text-xs font-semibold text-[#86868B] uppercase px-3 py-3 min-w-[160px]">Model / Elevation</th>
+              <th className="text-center text-xs font-semibold text-[#86868B] uppercase px-3 py-3 min-w-[100px]">Framing</th>
+              <th className="text-center text-xs font-semibold text-[#86868B] uppercase px-3 py-3 min-w-[100px]">Roofing</th>
+              <th className="text-center text-xs font-semibold text-[#86868B] uppercase px-3 py-3 min-w-[100px]">Backing</th>
+              <th className="text-center text-xs font-semibold text-[#86868B] uppercase px-3 py-3 min-w-[100px]">Inspection</th>
             </tr>
           </thead>
           <tbody>
-            {lots.map(lot => (
-              <tr key={lot.house_id} className="border-b border-[#E5E5EA] hover:bg-[#F9F9FB]">
-                <td className="px-3 py-2.5 text-sm font-semibold text-[#1D1D1F] sticky left-0 bg-white z-10">
-                  {lot.lot_number}
-                </td>
-                {phases.map(p => {
-                  const ph = lot.phases[p.id]
-                  const info = PHASE_STATUS_ICONS[ph?.status || 'pending']
-                  const dateStr = ph?.actual_end_date
-                    ? new Date(ph.actual_end_date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
-                    : ''
-                  return (
-                    <td key={p.id} className="px-2 py-2.5 text-center">
-                      <div className="text-base" title={ph?.status || 'pending'}>
-                        {info.symbol}
-                      </div>
-                      {dateStr && (
-                        <div className="text-[10px] text-[#86868B] mt-0.5">{dateStr}</div>
-                      )}
-                    </td>
-                  )
-                })}
+            {rows.map(r => (
+              <tr key={r.house_id} className="border-b border-[#E5E5EA] hover:bg-[#F9F9FB]">
+                <td className="px-3 py-2.5 text-sm font-mono font-semibold text-[#1D1D1F] sticky left-0 bg-white z-10">{r.lot_number}</td>
+                <td className="px-3 py-2.5 text-sm text-[#6E6E73] whitespace-nowrap">{r.model || '—'}</td>
+                {[r.framing, r.roofing, r.backing, r.inspection].map((val, i) => (
+                  <td key={i} className="px-3 py-2.5 text-center">
+                    {val > 0 ? (
+                      <span
+                        className="inline-block px-2.5 py-1 rounded text-xs font-bold tabular-nums"
+                        style={{
+                          color: getProgressColor(val),
+                          backgroundColor: getProgressBg(val),
+                        }}
+                      >
+                        {val}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[#D1D5DB]">—</span>
+                    )}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="bg-[#F5F5F7] border-t border-[#D2D2D7]">
+              <td className="px-3 py-3 text-sm font-semibold text-[#1D1D1F] sticky left-0 bg-[#F5F5F7] z-10">{rows.length}</td>
+              <td className="px-3 py-3 text-sm text-[#86868B]">Average</td>
+              {[avgFraming, avgRoofing, avgBacking, avgInspection].map((val, i) => (
+                <td key={i} className="px-3 py-3 text-center">
+                  <span
+                    className="inline-block px-2.5 py-1 rounded text-xs font-bold tabular-nums"
+                    style={{
+                      color: getProgressColor(val),
+                      backgroundColor: getProgressBg(val),
+                    }}
+                  >
+                    {val}%
+                  </span>
+                </td>
+              ))}
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>

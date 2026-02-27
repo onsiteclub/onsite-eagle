@@ -1,137 +1,154 @@
+<!--
+  @ai-rules
+  1. NUNCA delete entradas de "Historico de Evolucao" — apenas ADICIONE novas com data.
+  2. NUNCA delete entradas de "Decisoes de Arquitetura" — apenas ADICIONE.
+  3. Ao fazer mudancas significativas (features, refactors, migracoes),
+     SEMPRE adicione uma entrada ao Historico de Evolucao.
+  4. Mantenha a tabela Tech Stack atualizada — atualize versoes quando mudarem.
+  5. Este arquivo descreve O QUE o app e e COMO evoluiu.
+     Para build/deploy, veja PIPELINE.md.
+-->
+
 # OnSite Calculator
 
-Construction-grade calculator with imperial measurements and voice input.
+> Calculadora de construcao com matematica imperial (pes, polegadas, fracoes) e input por voz multilingual.
 
-Part of the [OnSite Club](https://onsiteclub.ca) ecosystem.
+## 1. Identidade
 
-## Features
+| Campo | Valor |
+|-------|-------|
+| **Nome** | OnSite Calculator |
+| **Diretorio** | `apps/calculator` |
+| **Proposito** | Calculadora especializada para construcao civil. Suporta fracoes imperiais (1/2, 1/4, 1/8, 1/16), conversao de unidades, calculo de escadas, triangulos. Voice input via Whisper + GPT-4o permite falar medidas em ingles ou portugues. |
+| **Audiencia** | Trabalhadores de construcao (todas as funcoes) |
+| **Plataforma** | Web + Android + iOS |
+| **Porta Dev** | 5173 (Vite) |
+| **URL Producao** | `calculator.onsiteclub.ca` / `calc.onsiteclub.ca` |
 
-- 📐 **Imperial Math** - Feet, inches, and fractions (1/2, 1/4, 1/8, 1/16)
-- 🎙️ **Voice Input** - Speak your measurements in English or Portuguese
-- 📱 **Cross-platform** - Web, Android, iOS
-- 🔐 **OnSite Integration** - Single sign-on with OnSite ecosystem
+## 2. Tech Stack
 
-## Quick Start
+| Camada | Tecnologia | Versao |
+|--------|------------|--------|
+| Framework | Vite | 5.4.0 |
+| React | React | 18.3.1 |
+| Mobile Bridge | Capacitor | 6.1.0 |
+| Styling | TailwindCSS | 3.4.1 |
+| Database | Supabase JS | 2.49.0 |
+| Voice AI | OpenAI (Whisper + GPT-4o) | Via Vercel serverless |
+| Testing | Vitest | 2.0.0 |
+| CI/CD | Codemagic | 4 workflows |
+| Deploy (web) | Vercel | Auto-deploy |
 
-```bash
-# Clone
-git clone https://github.com/onsiteclub/onsite-calculator.git
-cd onsite-calculator
+## 3. Telas / Rotas
 
-# Install
-npm install
+O app e SPA (Single Page Application) com tabs internas:
 
-# Setup environment
-cp .env.example .env.local
-# Edit .env.local with your Supabase keys
+| Tab | Componente | Descricao |
+|-----|-----------|-----------|
+| **Calculator** | `Calculator.tsx` | Calculadora principal com voice input, historico, fracoes imperiais |
+| **Stairs** | `StairsCalculator.tsx` | Calculo de escadas (rise, run, stringers) |
+| **Triangle** | `TriangleCalculator.tsx` | Resolver triangulos (lados, angulos) |
+| **Converter** | `UnitConverter.tsx` | Conversao imperial ↔ metrico |
 
-# Run
-npm run dev
-```
+### Componentes Overlay
 
-## Environment Variables
+| Componente | Trigger | Descricao |
+|-----------|---------|-----------|
+| `AuthGate.tsx` | Tentar usar voice sem login | Modal login/signup frictionless |
+| `VoiceConsentModal.tsx` | Primeiro uso de voice | Consent LGPD obrigatorio |
+| `HistoryModal.tsx` | Menu → History | Calculos salvos |
+| `HamburgerMenu.tsx` | Icone menu | Settings, legal, about |
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `VITE_SUPABASE_URL` | Supabase project URL | Yes |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key | Yes |
-| `OPENAI_API_KEY` | OpenAI API key (Vercel only) | For voice |
-| `VITE_STRIPE_CHECKOUT_URL` | Stripe checkout URL | For billing |
+### API Route (Vercel Serverless)
 
-## Development
+| Endpoint | Metodo | Descricao |
+|----------|--------|-----------|
+| `/api/interpret` | POST | Recebe audio WebM → Whisper transcreve → GPT-4o extrai expressao → retorna resultado |
 
-```bash
-npm run dev          # Start dev server
-npm run test         # Run tests
-npm run lint         # Lint code
-npm run build        # Production build
-npm run cap:android  # Open in Android Studio
-npm run cap:ios      # Open in Xcode
-```
+## 4. Packages Internos
 
-## Building for Mobile
+| Package | Imports | Proposito |
+|---------|---------|-----------|
+| `@onsite/auth` | `AuthProvider`, `useAuth` | Auth context (freemium: funciona anonimo) |
+| `@onsite/auth-ui` | Auth components | Modals de login/signup |
+| `@onsite/logger` | Structured logging | Logs de calculo e voz |
+| `@onsite/tokens` | Design tokens | Cores, espacamento |
+| `@onsite/utils` | Formatters | Sub-exports apenas (evitar tailwind-merge) |
 
-### Android
+## 5. Fluxo de Dados
 
-```bash
-# Build web assets
-npm run build
-
-# Add Android platform (first time only)
-npx cap add android
-
-# Sync and open
-npx cap sync android
-npx cap open android
-```
-
-Then build APK/AAB in Android Studio.
-
-### iOS
-
-```bash
-npm run build
-npx cap add ios
-npx cap sync ios
-npx cap open ios
-```
-
-Then archive in Xcode.
-
-## Project Structure
+### Voice Input Pipeline
 
 ```
-src/
-├── components/     # React components
-├── hooks/          # Custom React hooks
-├── lib/
-│   ├── calculator/ # Calculation engine
-│   └── supabase.ts # Auth client
-├── styles/         # CSS
-├── types/          # TypeScript types
-├── App.tsx         # Main component
-└── main.tsx        # Entry point
-
-api/
-└── interpret.ts    # Voice API (Vercel)
-
-tests/
-└── unit/           # Unit tests
+Usuario fala → WebM audio → POST /api/interpret
+  → Whisper (transcricao) → GPT-4o (extrai expressao)
+  → Sanitize (3 camadas: prompt + client regex + server regex)
+  → Calculator engine (PEMDAS) → Resultado
 ```
 
-## How It Works
+### Tabelas Supabase (leitura/escrita)
 
-### Calculator Engine
+| Tabela | Uso |
+|--------|-----|
+| `ccl_calculations` | Historico de calculos (tipo, input, resultado, metodo) |
+| `ccl_templates` | Templates de formulas (sistema + usuario) |
+| `core_voice_logs` | Logs de voice input (audio, transcricao, confidence, intent) |
+| `core_profiles` | Perfil do usuario |
+| `core_consents` | Consentimento de voz e dados |
 
-The calculator handles imperial measurements using a custom tokenizer and PEMDAS-compliant parser:
+### Modelo Freemium
 
-1. **Tokenize** - Breaks `"5 1/2 + 3 1/4"` into `["5 1/2", "+", "3 1/4"]`
-2. **Parse** - Converts each value to decimal inches
-3. **Evaluate** - Processes operations respecting PEMDAS
-4. **Format** - Outputs as feet/inches and total inches
+| Feature | Anonimo | Logado |
+|---------|---------|--------|
+| Calculadora basica | Sim | Sim |
+| Fracoes imperiais | Sim | Sim |
+| Voice input | **Nao** | Sim (com consent) |
+| Historico | **Nao** | Sim |
+| Escadas / Triangulo | Sim | Sim |
+| Converter | Sim | Sim |
 
-### Voice Input
+### CORS Origins
 
-1. User holds voice button
-2. Audio recorded as WebM
-3. Sent to `/api/interpret`
-4. Whisper transcribes audio
-5. GPT-4o-mini extracts expression
-6. Calculator engine evaluates
+Producao: `calculator.onsiteclub.ca`, `calc.onsiteclub.ca`, `app.onsiteclub.ca`
+Capacitor: `capacitor://localhost`
+Dev: `localhost:5173`
 
-## Security
+### Rate Limit
 
-- ✅ No `eval()` or `Function()` - Safe expression parsing
-- ✅ Rate limited API (30 req/min)
-- ✅ CORS whitelist
-- ✅ Supabase RLS for user data
+30 requests/minuto por IP no endpoint `/api/interpret`.
 
-## License
+## 6. Decisoes de Arquitetura
 
-Proprietary - OnSite Club © 2025
+1. **Pre-2026: Vite + Capacitor (nao Expo)** — Calculator e web-first (PWA), com bridge nativo via Capacitor. Expo seria overkill para uma SPA sem navegacao nativa complexa.
 
-## Links
+2. **Pre-2026: React 18.3.1 (nao 19)** — Capacitor exige React 18. Consistente com apps Expo.
 
-- [OnSite Club](https://onsiteclub.ca)
-- [Privacy Policy](https://onsiteclub.ca/legal/calculator/privacy.html)
-- [Terms of Service](https://onsiteclub.ca/legal/calculator/terms.html)
+3. **Pre-2026: Freemium (anon funciona)** — Calculadora basica funciona sem login. Voice e historico exigem conta. Reduz friccao de adocao.
+
+4. **Pre-2026: Voice via Vercel Serverless** — `api/interpret.ts` roda como serverless function no Vercel. OpenAI key fica server-side. Client so envia audio.
+
+5. **Pre-2026: 3 camadas de sanitize para percentagem** — GPT converte `10%` para `10/100` incorretamente. Fix: SYSTEM_PROMPT + client regex + server regex.
+
+6. **Pre-2026: CapacitorHttp disabled** — Bug do Capacitor HTTP nativo remove query params. Desabilitado para usar fetch nativo do WebView.
+
+7. **2026-01-15: Dark → Light theme (v3.2)** — Redesign para dashboard minimalista. Background `#F6F8FB`, cards `#FFFFFF`, accent teal `#0F3D3A`.
+
+8. **Pre-2026: Delete/Export removidos do menu** — Funcoes de deletar conta e exportar dados removidas do HamburgerMenu. Regressao resolvida no versionCode 11.
+
+## 7. Historico de Evolucao
+
+### Pre-2026 — v3.0: Fundacao
+- Calculadora imperial com fracoes (1/2, 1/4, 1/8, 1/16)
+- Voice input via Whisper + GPT-4o
+- Capacitor para Android + iOS
+- Codemagic CI/CD (4 workflows)
+- Freemium model (anon + logado)
+- StairsCalculator, TriangleCalculator, UnitConverter
+
+### 2026-01-15 — v3.2: UI Redesign & Branding
+- Theme: Dark → Light (minimalista dashboard style)
+- Cores: App `#F6F8FB`, Cards `#FFFFFF`, Accent `#0F3D3A`
+- Header simplificado (logo + user badge + offline badge)
+- Bug fixes: 3 infinite loops (useAuth, useDeepLink, refreshProfile)
+- Loop prevention com useRef
+- Arquivos: App.css, Calculator.tsx, HamburgerMenu.tsx

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const C = {
   bg: "#FAFAF8", bgCard: "#FFFFFF", border: "#E8E5DD",
@@ -194,22 +194,237 @@ const PKGS = [
   { id: "sharing", name: "sharing", sub: "QR links", layer: "c", desc: "Compartilhamento via QR code + access grants", users: ["monitor","operator"] },
 ];
 
-const DB = [
-  { p: "core_*", l: "Identidade", d: "profiles, devices, orgs, consents" },
-  { p: "egl_*", l: "Eagle", d: "sites, houses, photos, progress, timeline" },
-  { p: "tmk_*", l: "Timekeeper", d: "entries, geofences, projects" },
-  { p: "ccl_*", l: "Calculator", d: "calculations, templates" },
-  { p: "pay_*", l: "Payments", d: "invoices, house_payments", isNew: true },
-  { p: "shp_*", l: "Shop", d: "products, orders, carts" },
-  { p: "bil_*", l: "Billing", d: "subscriptions, products, payments" },
-  { p: "ref_*", l: "Refer\u00EAncia", d: "trades, provinces, units, phases" },
-  { p: "log_*", l: "Logs", d: "errors, events, locations" },
-  { p: "agg_*", l: "Agrega\u00E7\u00F5es", d: "platform_daily, trade_weekly, user_daily" },
-  { p: "int_*", l: "Intelig\u00EAncia", d: "worker/lot profiles, delay attributions" },
-  { p: "club_*", l: "Club", d: "badges, campaigns, streaks, news", isNew: true },
-  { p: "sch_*", l: "SheetChat", d: "posts, follows", isPlanned: true },
-  { p: "v_*", l: "Views", d: "churn, mrr, health, schedule_status" },
+/* \u2550\u2550\u2550 SCHEMA SNAPSHOT (fev 2026) \u2550\u2550\u2550 */
+/* Formato por tabela: [nome, colunas, rows, descri\u00E7\u00E3o, alerta?] */
+const SCHEMA_DATA = [
+  { p: "core_", l: "Identidade & Sharing", d: "Perfis, dispositivos, orgs, consentimentos", cl: C.dark, t: [
+    ["core_profiles", 47, 1, "Perfil 1:1 com auth.users. Trade, experi\u00EAncia, localiza\u00E7\u00E3o."],
+    ["core_devices", 23, 0, "Dispositivos dos usu\u00E1rios. Push tokens, modelo, OS."],
+    ["core_consents", 16, 0, "Consentimentos LGPD (9 tipos). Imut\u00E1vel, com hash."],
+    ["core_organizations", 13, 0, "Empresas/construtoras \u2014 tenants do multi-tenancy."],
+    ["core_org_memberships", 8, 0, "V\u00EDnculo N:N entre users e orgs com role."],
+    ["core_access_grants", 9, 0, "Compartilhamento via QR code. Token + status."],
+    ["core_pending_tokens", 6, 0, "Tokens QR pendentes (TTL 5min). SECURITY DEFINER."],
+    ["core_admin_users", 12, 0, "Admins aprovados. Roles: admin, super_admin, analyst."],
+    ["core_admin_logs", 9, 0, "Audit log de a\u00E7\u00F5es admin.", "USING(true)"],
+    ["core_voice_logs", 40, 0, "Logs de voz: \u00E1udio, transcri\u00E7\u00E3o, NLP, qualidade."],
+    ["core_ai_conversations", 8, 0, "Conversas com IA Prumo. Mensagens em JSONB."],
+    ["core_pricing_tiers", 7, 0, "Pricing por sqft vinculado \u00E0 organiza\u00E7\u00E3o."],
+  ]},
+  { p: "egl_", l: "Eagle (Visual)", d: "Sites, casas, fotos, progresso, timeline, materiais", cl: C.amber, t: [
+    ["egl_sites", 11, 0, "Loteamentos/canteiros. SVG do mapa, total de lotes."],
+    ["egl_houses", 20, 0, "Casas/lotes. Status, fase atual, coordenadas, sqft."],
+    ["egl_photos", 17, 0, "Fotos de fases. AI validation, metadata Prumo training."],
+    ["egl_progress", 9, 0, "Progresso por casa\u00D7fase. Status de aprova\u00E7\u00E3o."],
+    ["egl_timeline", 12, 2, "Timeline de eventos por casa. Multi-source."],
+    ["egl_issues", 13, 0, "Issues reportados. Severidade, status, fotos."],
+    ["egl_scans", 8, 0, "Scans de plantas. AI processing para SVG."],
+    ["egl_messages", 10, 20, "Mensagens na timeline. AI-mediated."],
+    ["egl_schedules", 18, 0, "Cronograma por casa. AI risk score.", "RLS OFF"],
+    ["egl_schedule_phases", 13, 0, "Fases do cronograma. Depend\u00EAncias, bloqueios."],
+    ["egl_external_events", 17, 4, "Eventos externos: clima, feriados, inspe\u00E7\u00E3o."],
+    ["egl_documents", 12, 0, "Documentos por lote: plantas, RSO, red lines.", "ANON CRUD"],
+    ["egl_document_batches", 8, 0, "Lotes de documentos agrupados.", "ANON CRUD"],
+    ["egl_document_links", 6, 0, "Links entre documentos e entidades.", "ANON CRUD"],
+    ["egl_material_requests", 30, 6, "Pedidos de material do Operator."],
+    ["egl_material_request_items", 12, 0, "Itens dos pedidos de material."],
+    ["egl_operator_assignments", 10, 1, "Atribui\u00E7\u00F5es de operadores a sites."],
+    ["egl_app_registry", 8, 15, "Registro de apps do ecossistema Eagle."],
+    ["egl_phase_assignments", 10, 0, "Worker por fase por casa (Avalon pattern)."],
+    ["egl_phase_rates", 8, 0, "Rate $/sqft por fase."],
+    ["egl_crews", 8, 0, "Equipes de campo (Frama, New York, etc)."],
+    ["egl_crew_members", 6, 0, "Membros das equipes."],
+    ["egl_material_tracking", 12, 0, "Pipeline materiais (ordered\u2192delivered\u2192installed)."],
+  ]},
+  { p: "tmk_", l: "Timekeeper (Horas)", d: "Entradas de ponto, geofences, projetos, sess\u00F5es", cl: C.green, t: [
+    ["tmk_entries", 25, 0, "Entradas de ponto. GPS auto + manual. Soft delete."],
+    ["tmk_geofences", 24, 0, "Geofences (locais de trabalho). Raio, coordenadas."],
+    ["tmk_projects", 20, 0, "Projetos com estimativas de horas e or\u00E7amento."],
+    ["tmk_sessions", 17, 0, "Sess\u00F5es de uso do app Timekeeper."],
+    ["tmk_day_summary", 19, 0, "Resumo di\u00E1rio: horas, entradas, sync."],
+    ["tmk_analytics", 20, 0, "Analytics de uso do Timekeeper."],
+    ["tmk_audit", 13, 0, "Audit trail de edi\u00E7\u00F5es em entradas."],
+    ["tmk_corrections", 13, 0, "Corre\u00E7\u00F5es manuais de ponto."],
+    ["tmk_errors", 13, 0, "Erros capturados no app Timekeeper."],
+    ["tmk_events", 14, 0, "Eventos de uso (feature tracking)."],
+    ["tmk_config", 8, 0, "Configura\u00E7\u00F5es por usu\u00E1rio do Timekeeper."],
+  ]},
+  { p: "ccl_", l: "Calculator (Voz)", d: "C\u00E1lculos e templates de constru\u00E7\u00E3o", cl: C.indigo, t: [
+    ["ccl_calculations", 16, 0, "C\u00E1lculos realizados. Input manual ou voz."],
+    ["ccl_templates", 14, 0, "Templates de f\u00F3rmulas. Sistema + custom."],
+  ]},
+  { p: "bil_", l: "Billing", d: "Assinaturas Stripe, produtos, pagamentos", cl: C.blue, t: [
+    ["bil_products", 14, 0, "Produtos/planos Stripe por app."],
+    ["bil_subscriptions", 28, 0, "Assinaturas ativas. Stripe sync completo."],
+    ["bil_payments", 21, 0, "Hist\u00F3rico de pagamentos com Stripe refs."],
+    ["bil_checkout_codes", 8, 0, "C\u00F3digos de checkout tempor\u00E1rios."],
+  ]},
+  { p: "shp_", l: "Shop (E-commerce)", d: "Produtos, variantes, pedidos, carrinho", cl: C.pink, t: [
+    ["shp_products", 27, 0, "Produtos da loja. SKU, pre\u00E7o, invent\u00E1rio."],
+    ["shp_variants", 13, 0, "Variantes (tamanho, cor) por produto."],
+    ["shp_categories", 10, 0, "Categorias hier\u00E1rquicas de produtos."],
+    ["shp_orders", 23, 0, "Pedidos com Stripe payment intent."],
+    ["shp_order_items", 12, 0, "Itens dos pedidos com pre\u00E7o unit\u00E1rio."],
+    ["shp_carts", 8, 0, "Carrinhos com items JSONB e expira\u00E7\u00E3o."],
+  ]},
+  { p: "club_", l: "Club (Gamifica\u00E7\u00E3o)", d: "Badges, campanhas, streaks, not\u00EDcias", cl: C.purple, t: [
+    ["club_badges", 14, 13, "Badges conquist\u00E1veis (achievements)."],
+    ["club_user_badges", 6, 0, "Badges conquistados por usu\u00E1rio."],
+    ["club_campaigns", 19, 0, "Campanhas de engajamento."],
+    ["club_campaign_interactions", 6, 0, "Intera\u00E7\u00F5es em campanhas."],
+    ["club_streaks", 8, 0, "Sequ\u00EAncias de uso (gamifica\u00E7\u00E3o)."],
+    ["club_news", 16, 0, "Not\u00EDcias e announcements."],
+    ["club_partner_offers", 18, 0, "Ofertas de parceiros."],
+    ["club_partner_redemptions", 4, 0, "Resgates de ofertas."],
+  ]},
+  { p: "crd_", l: "Cards / Blades", d: "Cart\u00F5es, transa\u00E7\u00F5es, ledger, funding", cl: C.teal, t: [
+    ["crd_cardholders", 15, 0, "Portadores de cart\u00E3o. KYC data."],
+    ["crd_cards", 21, 0, "Cart\u00F5es emitidos. Status, limites."],
+    ["crd_transactions", 19, 0, "Transa\u00E7\u00F5es com cart\u00E3o. MCC, merchant."],
+    ["crd_blades_ledger", 9, 0, "Ledger do programa Blades (pontos)."],
+    ["crd_funding_events", 11, 0, "Eventos de funding de cart\u00F5es."],
+    ["crd_waitlist", 8, 0, "Waitlist para programa de cart\u00F5es."],
+  ]},
+  { p: "sht_", l: "Sheets (Controle)", d: "Exports, views salvas, QuickBooks", cl: C.teal, t: [
+    ["sht_exports", 9, 0, "Exports de planilhas gerados."],
+    ["sht_saved_views", 12, 0, "Views/filtros salvos."],
+    ["sht_qb_mappings", 6, 0, "Mapeamento QuickBooks.", "USING(true)"],
+  ]},
+  { p: "ref_", l: "Refer\u00EAncia", d: "Lookup: trades, prov\u00EDncias, unidades, fases", cl: C.cyan, t: [
+    ["ref_trades", 18, 0, "Trades (profiss\u00F5es). Multil\u00EDngue, categorias."],
+    ["ref_provinces", 12, 0, "Prov\u00EDncias canadenses. Timezone, min wage."],
+    ["ref_units", 13, 0, "Unidades de medida. Convers\u00E3o metric\u2194imperial."],
+    ["ref_eagle_phases", 13, 0, "Fases de constru\u00E7\u00E3o (7 default)."],
+    ["ref_eagle_phase_items", 8, 0, "Itens de checklist por fase (140 codificados)."],
+    ["ref_material_types", 10, 0, "Tipos de material de constru\u00E7\u00E3o."],
+  ]},
+  { p: "log_", l: "Logs", d: "Erros, eventos de uso, localiza\u00E7\u00F5es GPS", cl: C.red, t: [
+    ["log_errors", 17, 0, "Erros com stack trace, contexto e device."],
+    ["log_events", 21, 0, "Eventos de uso para analytics."],
+    ["log_locations", 18, 0, "Localiza\u00E7\u00F5es GPS com accuracy e geofence."],
+  ]},
+  { p: "agg_", l: "Agrega\u00E7\u00F5es", d: "M\u00E9tricas pr\u00E9-calculadas: plataforma, trades, usu\u00E1rios", cl: C.blue, t: [
+    ["agg_platform_daily", 23, 0, "KPIs di\u00E1rios: users, entries, revenue, errors."],
+    ["agg_trade_weekly", 17, 0, "M\u00E9tricas semanais por trade e prov\u00EDncia."],
+    ["agg_user_daily", 32, 0, "Atividade di\u00E1ria por usu\u00E1rio. 32 colunas."],
+  ]},
+  { p: "int_", l: "Intelig\u00EAncia", d: "Padr\u00F5es, worker/lot profiles, AI reports", cl: C.purple, t: [
+    ["int_behavior_patterns", 17, 0, "Padr\u00F5es de comportamento por segmento."],
+    ["int_voice_patterns", 16, 0, "Padr\u00F5es de voz: termos, dialetos, varia\u00E7\u00F5es."],
+    ["int_worker_profiles", 20, 0, "Perfis de worker: performance, qualidade."],
+    ["int_lot_profiles", 18, 0, "Perfis de lote: dificuldade, terreno."],
+    ["int_delay_attributions", 22, 0, "Atribui\u00E7\u00E3o de atrasos: causa raiz."],
+    ["int_ai_reports", 18, 0, "Relat\u00F3rios AI gerados (weekly, monthly)."],
+    ["int_ai_contestations", 16, 0, "Contesta\u00E7\u00F5es de conclus\u00F5es da IA."],
+  ]},
 ];
+
+const TECH_TABS = [
+  { id: "data-flow", name: "Fluxo de Dados", icon: "\uD83D\uDD04", color: C.blue, summary: "29 rotas API \u00B7 SSR + direct \u00B7 polling model",
+    menu: [{ id: "overview", l: "Vis\u00E3o Geral" }, { id: "routes", l: "Rotas API (29)" }, { id: "patterns", l: "Padr\u00F5es" }, { id: "gaps", l: "Gaps & TODO" }] },
+  { id: "security", name: "Seguran\u00E7a", icon: "\uD83D\uDEE1\uFE0F", color: C.red, summary: "67 RLS policies \u00B7 5 roles \u00B7 SECURITY DEFINER",
+    menu: [{ id: "overview", l: "Vis\u00E3o Geral" }, { id: "rls", l: "RLS Policies (67)" }, { id: "trust", l: "Trust Boundaries" }, { id: "gaps", l: "Gaps & TODO" }] },
+  { id: "multi-tenant", name: "Multi-Tenancy", icon: "\uD83C\uDFE2", color: C.purple, summary: "14 tabelas \u00B7 4 helpers \u00B7 org_id pattern",
+    menu: [{ id: "overview", l: "Vis\u00E3o Geral" }, { id: "coverage", l: "Cobertura (14)" }, { id: "helpers", l: "Helpers SQL" }, { id: "gaps", l: "Gaps & TODO" }] },
+  { id: "lifecycle", name: "Ciclo de Vida", icon: "\u267B\uFE0F", color: C.green, summary: "9 consent types \u00B7 soft deletes \u00B7 retention",
+    menu: [{ id: "overview", l: "Vis\u00E3o Geral" }, { id: "consent", l: "Consent (9 tipos)" }, { id: "retention", l: "Reten\u00E7\u00E3o & Cleanup" }, { id: "gaps", l: "Gaps & TODO" }] },
+  { id: "observability", name: "Observabilidade", icon: "\uD83D\uDCCA", color: C.cyan, summary: "@onsite/logger \u00B7 Sentry (1/8) \u00B7 0 health checks",
+    menu: [{ id: "overview", l: "Vis\u00E3o Geral" }, { id: "logger", l: "@onsite/logger" }, { id: "monitoring", l: "Monitoring" }, { id: "gaps", l: "Gaps & TODO" }] },
+];
+
+/* ═══ DATA MERGE (live data over hardcoded defaults) ═══ */
+
+const RUNTIME_COLORS = { nextjs: C.blue, expo: C.green, capacitor: C.indigo, unknown: C.textMuted };
+
+function mergeRows(rows, liveApps) {
+  if (!liveApps?.length) return rows;
+  const liveMap = new Map(liveApps.map(a => [a.slug, a]));
+  const merged = rows.map(row => ({
+    ...row,
+    apps: row.apps.map(app => {
+      const live = liveMap.get(app.id);
+      if (!live) return app;
+      liveMap.delete(app.id);
+      return { ...app, deps: live.deps?.map(d => d.replace("@onsite/", "")) || app.deps };
+    }),
+  }));
+  // Auto-add apps found in scan but not in ROWS
+  const newApps = [];
+  for (const [slug, live] of liveMap) {
+    if (slug === "architecture") continue;
+    newApps.push({
+      id: slug, name: slug.charAt(0).toUpperCase() + slug.slice(1), sub: "auto-detected", color: RUNTIME_COLORS[live.runtime] || C.textMuted,
+      deps: live.deps?.map(d => d.replace("@onsite/", "")) || [], desc: `App detectado: ${live.runtime}`, tech: `${live.deps?.length || 0} pkgs`,
+      progress: 0, status: "dev", isAutoDetected: true,
+      dev: { stack: live.runtime, pipeline: "desconhecido", entry: `apps/${slug}/`, port: live.port || 0, notes: "Auto-detectado pelo scanner." },
+      screens: [],
+    });
+  }
+  if (newApps.length > 0) {
+    const runtimeRow = { nextjs: 0, expo: 1, capacitor: 2 };
+    for (const app of newApps) {
+      const live = liveApps.find(a => a.slug === app.id);
+      const ri = runtimeRow[live?.runtime] ?? merged.length - 1;
+      if (merged[ri]) merged[ri] = { ...merged[ri], apps: [...merged[ri].apps, app] };
+    }
+  }
+  return merged;
+}
+
+function mergePkgs(pkgs, livePkgs) {
+  if (!livePkgs?.length) return pkgs;
+  const liveMap = new Map(livePkgs.map(p => [p.slug, p]));
+  const merged = pkgs.map(pkg => {
+    const live = liveMap.get(pkg.id);
+    if (!live) return pkg;
+    liveMap.delete(pkg.id);
+    return { ...pkg, users: live.consumers?.length > 0 ? live.consumers.map(c => c.replace("@onsite/", "")) : pkg.users };
+  });
+  // Auto-add packages found in scan but not in PKGS
+  for (const [slug, live] of liveMap) {
+    merged.push({
+      id: slug, name: slug, sub: live.layer || "auto", layer: live.layer === "foundation" ? "f" : "c",
+      desc: `Package detectado automaticamente`, users: live.consumers?.map(c => c.replace("@onsite/", "")) || [],
+      isAutoDetected: true,
+    });
+  }
+  return merged;
+}
+
+function mergeSchema(schemaData, liveSchema) {
+  if (!liveSchema?.groups || liveSchema.source === "static") return schemaData;
+  // Build lookup of descriptions from hardcoded SCHEMA_DATA
+  const descMap = new Map();
+  const groupMeta = new Map();
+  for (const g of schemaData) {
+    groupMeta.set(g.p, { l: g.l, d: g.d, cl: g.cl });
+    for (const t of g.t) descMap.set(t[0], { desc: t[3], alert: t[4] });
+  }
+  // Build policy analysis from live data
+  const policyCount = new Map();
+  const policyQuals = new Map();
+  for (const p of (liveSchema.policies || [])) {
+    policyCount.set(p.tablename, (policyCount.get(p.tablename) || 0) + 1);
+    if (!policyQuals.has(p.tablename)) policyQuals.set(p.tablename, []);
+    policyQuals.get(p.tablename).push(p.qual || "");
+  }
+  return liveSchema.groups.map(g => {
+    const meta = groupMeta.get(g.prefix) || { l: g.prefix, d: "", cl: C.textMuted };
+    return {
+      p: g.prefix, l: meta.l, d: meta.d, cl: meta.cl,
+      t: g.tables.map(t => {
+        const known = descMap.get(t.table_name);
+        const polCount = policyCount.get(t.table_name) || 0;
+        const quals = policyQuals.get(t.table_name) || [];
+        const hasTrueQual = quals.some(q => q.trim() === "true" || q.trim() === "(true)");
+        let alert = known?.alert;
+        if (!alert && polCount === 0) alert = "RLS OFF";
+        else if (!alert && hasTrueQual) alert = "USING(true)";
+        return [t.table_name, t.col_count || 0, t.row_estimate || 0, known?.desc || "", alert];
+      }),
+    };
+  });
+}
 
 /* ═══ COMPONENTS ═══ */
 
@@ -234,9 +449,9 @@ function ProgressBar({ value, color }) {
   );
 }
 
-function PkgModal({ pkg, onClose }) {
+function PkgModal({ pkg, onClose, allRows }) {
   if (!pkg) return null;
-  const allApps = ROWS.flatMap(r => r.apps);
+  const allApps = (allRows || ROWS).flatMap(r => r.apps);
   const users = allApps.filter(a => pkg.users.includes(a.id));
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(4px)" }}>
@@ -462,22 +677,1068 @@ function AppModal({ app, onClose }) {
   );
 }
 
+function TechModal({ tab, section, setSection, onClose }) {
+  if (!tab) return null;
+
+  const mt = (items) => (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: 14, marginBottom: 24 }}>
+      {items.map(m => (
+        <div key={m.l} style={{ background: C.bg, borderRadius: 8, padding: 14, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 9, fontWeight: 700, fontFamily: fnt, color: C.textMuted, letterSpacing: 1, marginBottom: 6 }}>{m.l}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, fontFamily: fnt, color: m.c || tab.color }}>{m.v}</div>
+          {m.s && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>{m.s}</div>}
+        </div>
+      ))}
+    </div>
+  );
+
+  const sl = (items) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {items.map((item, i) => {
+        const sc = { ok: C.green, warn: C.amber, error: C.red, info: C.blue }[item.s] || C.textMuted;
+        const si = { ok: "\u2713", warn: "!", error: "\u2717", info: "i" }[item.s] || "?";
+        return (
+          <div key={i} style={{ display: "flex", gap: 12, padding: "11px 14px", background: C.bg, borderRadius: 8, border: `1px solid ${C.border}`, alignItems: "flex-start" }}>
+            <div style={{ width: 22, height: 22, borderRadius: 6, background: `${sc}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: sc, flexShrink: 0, marginTop: 1 }}>{si}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, fontFamily: fnt, color: C.text }}>{item.t}</div>
+              <div style={{ fontSize: 12, color: C.textSec, marginTop: 3, lineHeight: 1.5 }}>{item.d}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const tb = (headers, rows) => (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: headers.map(h => h.w || "1fr").join(" "), background: C.bg, padding: "10px 14px", borderBottom: `1px solid ${C.border}` }}>
+        {headers.map(h => <span key={h.l} style={{ fontSize: 9, fontWeight: 700, fontFamily: fnt, color: C.textMuted, letterSpacing: 1 }}>{h.l}</span>)}
+      </div>
+      {rows.map((row, i) => (
+        <div key={i} style={{ display: "grid", gridTemplateColumns: headers.map(h => h.w || "1fr").join(" "), padding: "9px 14px", borderBottom: i < rows.length - 1 ? `1px solid ${C.border}` : "none", background: i % 2 === 1 ? `${C.bg}60` : "transparent" }}>
+          {row.map((cell, j) => <span key={j} style={{ fontSize: 12, color: j === 0 ? C.text : C.textSec, fontWeight: j === 0 ? 600 : 400, fontFamily: j === 0 ? fnt : "inherit", lineHeight: 1.5 }}>{cell}</span>)}
+        </div>
+      ))}
+    </div>
+  );
+
+  const sub = (text) => <div style={{ fontSize: 10, fontWeight: 700, fontFamily: fnt, color: C.textMuted, letterSpacing: 1.2, marginBottom: 12, marginTop: 24 }}>{text}</div>;
+  const p = (text) => <p style={{ color: C.textSec, fontSize: 14, lineHeight: 1.8, margin: "0 0 20px", maxWidth: 620 }}>{text}</p>;
+
+  const content = (() => {
+    const k = `${tab.id}/${section}`;
+
+    /* ── DATA FLOW ── */
+    if (k === "data-flow/overview") return (<div>
+      {p("Apps Next.js usam @onsite/supabase (SSR com cookies httpOnly). Apps Expo conectam direto ao Supabase com anon key + RLS. N\u00E3o h\u00E1 edge functions nem realtime subscriptions \u2014 modelo intencional de polling.")}
+      {mt([{ l: "API ROUTES", v: "29", s: "4 apps Next.js" }, { l: "EDGE FUNCTIONS", v: "0", s: "planejadas" }, { l: "REALTIME SUBS", v: "0", s: "polling intencional" }])}
+      {sub("PADR\u00C3O DE CONEX\u00C3O")}
+      {sl([
+        { s: "ok", t: "Next.js \u2192 SSR", d: "Monitor, Analytics, Dashboard, Auth usam @onsite/supabase com cookies. Server Components + Server Actions." },
+        { s: "ok", t: "Expo \u2192 Direct", d: "Timekeeper, Operator, Field, Inspect conectam direto com anon key. RLS protege os dados." },
+        { s: "ok", t: "Capacitor \u2192 Hybrid", d: "Calculator usa API serverless (/api/interpret) + acesso an\u00F4nimo sem auth." },
+      ])}
+    </div>);
+    if (k === "data-flow/routes") return (<div>
+      {tb(
+        [{ l: "APP", w: "120px" }, { l: "ROUTES", w: "60px" }, { l: "EXEMPLOS" }],
+        [
+          ["Monitor", "8", "/api/timeline/mediate, /api/photos, /api/houses"],
+          ["Dashboard", "11", "/api/subscriptions, /api/admin, /api/members"],
+          ["Auth", "7", "/api/auth/callback, /api/auth/confirm, /api/delete-account"],
+          ["Analytics", "2", "/api/export, /api/kpis"],
+          ["Calculator", "1", "/api/interpret (voice \u2192 calculation)"],
+        ]
+      )}
+      {sub("EXPO APPS (0 API ROUTES)")}
+      {p("Timekeeper, Operator, Field e Inspect n\u00E3o t\u00EAm rotas API pr\u00F3prias. Conectam diretamente ao Supabase client-side via @supabase/supabase-js com anon key.")}
+    </div>);
+    if (k === "data-flow/patterns") return (<div>
+      {sub("SSR PATTERN (NEXT.JS)")}
+      {sl([
+        { s: "ok", t: "@onsite/supabase/server", d: "createClient() com cookies httpOnly. Usado em Server Components e Server Actions." },
+        { s: "ok", t: "@onsite/supabase/client", d: "createBrowserClient() para Client Components. Synca session com cookies." },
+        { s: "ok", t: "@onsite/supabase/middleware", d: "Refresh de session autom\u00E1tico via middleware Next.js." },
+      ])}
+      {sub("DIRECT PATTERN (EXPO)")}
+      {sl([
+        { s: "ok", t: "Supabase JS direto", d: "Cada app cria seu client com SUPABASE_URL + SUPABASE_ANON_KEY. RLS como \u00FAnica barreira." },
+        { s: "ok", t: "AsyncStorage session", d: "Session persistida via AsyncStorage. Auto-refresh de JWT tokens." },
+        { s: "warn", t: "Sem middleware", d: "N\u00E3o h\u00E1 camada intermedi\u00E1ria. Anon key exposta no bundle (normal, mas depende 100% do RLS)." },
+      ])}
+      {sub("AUTH FLOW")}
+      {sl([
+        { s: "ok", t: "Supabase Auth", d: "Magic link + email/password. Shared session via @onsite/auth package." },
+        { s: "warn", t: "Calculator sem auth", d: "Calculator opera anonimamente. voice_logs com user_id NULL. Rate limit por IP." },
+      ])}
+    </div>);
+    if (k === "data-flow/gaps") return (<div>
+      {sl([
+        { s: "warn", t: "Edge Functions: 0 deployed", d: "Planejadas para rate limiting, image resize, webhook processing. Hoje tudo via API routes Next.js." },
+        { s: "info", t: "Realtime: 0 subscriptions", d: "Modelo de polling intencional. Futuro: realtime para timeline e chat (SheetChat)." },
+        { s: "warn", t: "Sem webhook receiver", d: "Nenhum endpoint para webhooks Stripe, SendGrid, etc. Billing depende de polling." },
+        { s: "info", t: "Sem API Gateway", d: "Cada app exp\u00F5e suas pr\u00F3prias rotas. Sem rate limiting unificado ou API versioning." },
+        { s: "warn", t: "Sem OpenAPI/Swagger", d: "Nenhuma documenta\u00E7\u00E3o autom\u00E1tica das 29 rotas. Dificulta onboarding de devs." },
+        { s: "info", t: "Sem cache layer", d: "Nenhum Redis/Upstash. Views e queries sem cache. Aceit\u00E1vel no volume atual." },
+      ])}
+    </div>);
+
+    /* ── SECURITY ── */
+    if (k === "security/overview") return (<div>
+      {p("Todas as 40+ tabelas t\u00EAm RLS habilitado. 67 policies implementadas. 5 roles organizacionais. Separa\u00E7\u00E3o de chaves anon vs service_role. 5 fun\u00E7\u00F5es SECURITY DEFINER para queries privilegiadas.")}
+      {mt([{ l: "RLS POLICIES", v: "67", s: "todas as tabelas" }, { l: "ORG ROLES", v: "5", s: "worker \u2192 owner" }, { l: "SEC DEFINER", v: "5", s: "fun\u00E7\u00F5es privilegiadas" }])}
+      {sub("ROLES")}
+      {tb(
+        [{ l: "ROLE", w: "110px" }, { l: "N\u00CDVEL", w: "50px" }, { l: "PERMISS\u00D5ES" }],
+        [
+          ["Worker", "1", "Upload fotos, ver pr\u00F3prios dados, clock in/out"],
+          ["Inspector", "2", "Validar fotos, aprovar/rejeitar fases"],
+          ["Supervisor", "3", "Gerenciar sites e casas, atribuir workers"],
+          ["Admin", "4", "Gerenciar org, membros, billing"],
+          ["Owner", "5", "Tudo \u2014 incluindo deletar org"],
+        ]
+      )}
+    </div>);
+    if (k === "security/rls") return (<div>
+      {tb(
+        [{ l: "GRUPO", w: "120px" }, { l: "TABELAS", w: "55px" }, { l: "POLICIES", w: "60px" }, { l: "PADR\u00C3O" }],
+        [
+          ["Timekeeper", "3", "9", "own data + viewer via access_grants"],
+          ["Core/Identity", "5", "12", "own data (CRUD) + viewer shared"],
+          ["Eagle", "7", "~10", "\u26A0\uFE0F PERMISSIVO (temporário)"],
+          ["Calculator", "2", "4", "own data OR null user_id"],
+          ["Shop", "6", "8", "public SELECT + admin ALL"],
+          ["Billing", "3", "5", "public SELECT + own data"],
+          ["Admin", "2", "7", "is_active_admin() + super_admin"],
+          ["Logs", "4", "8", "own data + authenticated INSERT"],
+          ["Reference", "3", "3", "public SELECT (is_active)"],
+          ["Aggregations", "3", "4", "admin only + own agg_user_daily"],
+        ]
+      )}
+      {sub("SECURITY DEFINER FUNCTIONS")}
+      {sl([
+        { s: "ok", t: "is_active_admin()", d: "Verifica se user \u00E9 admin ativo. Bypassa RLS de admin_users." },
+        { s: "ok", t: "is_super_admin()", d: "Verifica se user \u00E9 super_admin. Para opera\u00E7\u00F5es destrutivas." },
+        { s: "ok", t: "lookup_pending_token()", d: "Busca token QR de forma segura sem expor pending_tokens." },
+        { s: "ok", t: "get_user_organization_ids()", d: "Retorna org IDs do user. Base do multi-tenancy RLS." },
+        { s: "ok", t: "check_email_exists()", d: "Verifica email em auth.users sem expor dados." },
+      ])}
+    </div>);
+    if (k === "security/trust") return (<div>
+      {sub("CHAVES DE ACESSO")}
+      {sl([
+        { s: "ok", t: "anon key (publishable)", d: "Usada por todos os clients. Exposta no bundle. RLS \u00E9 a barreira. Sem acesso a service_role." },
+        { s: "ok", t: "service_role key", d: "Apenas server-side (Next.js API routes, Server Actions). Bypassa RLS. Nunca no client." },
+        { s: "ok", t: "JWT tokens", d: "Supabase Auth emite JWTs. Claims incluem user_id, role, email. Refresh autom\u00E1tico." },
+      ])}
+      {sub("BOUNDARIES")}
+      {sl([
+        { s: "ok", t: "Client \u2192 Supabase", d: "Anon key + RLS. Sem acesso direto a tabelas sem policy." },
+        { s: "ok", t: "Server \u2192 Supabase", d: "Service_role key. Usado para admin ops, triggers, migrations." },
+        { s: "ok", t: "App \u2192 App", d: "Sem comunica\u00E7\u00E3o direta entre apps. Todos passam pelo Supabase." },
+        { s: "warn", t: "Expo bundle", d: "Anon key no bundle Android. Engenharia reversa poss\u00EDvel mas in\u00F3cua (RLS protege)." },
+      ])}
+    </div>);
+    if (k === "security/gaps") return (<div>
+      {sl([
+        { s: "error", t: "Eagle tables: USING(true)", d: "7 tabelas Eagle com RLS permissivo. Qualquer authenticated user l\u00EA/escreve tudo. Prioridade P0." },
+        { s: "warn", t: "HaveIBeenPwned desabilitado", d: "Prote\u00E7\u00E3o contra senhas vazadas est\u00E1 OFF no Supabase Dashboard. Ativar manualmente." },
+        { s: "warn", t: "Sem rate limiting no Supabase", d: "Anon key sem throttle. Abuso poss\u00EDvel via chamadas diretas ao PostgREST." },
+        { s: "warn", t: "Sem key rotation", d: "Nenhum processo de rota\u00E7\u00E3o de anon/service_role keys." },
+        { s: "info", t: "postgis no schema public", d: "Extens\u00E3o deveria estar em 'extensions'. Impacto baixo." },
+      ])}
+    </div>);
+
+    /* ── MULTI-TENANT ── */
+    if (k === "multi-tenant/overview") return (<div>
+      {p("Multi-tenancy via coluna organization_id em 14 tabelas. Memberships N:N em core_org_memberships com 5 roles. RLS usa get_user_organization_ids() para filtrar por org. Padr\u00E3o OR organization_id IS NULL para dados legados.")}
+      {mt([{ l: "TABELAS c/ ORG_ID", v: "14", s: "de ~40 total" }, { l: "HELPER FUNCS", v: "4", s: "SECURITY DEFINER" }, { l: "ORG ROLES", v: "5", s: "worker \u2192 owner" }])}
+      {sub("MODELO")}
+      {sl([
+        { s: "ok", t: "N:N Memberships", d: "Um worker pode pertencer a m\u00FAltiplas orgs. core_org_memberships(user_id, org_id, role)." },
+        { s: "ok", t: "RLS Pattern", d: "USING (organization_id IN (SELECT get_user_organization_ids()) OR organization_id IS NULL)" },
+        { s: "warn", t: "NULL = legado", d: "Dados sem org_id s\u00E3o vis\u00EDveis a todos. Necess\u00E1rio migrar para org espec\u00EDfica." },
+      ])}
+    </div>);
+    if (k === "multi-tenant/coverage") return (<div>
+      {tb(
+        [{ l: "TABELA", w: "180px" }, { l: "APP", w: "100px" }, { l: "STATUS" }],
+        [
+          ["egl_sites", "Eagle", "\u2705 Implementado"],
+          ["egl_houses", "Eagle", "\u2705 Implementado"],
+          ["egl_photos", "Eagle", "\u2705 Implementado"],
+          ["egl_progress", "Eagle", "\u2705 Implementado"],
+          ["egl_timeline", "Eagle", "\u2705 Implementado"],
+          ["egl_issues", "Eagle", "\u2705 Implementado"],
+          ["egl_scans", "Eagle", "\u2705 Implementado"],
+          ["egl_messages", "Eagle", "\u2705 Implementado"],
+          ["tmk_entries", "Timekeeper", "\u2705 Implementado"],
+          ["tmk_geofences", "Timekeeper", "\u2705 Implementado"],
+          ["tmk_projects", "Timekeeper", "\u2705 Implementado"],
+          ["ccl_calculations", "Calculator", "\u2705 Implementado"],
+          ["ccl_templates", "Calculator", "\u2705 Implementado"],
+          ["int_ai_reports", "Intelligence", "\u2705 Implementado"],
+        ]
+      )}
+    </div>);
+    if (k === "multi-tenant/helpers") return (<div>
+      {sl([
+        { s: "ok", t: "get_user_organization_ids()", d: "Retorna array de org IDs do user autenticado. SECURITY DEFINER \u2014 bypassa RLS para consultar core_org_memberships." },
+        { s: "ok", t: "user_belongs_to_org(org_id)", d: "Retorna boolean. Verifica se user pertence a uma org espec\u00EDfica." },
+        { s: "ok", t: "get_user_org_role(org_id)", d: "Retorna role (worker/inspector/supervisor/admin/owner) do user na org." },
+        { s: "ok", t: "user_is_org_admin(org_id)", d: "Retorna boolean. True se role \u00E9 'admin' ou 'owner'." },
+      ])}
+      {sub("TABELAS DE SUPORTE")}
+      {tb(
+        [{ l: "TABELA", w: "200px" }, { l: "PROP\u00D3SITO" }],
+        [
+          ["core_organizations", "Registro de empresas/construtoras (tenants)"],
+          ["core_org_memberships", "N:N entre users e orgs com role"],
+          ["core_pricing_tiers", "Pricing por sqft vinculado \u00E0 org"],
+        ]
+      )}
+    </div>);
+    if (k === "multi-tenant/gaps") return (<div>
+      {sl([
+        { s: "warn", t: "material_requests sem org_id", d: "Tabela de pedidos de material (Operator) n\u00E3o tem organization_id. N\u00E3o filtra por tenant." },
+        { s: "warn", t: "operator_assignments sem org_id", d: "Atribui\u00E7\u00F5es de operador n\u00E3o s\u00E3o tenant-scoped." },
+        { s: "warn", t: "RLS n\u00E3o enfor\u00E7a org_id", d: "Eagle tables usam USING(true). Quando fixar, precisa incluir org_id no RLS." },
+        { s: "info", t: "Sem tenant isolation tests", d: "Nenhum teste verifica que user A n\u00E3o v\u00EA dados da org B." },
+        { s: "info", t: "Dados legados sem org", d: "Dados criados antes da migration 004 t\u00EAm org_id NULL. Precisam ser migrados." },
+      ])}
+    </div>);
+
+    /* ── LIFECYCLE ── */
+    if (k === "lifecycle/overview") return (<div>
+      {p("Sistema de consentimento granular com 9 tipos. Soft deletes no Timekeeper (deleted_at). Fun\u00E7\u00F5es de reten\u00E7\u00E3o existem mas n\u00E3o est\u00E3o agendadas. Account deletion com CASCADE. Storage files N\u00C3O s\u00E3o deletados quando records s\u00E3o removidos.")}
+      {mt([{ l: "CONSENT TYPES", v: "9", s: "granulares" }, { l: "SOFT DELETE", v: "3", s: "tabelas tmk_*" }, { l: "RETENTION JOBS", v: "0", s: "n\u00E3o agendado", c: C.red }])}
+    </div>);
+    if (k === "lifecycle/consent") return (<div>
+      {tb(
+        [{ l: "TIPO", w: "200px" }, { l: "OBRIGAT\u00D3RIO", w: "90px" }, { l: "DESCRI\u00C7\u00C3O" }],
+        [
+          ["terms_of_service", "Sim", "Termos de uso do app"],
+          ["privacy_policy", "Sim", "Pol\u00EDtica de privacidade"],
+          ["data_collection", "Sim", "Coleta de dados de uso"],
+          ["voice_collection", "N\u00E3o", "Grava\u00E7\u00E3o de \u00E1udio de voz"],
+          ["voice_training", "N\u00E3o", "Uso de voz para treinar IA"],
+          ["location_tracking", "N\u00E3o", "Rastreamento GPS cont\u00EDnuo"],
+          ["analytics", "N\u00E3o", "Analytics comportamental"],
+          ["marketing", "N\u00E3o", "Comunica\u00E7\u00F5es de marketing"],
+          ["third_party_sharing", "N\u00E3o", "Compartilhamento com terceiros"],
+        ]
+      )}
+      {sub("CAMPOS DO REGISTRO")}
+      {p("Cada consentimento registra: document_version, document_url, document_hash, IP, user_agent, app_name, collection_method. Imut\u00E1vel \u2014 revoga\u00E7\u00E3o cria novo record.")}
+    </div>);
+    if (k === "lifecycle/retention") return (<div>
+      {sub("SOFT DELETES")}
+      {sl([
+        { s: "ok", t: "tmk_entries (deleted_at)", d: "Entradas de ponto soft-deleted. Queries filtram WHERE deleted_at IS NULL." },
+        { s: "ok", t: "tmk_geofences (deleted_at)", d: "Geofences soft-deleted. Mant\u00E9m hist\u00F3rico de horas." },
+        { s: "ok", t: "tmk_projects (deleted_at)", d: "Projetos soft-deleted. Entries referenciando projeto mantidas." },
+      ])}
+      {sub("RETENTION CLEANUP")}
+      {sl([
+        { s: "warn", t: "retention_cleanup.sql existe", d: "Fun\u00E7\u00E3o limpa logs >30 dias e events >90 dias. Mas N\u00C3O est\u00E1 agendada \u2014 precisa de pg_cron." },
+        { s: "ok", t: "/api/delete-account", d: "Endpoint em apps/auth. CASCADE deleta todos os dados do user. Irrevers\u00EDvel." },
+        { s: "error", t: "Storage files \u00F3rf\u00E3os", d: "Ao deletar records no DB, arquivos no Storage (fotos, \u00E1udios) N\u00C3O s\u00E3o removidos." },
+      ])}
+    </div>);
+    if (k === "lifecycle/gaps") return (<div>
+      {sl([
+        { s: "error", t: "pg_cron n\u00E3o configurado", d: "retention_cleanup.sql existe mas nunca executa. Logs e events acumulam indefinidamente." },
+        { s: "error", t: "Storage orphans", d: "Deletar DB records n\u00E3o deleta arquivos no Storage. Sem garbage collector." },
+        { s: "warn", t: "Sem anonymization", d: "Nenhuma fun\u00E7\u00E3o para anonimizar dados. LGPD/GDPR exigem para dados retidos ap\u00F3s exclus\u00E3o." },
+        { s: "warn", t: "Sem data export", d: "Nenhum endpoint de portabilidade (LGPD Art. 18). User n\u00E3o consegue exportar seus dados." },
+        { s: "info", t: "Sem audit trail", d: "Apenas admin_logs para a\u00E7\u00F5es admin. A\u00E7\u00F5es de users comuns n\u00E3o s\u00E3o auditadas." },
+      ])}
+    </div>);
+
+    /* ── OBSERVABILITY ── */
+    if (k === "observability/overview") return (<div>
+      {p("Package @onsite/logger implementado com 16 tags, ring buffer de 500 entries, e sistema de sinks (console + file). Sentry configurado APENAS no Timekeeper. Nenhum health check endpoint. 3 apps Expo sem logging algum.")}
+      {mt([{ l: "LOGGER TAGS", v: "16", s: "@onsite/logger" }, { l: "SENTRY APPS", v: "1/8", s: "apenas Timekeeper", c: C.red }, { l: "HEALTH CHECKS", v: "0", s: "nenhum endpoint", c: C.red }])}
+    </div>);
+    if (k === "observability/logger") return (<div>
+      {sub("TAGS DISPON\u00CDVEIS (16)")}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 24 }}>
+        {["AUTH","SYNC","GPS","GEOFENCE","ENTRY","OFFLINE","TIMER","PHOTO","UPLOAD","AI","CAMERA","NETWORK","ERROR","DEBUG","APP","BACKGROUND"].map(t => (
+          <span key={t} style={{ background: `${tab.color}08`, border: `1px solid ${tab.color}20`, borderRadius: 4, padding: "4px 10px", fontSize: 11, fontWeight: 600, fontFamily: fnt, color: tab.color }}>{t}</span>
+        ))}
+      </div>
+      {sub("FEATURES")}
+      {sl([
+        { s: "ok", t: "Ring Buffer (500)", d: "\u00DAltimas 500 entries mantidas em mem\u00F3ria. Evita memory leak em long-running apps." },
+        { s: "ok", t: "Console Sink", d: "Output formatado com emoji + tag + timestamp. Filtro por n\u00EDvel." },
+        { s: "ok", t: "File Sink", d: "Persiste logs em arquivo local. \u00DAtil para debug p\u00F3s-crash." },
+        { s: "warn", t: "Sem remote sink", d: "Logs n\u00E3o s\u00E3o enviados para servi\u00E7o externo. Apenas local." },
+      ])}
+      {sub("ADO\u00C7\u00C3O POR APP")}
+      {tb(
+        [{ l: "APP", w: "130px" }, { l: "LOGGER", w: "70px" }, { l: "SENTRY", w: "70px" }, { l: "NOTA" }],
+        [
+          ["Timekeeper", "\u2705", "\u2705", "\u00DAnico app com stack completo"],
+          ["Monitor", "\u2705", "\u2716", "Logger via @onsite/logger"],
+          ["Analytics", "\u2705", "\u2716", "Logger b\u00E1sico"],
+          ["Dashboard", "\u2705", "\u2716", "Logger b\u00E1sico"],
+          ["Calculator", "\u2705", "\u2716", "Logger custom (n\u00E3o @onsite/logger)"],
+          ["Operator", "\u2716", "\u2716", "Sem logging"],
+          ["Field", "\u2716", "\u2716", "Sem logging"],
+          ["Inspect", "\u2716", "\u2716", "Sem logging"],
+        ]
+      )}
+    </div>);
+    if (k === "observability/monitoring") return (<div>
+      {sub("SENTRY")}
+      {sl([
+        { s: "ok", t: "Timekeeper: Sentry ativo", d: "DSN configurado em app.json. Captura crashes, erros JS, e performance." },
+        { s: "error", t: "7 apps sem Sentry", d: "Monitor, Analytics, Dashboard, Auth, Operator, Field, Inspect, Calculator \u2014 sem error tracking." },
+      ])}
+      {sub("HEALTH CHECKS")}
+      {sl([
+        { s: "error", t: "0 endpoints /health", d: "Nenhum app exp\u00F5e /health ou /ready. Imposs\u00EDvel monitorar uptime externamente." },
+        { s: "error", t: "Sem uptime monitoring", d: "Nenhum servi\u00E7o (UptimeRobot, Checkly, etc.) monitorando os apps." },
+      ])}
+      {sub("APM & ALERTING")}
+      {sl([
+        { s: "error", t: "Sem APM", d: "Nenhum Application Performance Monitoring. Sem m\u00E9tricas de lat\u00EAncia, throughput, error rate." },
+        { s: "error", t: "Sem alerting", d: "Nenhum sistema de alertas. Erros s\u00E3o descobertos manualmente." },
+      ])}
+    </div>);
+    if (k === "observability/gaps") return (<div>
+      {sl([
+        { s: "error", t: "3 Expo apps sem logging", d: "Operator, Field, Inspect n\u00E3o t\u00EAm @onsite/logger integrado. Debugging \u00E9 cego." },
+        { s: "error", t: "7 apps sem Sentry", d: "Apenas Timekeeper tem error tracking. Crashes nos outros apps passam despercebidos." },
+        { s: "error", t: "0 health endpoints", d: "Nenhum /health. Imposs\u00EDvel integrar com load balancer ou monitoring." },
+        { s: "warn", t: "Sem remote log sink", d: "Logs ficam apenas no device/server. Sem agrega\u00E7\u00E3o centralizada (Loki, DataDog)." },
+        { s: "warn", t: "Calculator com logger custom", d: "Usa logger pr\u00F3prio, n\u00E3o @onsite/logger. Sem consist\u00EAncia de formato." },
+        { s: "info", t: "Sem structured metrics", d: "Nenhum contador/histogram exposto. Sem dashboards de runtime." },
+      ])}
+    </div>);
+
+    return <p style={{ color: C.textMuted }}>Se\u00E7\u00E3o n\u00E3o encontrada</p>;
+  })();
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(6px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: C.bgCard, borderRadius: 16, width: 1100, maxWidth: "96vw", height: 720, maxHeight: "92vh", boxShadow: "0 32px 100px rgba(0,0,0,0.25)", border: `1px solid ${C.border}`, display: "flex", overflow: "hidden" }}>
+
+        {/* Sidebar */}
+        <div style={{ width: 220, background: C.bg, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+          <div style={{ padding: "28px 24px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <span style={{ fontSize: 24 }}>{tab.icon}</span>
+              <span style={{ fontWeight: 800, fontSize: 18, fontFamily: fnt, color: C.text }}>{tab.name}</span>
+            </div>
+            <p style={{ color: C.textMuted, fontSize: 11, fontFamily: fnt, margin: 0, lineHeight: 1.5 }}>{tab.summary}</p>
+          </div>
+          <div style={{ flex: 1, padding: "0 12px" }}>
+            {tab.menu.map(item => {
+              const active = section === item.id;
+              return (
+                <button key={item.id} onClick={() => setSection(item.id)} style={{
+                  display: "block", width: "100%", textAlign: "left",
+                  padding: "12px 14px", marginBottom: 2, border: "none", cursor: "pointer",
+                  background: active ? `${tab.color}0C` : "transparent", borderRadius: 8, transition: "all 0.15s",
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: active ? 700 : 500, fontFamily: fnt, color: active ? tab.color : C.textSec }}>{item.l}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 28px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, fontFamily: fnt, color: C.text }}>{tab.menu.find(m => m.id === section)?.l || tab.name}</h2>
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.textMuted }}>{tab.name} \u2014 investiga\u00E7\u00E3o real do monorepo</p>
+            </div>
+            <button onClick={onClose} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 18, color: C.textMuted, flexShrink: 0 }}>{"\u2715"}</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+            {content}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ SUPABASE EXPLORER ═══ */
+
+function SupabaseExplorer({ schemaData }) {
+  const sd = schemaData || SCHEMA_DATA;
+  const [search, setSearch] = useState("");
+  const [openGroups, setOpenGroups] = useState({ "core_": true });
+  const [openTable, setOpenTable] = useState(null);
+
+  const totalTables = sd.reduce((s, g) => s + g.t.length, 0);
+  const totalAlerts = sd.reduce((s, g) => s + g.t.filter(t => t[4]).length, 0);
+
+  const filtered = search
+    ? sd.map(g => ({ ...g, t: g.t.filter(t => t[0].includes(search.toLowerCase()) || t[3].toLowerCase().includes(search.toLowerCase())) })).filter(g => g.t.length > 0)
+    : sd;
+
+  const alertColor = (a) => a === "RLS OFF" || a === "ANON CRUD" ? C.red : C.amber;
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 5, background: C.supabase, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", fontWeight: 800 }}>⚡</div>
+          <span style={{ fontWeight: 800, fontSize: 15, fontFamily: fnt, color: C.supabase }}>SUPABASE EXPLORER</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10, fontFamily: fnt, color: C.textMuted }}>{totalTables} tables</span>
+          <span style={{ fontSize: 10, fontFamily: fnt, color: C.textMuted }}>130+ RLS policies</span>
+          <span style={{ fontSize: 10, fontFamily: fnt, color: C.textMuted }}>120+ FKs</span>
+          {totalAlerts > 0 && <span style={{ fontSize: 10, fontFamily: fnt, color: C.red, fontWeight: 700 }}>{totalAlerts} alertas</span>}
+        </div>
+      </div>
+
+      {/* Search */}
+      <div style={{ marginBottom: 14, maxWidth: 500, margin: "0 auto 14px" }}>
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder={"Buscar tabela ou descri\u00E7\u00E3o..."}
+          style={{
+            width: "100%", padding: "10px 14px", borderRadius: 8, border: `1.5px solid ${C.border}`,
+            fontFamily: fnt, fontSize: 12, background: C.bgCard, color: C.text, outline: "none",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
+      {/* Groups */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {filtered.map(group => {
+          const isOpen = openGroups[group.p] || search.length > 0;
+          const groupAlerts = group.t.filter(t => t[4]).length;
+          return (
+            <div key={group.p} style={{ background: C.bgCard, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+              {/* Group header */}
+              <div
+                onClick={() => setOpenGroups(prev => ({ ...prev, [group.p]: !prev[group.p] }))}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer",
+                  borderBottom: isOpen ? `1px solid ${C.border}` : "none",
+                  background: isOpen ? `${group.cl}06` : "transparent",
+                }}
+              >
+                <span style={{ fontSize: 10, color: C.textMuted, fontFamily: fnt, width: 12 }}>{isOpen ? "▼" : "▶"}</span>
+                <code style={{ color: group.cl, fontWeight: 800, fontSize: 12, fontFamily: fnt, minWidth: 44 }}>{group.p}</code>
+                <span style={{ fontWeight: 700, fontSize: 12, fontFamily: fnt, color: C.text, flex: 1 }}>{group.l}</span>
+                <span style={{ fontSize: 10, fontFamily: fnt, color: C.textMuted }}>{group.t.length} tabelas</span>
+                {groupAlerts > 0 && <span style={{ fontSize: 9, fontWeight: 700, fontFamily: fnt, color: C.red, background: `${C.red}10`, borderRadius: 3, padding: "1px 6px" }}>{groupAlerts} alertas</span>}
+              </div>
+
+              {/* Tables */}
+              {isOpen && (
+                <div style={{ padding: "4px 8px 8px" }}>
+                  {group.t.map(t => {
+                    const [name, cols, rows, desc, alert] = t;
+                    const isExp = openTable === name;
+                    return (
+                      <div key={name} style={{ marginBottom: 3 }}>
+                        <div
+                          onClick={() => setOpenTable(isExp ? null : name)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+                            borderRadius: 6, cursor: "pointer",
+                            background: isExp ? `${group.cl}08` : "transparent",
+                            border: isExp ? `1px solid ${group.cl}20` : "1px solid transparent",
+                          }}
+                        >
+                          <code style={{ fontFamily: fnt, fontSize: 11, fontWeight: 600, color: C.text, minWidth: 190 }}>{name}</code>
+                          <span style={{ fontSize: 9, fontFamily: fnt, color: C.textMuted, minWidth: 55 }}>{cols} cols</span>
+                          <span style={{ fontSize: 9, fontFamily: fnt, color: rows > 0 ? C.green : C.textMuted, minWidth: 50 }}>{rows} rows</span>
+                          {alert && (
+                            <span style={{ fontSize: 8, fontWeight: 800, fontFamily: fnt, color: alertColor(alert), background: `${alertColor(alert)}12`, borderRadius: 3, padding: "1px 6px", whiteSpace: "nowrap" }}>{alert}</span>
+                          )}
+                        </div>
+                        {isExp && (
+                          <div style={{ padding: "6px 10px 10px 22px" }}>
+                            <p style={{ color: C.textSec, fontSize: 12, lineHeight: 1.6, margin: "0 0 6px" }}>{desc}</p>
+                            {alert && (
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${alertColor(alert)}08`, border: `1px solid ${alertColor(alert)}20`, borderRadius: 5, padding: "4px 10px", marginTop: 2 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: alertColor(alert), fontFamily: fnt }}>
+                                  {alert === "RLS OFF" ? "⛔ RLS DESABILITADO — qualquer user autenticado acessa tudo" :
+                                   alert === "ANON CRUD" ? "⚠ ANON com CRUD completo — anônimos podem ler/escrever" :
+                                   "⚠ USING(true) — sem filtro real de dados"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p style={{ textAlign: "center", color: C.textMuted, fontSize: 9, fontFamily: fnt, marginTop: 14, fontStyle: "italic" }}>
+        {totalTables} tabelas em {sd.length} grupos · Clique nos grupos para expandir
+      </p>
+    </div>
+  );
+}
+
+/* ═══ VISÃO 2037 TAB ═══ */
+
+function VisaoTab() {
+  const section = (title, color, children) => (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div style={{ width: 3, height: 20, borderRadius: 2, background: color }} />
+        <span style={{ fontWeight: 800, fontSize: 14, fontFamily: fnt, color: C.text }}>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+
+  const roadmapItem = (year, title, desc, color, done) => (
+    <div key={year} style={{ display: "flex", gap: 14, marginBottom: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", background: done ? color : `${color}20`, border: `2px solid ${color}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {done && <span style={{ color: "#fff", fontSize: 12, fontWeight: 800 }}>✓</span>}
+        </div>
+        <div style={{ width: 2, flex: 1, background: `${color}30`, marginTop: 4 }} />
+      </div>
+      <div style={{ paddingBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+          <span style={{ fontWeight: 800, fontSize: 13, fontFamily: fnt, color }}>{year}</span>
+          <span style={{ fontWeight: 700, fontSize: 13, fontFamily: fnt, color: C.text }}>{title}</span>
+        </div>
+        <p style={{ color: C.textSec, fontSize: 12, lineHeight: 1.6, margin: 0 }}>{desc}</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {section("A Oportunidade", C.amber, (
+        <div style={{ background: C.bgCard, borderRadius: 10, border: `1px solid ${C.border}`, padding: 20 }}>
+          <p style={{ color: C.textSec, fontSize: 14, lineHeight: 1.8, margin: 0 }}>
+            {"A ind\u00FAstria de constru\u00E7\u00E3o canadense \u00E9 "}
+            <strong>um dos setores mais fragmentados e manuais</strong>
+            {" da economia. Supervisores usam Excel, WhatsApp e pranchetas para controlar obras de milh\u00F5es de d\u00F3lares. N\u00E3o existe plataforma integrada que conecte todos os atores."}
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginTop: 16 }}>
+            {[
+              ["CA$171B", "Indústria/ano", "PIB construção no Canadá"],
+              ["1.5M", "Trabalhadores", "Sem ferramentas digitais"],
+              ["~0%", "Digitalização", "Setor mais atrasado vs tech"],
+            ].map(([v, l, d]) => (
+              <div key={l} style={{ background: C.bg, borderRadius: 8, padding: 12, textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: fnt, color: C.amber }}>{v}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, fontFamily: fnt, color: C.text, marginTop: 2 }}>{l}</div>
+                <div style={{ fontSize: 9, color: C.textMuted, marginTop: 2 }}>{d}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {section("Arquitetura Ampulheta", C.purple, (
+        <div style={{ background: C.bgCard, borderRadius: 10, border: `1px solid ${C.border}`, padding: 20, textAlign: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{ background: `${C.blue}10`, borderRadius: 8, padding: "8px 24px", border: `1px solid ${C.blue}20` }}>
+              <span style={{ fontWeight: 800, fontSize: 11, fontFamily: fnt, color: C.blue }}>COLETA</span>
+              <div style={{ fontSize: 9, color: C.textMuted, marginTop: 2 }}>12 apps especializados capturando dados reais</div>
+            </div>
+            <svg width="40" height="24" viewBox="0 0 40 24"><path d="M10 2 L20 20 L30 2" stroke={C.purple} strokeWidth="2" fill="none" strokeLinecap="round" /></svg>
+            <div style={{ background: `${C.supabase}10`, borderRadius: 8, padding: "8px 24px", border: `1px solid ${C.supabase}20` }}>
+              <span style={{ fontWeight: 800, fontSize: 11, fontFamily: fnt, color: C.supabase }}>CENTRALIZAÇÃO</span>
+              <div style={{ fontSize: 9, color: C.textMuted, marginTop: 2 }}>Supabase unificado · PostgreSQL + RLS + Auth</div>
+            </div>
+            <svg width="40" height="24" viewBox="0 0 40 24"><path d="M15 4 L20 20 L25 4" stroke={C.purple} strokeWidth="2" fill="none" strokeLinecap="round" /></svg>
+            <div style={{ background: `${C.purple}10`, borderRadius: 8, padding: "8px 24px", border: `1px solid ${C.purple}20` }}>
+              <span style={{ fontWeight: 800, fontSize: 11, fontFamily: fnt, color: C.purple }}>INTELIGÊNCIA</span>
+              <div style={{ fontSize: 9, color: C.textMuted, marginTop: 2 }}>Prumo AI · Analytics · Marketplace de dados</div>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {section("Roadmap 2024–2037", C.green, (
+        <div style={{ background: C.bgCard, borderRadius: 10, border: `1px solid ${C.border}`, padding: 20 }}>
+          {[
+            ["2024", "Primeiros apps", "Calculator (voz) + Timekeeper (GPS). Primeiros dados reais.", C.green, true],
+            ["2025", "Eagle Ecosystem", "Monitor, Operator, Field, Inspect. Visual inspection + AI.", C.green, true],
+            ["2026", "Plataforma completa", "Analytics, Sheets, Payments, Club. Billing + gamificação.", C.blue, false],
+            ["2027", "Prumo AI v1", "Modelo treinado com 2+ anos de dados reais. Computer Vision + NLP.", C.purple, false],
+            ["2028–30", "Robot pilot", "Kepler K2 com Prumo. Robô + humano no canteiro.", C.amber, false],
+            ["2031–37", "Scale & License", "Marketplace de dados, White Label, expansão internacional.", C.dark, false],
+          ].map(([y, t, d, c, done]) => roadmapItem(y, t, d, c, done))}
+        </div>
+      ))}
+
+      {section("Data Moat", C.dark, (
+        <div style={{ background: C.bgCard, borderRadius: 10, border: `1px solid ${C.border}`, padding: 20 }}>
+          <p style={{ color: C.textSec, fontSize: 13, lineHeight: 1.7, margin: "0 0 14px" }}>
+            {"Cada dia de uso dos apps gera dados que alimentam a IA. Quanto mais dados, melhor a IA. Melhor a IA, mais usu\u00E1rios. Mais usu\u00E1rios, mais dados. "}
+            <strong>Esse ciclo é impossível de copiar.</strong>
+          </p>
+          <div style={{ display: "flex", justifyContent: "center", gap: 4, flexWrap: "wrap" }}>
+            {["Dados reais", "Network effect", "Integração vertical", "Conhecimento de domínio", "Vantagem de tempo"].map(t => (
+              <span key={t} style={{ background: `${C.dark}08`, border: `1px solid ${C.dark}15`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 600, fontFamily: fnt, color: C.dark }}>{t}</span>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {section("Kepler K2 — Robótica", C.amber, (
+        <div style={{ background: C.bgCard, borderRadius: 10, border: `1px solid ${C.border}`, padding: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <p style={{ color: C.textSec, fontSize: 13, lineHeight: 1.7, margin: "0 0 12px" }}>
+                {"Em 10 anos, rob\u00F4s humanoides + humanos ser\u00E3o mais baratos que prefab para constru\u00E7\u00E3o residencial. O Prumo AI d\u00E1 o \u201Colho treinado\u201D de um carpinteiro ao rob\u00F4."}
+              </p>
+              <div style={{ fontSize: 10, fontWeight: 700, fontFamily: fnt, color: C.textMuted, letterSpacing: 1, marginBottom: 6 }}>SPECS KEPLER K2</div>
+              {[
+                ["Preço", "~CA$45k"],
+                ["Altura/Peso", "178cm / 85kg"],
+                ["Payload", "30kg por braço"],
+                ["Bateria", "8h operacional"],
+                ["Mãos", "12 DoF — destreza fina"],
+                ["SDK", "Aberto — custom .onnx models"],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: "flex", gap: 8, marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fnt, color: C.text, minWidth: 80 }}>{k}</span>
+                  <span style={{ fontSize: 11, color: C.textSec }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: `linear-gradient(135deg, ${C.amber}10, ${C.amber}05)`, borderRadius: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: `1px solid ${C.amber}20`, padding: 20 }}>
+              <div style={{ width: 60, height: 60, borderRadius: 16, background: `${C.amber}15`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 32 }}>🤖</span>
+              </div>
+              <span style={{ fontWeight: 800, fontSize: 14, fontFamily: fnt, color: C.amberDark }}>Kepler K2</span>
+              <span style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>"Bumblebee" · Produção em massa 2025</span>
+              <span style={{ fontSize: 9, color: C.textMuted, marginTop: 6, textAlign: "center", lineHeight: 1.5 }}>Open SDK = Android da robótica<br/>vs Tesla Optimus (fechado)</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ═══ PORTAL: DOC BROWSER ═══ */
+
+function DocBrowser() {
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [openCat, setOpenCat] = useState({});
+
+  useEffect(() => {
+    fetch("/api/docs").then(r => r.json()).then(d => { setDocs(d.data || []); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  const categories = {};
+  for (const doc of docs) {
+    const cat = doc.category || "other";
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push(doc);
+  }
+
+  const catMeta = {
+    root: { label: "📋 Root", color: C.amber },
+    intelligence: { label: "🧠 Intelligence", color: C.purple },
+    "per-app": { label: "📱 Per-App", color: C.blue },
+    "per-package": { label: "📦 Per-Package", color: C.teal },
+    memory: { label: "🏗️ Memory", color: C.cyan },
+    other: { label: "📄 Outros", color: C.textMuted },
+  };
+
+  const freshColor = (mod) => {
+    if (!mod) return C.textMuted;
+    const days = Math.floor((Date.now() - new Date(mod).getTime()) / 86400000);
+    if (days <= 7) return C.green;
+    if (days <= 30) return C.amber;
+    return C.red;
+  };
+
+  const freshLabel = (mod) => {
+    if (!mod) return "?";
+    const days = Math.floor((Date.now() - new Date(mod).getTime()) / 86400000);
+    return `${days}d`;
+  };
+
+  const filtered = search
+    ? docs.filter(d => d.relativePath.toLowerCase().includes(search.toLowerCase()) || (d.title || "").toLowerCase().includes(search.toLowerCase()))
+    : docs;
+
+  const filteredCats = {};
+  for (const doc of filtered) {
+    const cat = doc.category || "other";
+    if (!filteredCats[cat]) filteredCats[cat] = [];
+    filteredCats[cat].push(doc);
+  }
+
+  const totalLines = docs.reduce((s, d) => s + (d.lineCount || 0), 0);
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ textAlign: "center", marginBottom: 12 }}>
+        <span style={{ fontWeight: 800, fontSize: 14, fontFamily: fnt, color: C.teal }}>DOCUMENTAÇÃO DO ECOSSISTEMA</span>
+        <div style={{ color: C.textMuted, fontSize: 10, fontFamily: fnt, marginTop: 3 }}>
+          {loading ? "Carregando..." : `${docs.length} docs · ${totalLines.toLocaleString()} linhas`}
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 600, margin: "0 auto 12px" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome ou título..."
+          style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bgCard, fontSize: 12, fontFamily: fnt, color: C.text, outline: "none", boxSizing: "border-box" }} />
+      </div>
+
+      {!loading && Object.entries(filteredCats).sort(([a], [b]) => {
+        const order = ["root", "intelligence", "per-app", "per-package", "memory", "other"];
+        return order.indexOf(a) - order.indexOf(b);
+      }).map(([cat, catDocs]) => {
+        const meta = catMeta[cat] || catMeta.other;
+        const isOpen = openCat[cat] !== false;
+        return (
+          <div key={cat} style={{ maxWidth: 600, margin: "0 auto 8px" }}>
+            <button onClick={() => setOpenCat(p => ({ ...p, [cat]: !isOpen }))} style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "8px 12px", background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 6,
+              cursor: "pointer", textAlign: "left",
+            }}>
+              <span style={{ fontWeight: 700, fontSize: 12, fontFamily: fnt, color: meta.color }}>{meta.label} ({catDocs.length})</span>
+              <span style={{ fontSize: 10, color: C.textMuted }}>{isOpen ? "▼" : "▶"}</span>
+            </button>
+            {isOpen && (
+              <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
+                {catDocs.sort((a, b) => (b.lineCount || 0) - (a.lineCount || 0)).map(doc => (
+                  <div key={doc.relativePath} style={{
+                    padding: "6px 12px", background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 4,
+                    borderLeft: `3px solid ${freshColor(doc.modifiedAt)}`,
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 600, fontSize: 11, fontFamily: fnt, color: C.text }}>{doc.relativePath}</span>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span style={{ fontSize: 9, fontFamily: fnt, color: C.textMuted }}>{doc.lineCount || 0} linhas</span>
+                        <span style={{ fontSize: 9, fontFamily: fnt, color: freshColor(doc.modifiedAt), fontWeight: 700 }}>{freshLabel(doc.modifiedAt)}</span>
+                      </div>
+                    </div>
+                    {doc.title && <div style={{ fontSize: 10, color: C.textSec, marginTop: 2 }}>{doc.title}</div>}
+                    {doc.headings && doc.headings.length > 0 && (
+                      <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {doc.headings.slice(0, 6).map((h, i) => (
+                          <span key={i} style={{ fontSize: 8, fontFamily: fnt, color: C.textMuted, background: `${C.teal}08`, border: `1px solid ${C.teal}20`, borderRadius: 3, padding: "1px 5px" }}>{h}</span>
+                        ))}
+                        {doc.headings.length > 6 && <span style={{ fontSize: 8, color: C.textMuted }}>+{doc.headings.length - 6}</span>}
+                      </div>
+                    )}
+                    {doc.tableRefs && doc.tableRefs.length > 0 && (
+                      <div style={{ marginTop: 3, fontSize: 8, fontFamily: fnt, color: C.supabase }}>
+                        DB refs: {doc.tableRefs.slice(0, 5).join(", ")}{doc.tableRefs.length > 5 ? ` +${doc.tableRefs.length - 5}` : ""}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══ PORTAL: DEPS MATRIX ═══ */
+
+function DepsMatrix() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/deps").then(r => r.json()).then(d => { setData(d.data || d); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: C.textMuted, fontSize: 12, fontFamily: fnt }}>Carregando...</div>;
+  if (!data) return <div style={{ textAlign: "center", padding: 40, color: C.red, fontSize: 12, fontFamily: fnt }}>Erro ao carregar dados</div>;
+
+  const apps = data.nodes?.filter(n => n.type === "app") || [];
+  const pkgs = data.nodes?.filter(n => n.type === "package") || [];
+  const edges = data.edges || [];
+  const orphans = data.orphans || [];
+  const hubs = data.hubs || [];
+
+  const edgeSet = new Set(edges.map(e => `${e.from}→${e.to}`));
+  const runtimeColors = { nextjs: C.blue, expo: C.green, capacitor: C.indigo, unknown: C.textMuted };
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ textAlign: "center", marginBottom: 12 }}>
+        <span style={{ fontWeight: 800, fontSize: 14, fontFamily: fnt, color: C.teal }}>GRAFO DE DEPENDÊNCIAS</span>
+        <div style={{ color: C.textMuted, fontSize: 10, fontFamily: fnt, marginTop: 3 }}>
+          {apps.length} apps · {pkgs.length} pkgs · {edges.length} edges
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+        {[["Next.js", C.blue], ["Expo", C.green], ["Capacitor", C.indigo]].map(([label, color]) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+            <span style={{ fontSize: 9, fontFamily: fnt, color: C.textMuted }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Matrix */}
+      <div style={{ overflowX: "auto", maxWidth: "100%" }}>
+        <table style={{ borderCollapse: "collapse", margin: "0 auto", fontSize: 9, fontFamily: fnt }}>
+          <thead>
+            <tr>
+              <th style={{ padding: "4px 8px", borderBottom: `2px solid ${C.border}`, textAlign: "left", color: C.textMuted, fontSize: 8 }}>App / Pkg →</th>
+              {pkgs.map(p => (
+                <th key={p.name} style={{
+                  padding: "4px 4px", borderBottom: `2px solid ${C.border}`, textAlign: "center",
+                  color: orphans.includes(p.name.replace("@onsite/", "")) ? C.red : hubs.some(h => h.name === p.name.replace("@onsite/", "")) ? C.amber : C.textMuted,
+                  fontWeight: orphans.includes(p.name.replace("@onsite/", "")) ? 800 : 600,
+                  fontSize: 8, writingMode: "vertical-rl", height: 70, maxWidth: 20,
+                }}>
+                  {p.name.replace("@onsite/", "")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {apps.map(app => {
+              const rc = runtimeColors[app.runtime] || runtimeColors.unknown;
+              return (
+                <tr key={app.name}>
+                  <td style={{ padding: "4px 8px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, color: rc, whiteSpace: "nowrap" }}>
+                    {app.name.replace("@onsite/", "")}
+                  </td>
+                  {pkgs.map(p => {
+                    const has = edgeSet.has(`${app.name}→${p.name}`);
+                    return (
+                      <td key={p.name} style={{
+                        padding: "4px 4px", borderBottom: `1px solid ${C.border}`, textAlign: "center",
+                        background: has ? `${rc}08` : "transparent",
+                      }}>
+                        {has ? <span style={{ color: rc, fontWeight: 800 }}>✓</span> : <span style={{ color: `${C.border}` }}>·</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Orphans + Hubs */}
+      <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 16, flexWrap: "wrap" }}>
+        {orphans.length > 0 && (
+          <div style={{ background: `${C.red}08`, border: `1px solid ${C.red}30`, borderRadius: 6, padding: "8px 14px" }}>
+            <div style={{ fontWeight: 700, fontSize: 10, fontFamily: fnt, color: C.red, marginBottom: 4 }}>🔴 Órfãos ({orphans.length})</div>
+            {orphans.map(o => <div key={o} style={{ fontSize: 9, color: C.textSec }}>@onsite/{o}</div>)}
+          </div>
+        )}
+        {hubs.length > 0 && (
+          <div style={{ background: `${C.amber}08`, border: `1px solid ${C.amber}30`, borderRadius: 6, padding: "8px 14px" }}>
+            <div style={{ fontWeight: 700, fontSize: 10, fontFamily: fnt, color: C.amberDark, marginBottom: 4 }}>⚠️ Hubs ({hubs.length})</div>
+            {hubs.map(h => <div key={h.name} style={{ fontSize: 9, color: C.textSec }}>@onsite/{h.name} ({h.consumers} apps)</div>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══ PORTAL: MIGRATION TIMELINE ═══ */
+
+function MigrationTimeline() {
+  const [migrations, setMigrations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/migrations").then(r => r.json()).then(d => { setMigrations(d.data || []); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: C.textMuted, fontSize: 12, fontFamily: fnt }}>Carregando...</div>;
+
+  const totalCreate = migrations.reduce((s, m) => s + (m.statements?.create_table || 0), 0);
+  const totalPolicy = migrations.reduce((s, m) => s + (m.statements?.create_policy || 0), 0);
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ textAlign: "center", marginBottom: 12 }}>
+        <span style={{ fontWeight: 800, fontSize: 14, fontFamily: fnt, color: C.teal }}>TIMELINE DE MIGRATIONS</span>
+        <div style={{ color: C.textMuted, fontSize: 10, fontFamily: fnt, marginTop: 3 }}>
+          {migrations.length} migrations · {totalCreate} CREATE TABLE · {totalPolicy} CREATE POLICY
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 600, margin: "0 auto" }}>
+        {migrations.slice().reverse().map((m, i) => {
+          const st = m.statements || {};
+          const total = Object.values(st).reduce((a, b) => a + b, 0);
+          return (
+            <div key={m.name} style={{ display: "flex", gap: 12, marginBottom: 2 }}>
+              {/* Timeline dot + line */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 20, flexShrink: 0 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: total > 10 ? C.teal : C.border, border: `2px solid ${C.bgCard}`, boxShadow: `0 0 0 1px ${total > 10 ? C.teal : C.border}` }} />
+                {i < migrations.length - 1 && <div style={{ width: 2, flex: 1, background: C.border, minHeight: 20 }} />}
+              </div>
+              {/* Content */}
+              <div style={{ flex: 1, paddingBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontWeight: 700, fontSize: 11, fontFamily: fnt, color: C.text }}>{m.name}</span>
+                  {m.date && <span style={{ fontSize: 9, fontFamily: fnt, color: C.textMuted }}>{m.date}</span>}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                  {st.create_table > 0 && <span style={{ fontSize: 8, fontFamily: fnt, color: C.green, background: `${C.green}10`, border: `1px solid ${C.green}25`, borderRadius: 3, padding: "1px 6px" }}>{st.create_table} CREATE TABLE</span>}
+                  {st.alter_table > 0 && <span style={{ fontSize: 8, fontFamily: fnt, color: C.blue, background: `${C.blue}10`, border: `1px solid ${C.blue}25`, borderRadius: 3, padding: "1px 6px" }}>{st.alter_table} ALTER</span>}
+                  {st.create_policy > 0 && <span style={{ fontSize: 8, fontFamily: fnt, color: C.purple, background: `${C.purple}10`, border: `1px solid ${C.purple}25`, borderRadius: 3, padding: "1px 6px" }}>{st.create_policy} POLICY</span>}
+                  {st.create_function > 0 && <span style={{ fontSize: 8, fontFamily: fnt, color: C.cyan, background: `${C.cyan}10`, border: `1px solid ${C.cyan}25`, borderRadius: 3, padding: "1px 6px" }}>{st.create_function} FUNCTION</span>}
+                  {st.create_view > 0 && <span style={{ fontSize: 8, fontFamily: fnt, color: C.indigo, background: `${C.indigo}10`, border: `1px solid ${C.indigo}25`, borderRadius: 3, padding: "1px 6px" }}>{st.create_view} VIEW</span>}
+                  {st.create_index > 0 && <span style={{ fontSize: 8, fontFamily: fnt, color: C.amberDark, background: `${C.amber}10`, border: `1px solid ${C.amber}25`, borderRadius: 3, padding: "1px 6px" }}>{st.create_index} INDEX</span>}
+                  {st.drop > 0 && <span style={{ fontSize: 8, fontFamily: fnt, color: C.red, background: `${C.red}10`, border: `1px solid ${C.red}25`, borderRadius: 3, padding: "1px 6px" }}>{st.drop} DROP</span>}
+                </div>
+                {m.tables_created && m.tables_created.length > 0 && (
+                  <div style={{ fontSize: 8, fontFamily: fnt, color: C.textMuted, marginTop: 3 }}>
+                    Tabelas: {m.tables_created.slice(0, 5).join(", ")}{m.tables_created.length > 5 ? ` +${m.tables_created.length - 5}` : ""}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══ PORTAL: HEALTH CHECKS ═══ */
+
+function HealthChecks() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/health").then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: C.textMuted, fontSize: 12, fontFamily: fnt }}>Carregando...</div>;
+  if (!data) return <div style={{ textAlign: "center", padding: 40, color: C.red, fontSize: 12, fontFamily: fnt }}>Erro ao carregar dados</div>;
+
+  const findings = data.findings || [];
+  const summary = data.summary || {};
+
+  const sevColor = { critical: C.red, warning: C.amber, info: C.blue };
+  const sevIcon = { critical: "🔴", warning: "⚠️", info: "ℹ️" };
+  const sevLabel = { critical: "CRÍTICO", warning: "AVISO", info: "INFO" };
+
+  const grouped = {};
+  for (const f of findings) {
+    if (!grouped[f.severity]) grouped[f.severity] = [];
+    grouped[f.severity].push(f);
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ textAlign: "center", marginBottom: 12 }}>
+        <span style={{ fontWeight: 800, fontSize: 14, fontFamily: fnt, color: C.teal }}>SAÚDE DO SISTEMA</span>
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 6 }}>
+          {summary.critical > 0 && <span style={{ fontSize: 10, fontFamily: fnt, color: C.red, fontWeight: 700 }}>{summary.critical} críticos</span>}
+          {summary.warning > 0 && <span style={{ fontSize: 10, fontFamily: fnt, color: C.amberDark, fontWeight: 700 }}>{summary.warning} avisos</span>}
+          {summary.info > 0 && <span style={{ fontSize: 10, fontFamily: fnt, color: C.blue }}>{summary.info} info</span>}
+          {findings.length === 0 && <span style={{ fontSize: 10, fontFamily: fnt, color: C.green, fontWeight: 700 }}>✅ Tudo limpo!</span>}
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 600, margin: "0 auto" }}>
+        {["critical", "warning", "info"].map(sev => {
+          const items = grouped[sev];
+          if (!items || items.length === 0) return null;
+          return (
+            <div key={sev} style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 800, fontSize: 11, fontFamily: fnt, color: sevColor[sev], marginBottom: 6 }}>
+                {sevIcon[sev]} {sevLabel[sev]} ({items.length})
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {items.map((f, i) => (
+                  <div key={i} style={{
+                    padding: "10px 14px", background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 6,
+                    borderLeft: `3px solid ${sevColor[sev]}`,
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 11, fontFamily: fnt, color: C.text }}>{f.title}</div>
+                    <div style={{ fontSize: 10, color: C.textSec, marginTop: 3, lineHeight: 1.5 }}>{f.description}</div>
+                    <div style={{ fontSize: 9, fontFamily: fnt, color: C.teal, marginTop: 4, fontStyle: "italic" }}>💡 {f.suggestion}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ═══ MAIN PAGE ═══ */
 
 export default function App() {
   const [modalPkg, setModalPkg] = useState(null);
   const [appModal, setAppModal] = useState(null);
-  const [dbModal, setDbModal] = useState(false);
+  const [techModal, setTechModal] = useState(null);
+  const [techSection, setTechSection] = useState("overview");
+  const [mode, setMode] = useState("pitch");
+  const [pitchTab, setPitchTab] = useState("eco");
+  const [engTab, setEngTab] = useState("arch");
+  const [portalTab, setPortalTab] = useState("docs");
+
+  // Live data from APIs (overlays hardcoded defaults)
+  const [liveApps, setLiveApps] = useState(null);
+  const [livePkgs, setLivePkgs] = useState(null);
+  const [liveSchema, setLiveSchema] = useState(null);
+  const [dataSource, setDataSource] = useState("static");
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/apps").then(r => r.json()).catch(() => null),
+      fetch("/api/packages").then(r => r.json()).catch(() => null),
+      fetch("/api/schema").then(r => r.json()).catch(() => null),
+    ]).then(([apps, pkgs, schema]) => {
+      if (apps?.data) setLiveApps(apps.data);
+      if (pkgs?.data) setLivePkgs(pkgs.data);
+      if (schema?.groups) setLiveSchema(schema);
+      const src = schema?.source === "live" ? "live" : (apps?.data || pkgs?.data) ? "snapshot" : "static";
+      setDataSource(src);
+    });
+  }, []);
+
+  // Merged data: real facts + rich descriptions
+  const rows = liveApps ? mergeRows(ROWS, liveApps) : ROWS;
+  const pkgs = livePkgs ? mergePkgs(PKGS, livePkgs) : PKGS;
+  const schema = liveSchema?.groups ? mergeSchema(SCHEMA_DATA, liveSchema) : SCHEMA_DATA;
 
   const hlPkgs = appModal?.deps || null;
-  const rowCount = ROWS.length;
+  const rowCount = rows.length;
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Segoe UI', -apple-system, sans-serif", padding: "20px 16px", maxWidth: 800, margin: "0 auto" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
-      <PkgModal pkg={modalPkg} onClose={() => setModalPkg(null)} />
+      <PkgModal pkg={modalPkg} onClose={() => setModalPkg(null)} allRows={rows} />
       <AppModal app={appModal} onClose={() => setAppModal(null)} />
+      <TechModal tab={techModal} section={techSection} setSection={setTechSection} onClose={() => { setTechModal(null); setTechSection("overview"); }} />
 
       {/* ═══ HEADER ═══ */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
@@ -486,43 +1747,88 @@ export default function App() {
           <span style={{ fontSize: 13 }}>{"\uD83E\uDD85"}</span>
           <span style={{ color: C.amberDark, fontWeight: 800, fontSize: 13, fontFamily: fnt }}>EAGLE MONOREPO</span>
         </div>
-        <p style={{ color: C.textMuted, fontSize: 10, fontFamily: fnt, margin: "6px 0 0" }}>Turborepo \u00B7 Node \u226520 \u00B7 TS 5.x \u00B7 11 apps + 1 planejado \u00B7 17 packages</p>
+        <p style={{ color: C.textMuted, fontSize: 10, fontFamily: fnt, margin: "6px 0 0" }}>
+          Turborepo · Node ≥20 · TS 5.x · {rows.flatMap(r => r.apps).length} apps · {pkgs.length} packages
+        </p>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 4 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: dataSource === "live" ? C.green : dataSource === "snapshot" ? C.amber : C.red }} />
+          <span style={{ fontSize: 9, fontFamily: fnt, color: C.textMuted }}>
+            {dataSource === "live" ? "Dados Live (Supabase)" : dataSource === "snapshot" ? "Snapshot (filesystem)" : "Estático (hardcoded)"}
+          </span>
+        </div>
+
+        {/* Mode Toggle */}
+        <div style={{ display: "flex", gap: 0, marginTop: 12, background: C.bgCard, borderRadius: 8, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+          {[
+            { id: "pitch", label: "💼 Pitch", desc: "Investidores" },
+            { id: "eng", label: "⚙️ Engenharia", desc: "Devs & CTOs" },
+            { id: "portal", label: "🔍 Portal", desc: "Interno" },
+          ].map(m => (
+            <button key={m.id} onClick={() => setMode(m.id)} style={{
+              padding: "8px 20px", border: "none", cursor: "pointer",
+              background: mode === m.id ? C.amberBg : "transparent",
+              borderBottom: mode === m.id ? `2px solid ${C.amber}` : "2px solid transparent",
+              transition: "all 0.15s",
+            }}>
+              <div style={{ fontWeight: 700, fontSize: 12, fontFamily: fnt, color: mode === m.id ? C.amberDark : C.textMuted }}>{m.label}</div>
+              <div style={{ fontSize: 9, color: C.textMuted, marginTop: 1 }}>{m.desc}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Bar */}
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          {mode === "pitch" ? (
+            <>
+              {[
+                { id: "eco", label: "Ecossistema" },
+                { id: "vision", label: "Visão 2037" },
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setPitchTab(tab.id)} style={{
+                  padding: "6px 16px", borderRadius: 6, border: `1px solid ${pitchTab === tab.id ? C.amber : C.border}`,
+                  background: pitchTab === tab.id ? `${C.amber}10` : C.bgCard, cursor: "pointer",
+                  fontWeight: 600, fontSize: 11, fontFamily: fnt,
+                  color: pitchTab === tab.id ? C.amberDark : C.textMuted,
+                }}>{tab.label}</button>
+              ))}
+            </>
+          ) : mode === "eng" ? (
+            <>
+              {[
+                { id: "arch", label: "Arquitetura Técnica" },
+                { id: "supabase", label: "Supabase Explorer" },
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setEngTab(tab.id)} style={{
+                  padding: "6px 16px", borderRadius: 6, border: `1px solid ${engTab === tab.id ? C.blue : C.border}`,
+                  background: engTab === tab.id ? `${C.blue}10` : C.bgCard, cursor: "pointer",
+                  fontWeight: 600, fontSize: 11, fontFamily: fnt,
+                  color: engTab === tab.id ? C.blue : C.textMuted,
+                }}>{tab.label}</button>
+              ))}
+            </>
+          ) : (
+            <>
+              {[
+                { id: "docs", label: "📄 Docs" },
+                { id: "deps", label: "🔗 Dependências" },
+                { id: "migrations", label: "📜 Migrations" },
+                { id: "health", label: "🏥 Saúde" },
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setPortalTab(tab.id)} style={{
+                  padding: "6px 16px", borderRadius: 6, border: `1px solid ${portalTab === tab.id ? C.teal : C.border}`,
+                  background: portalTab === tab.id ? `${C.teal}10` : C.bgCard, cursor: "pointer",
+                  fontWeight: 600, fontSize: 11, fontFamily: fnt,
+                  color: portalTab === tab.id ? C.teal : C.textMuted,
+                }}>{tab.label}</button>
+              ))}
+            </>
+          )}
+        </div>
       </div>
 
-      {/* ═══ DATABASE MODAL ═══ */}
-      {dbModal && (
-        <div onClick={() => setDbModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(4px)" }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 14, padding: 20, maxWidth: 520, width: "92%", maxHeight: "80vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", border: `1px solid ${C.supabase}30` }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 20, height: 20, borderRadius: 4, background: C.supabase, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", fontWeight: 800 }}>{"\u26A1"}</div>
-                <span style={{ color: C.supabase, fontWeight: 800, fontSize: 14, fontFamily: fnt }}>PostgreSQL Schema</span>
-              </div>
-              <button onClick={() => setDbModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.textMuted, padding: 4 }}>{"\u2715"}</button>
-            </div>
-            <p style={{ color: C.textMuted, fontSize: 10, fontFamily: fnt, margin: "0 0 12px" }}>40+ tables \u00B7 RLS em todas \u00B7 Multi-tenant via organization_id</p>
-            <div style={{ display: "grid", gap: 5 }}>
-              {DB.map(item => (
-                <div key={item.p} style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "7px 12px",
-                  background: C.bgCard, borderRadius: 6,
-                  border: `1px ${item.isPlanned ? "dashed" : "solid"} ${item.isNew ? `${C.teal}40` : item.isPlanned ? `${C.planned}40` : C.border}`,
-                  opacity: item.isPlanned ? 0.5 : 1,
-                }}>
-                  <code style={{ color: item.isNew ? C.teal : item.isPlanned ? C.planned : C.supabase, fontFamily: fnt, fontSize: 11, fontWeight: 700, minWidth: 48 }}>{item.p}</code>
-                  <span style={{ color: C.text, fontSize: 11, fontWeight: 600 }}>{item.l}</span>
-                  {item.isNew && <Badge variant="new">NOVO</Badge>}
-                  {item.isPlanned && <Badge variant="planned">TBD</Badge>}
-                  <span style={{ color: C.textMuted, fontSize: 9 }}>{item.d}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ═══ PITCH: ECOSSISTEMA ═══ */}
+      {mode === "pitch" && pitchTab === "eco" && (<>
 
-      {/* ═══ ARQUITETURA (top half of hourglass) ═══ */}
-      <>
         {/* External ecosystem */}
         <div style={{ textAlign: "center", marginBottom: 8 }}>
           <div style={{ color: C.amberDark, fontSize: 9, fontWeight: 700, fontFamily: fnt, letterSpacing: 1.5, marginBottom: 8 }}>ECOSSISTEMA EXTERNO</div>
@@ -556,7 +1862,7 @@ export default function App() {
           </svg>
 
           <div style={{ position: "relative", zIndex: 1 }}>
-            {ROWS.map((row, ri) => {
+            {rows.map((row, ri) => {
               const insets = [0, 10, 18];
               const inset = insets[ri] || 0;
               const cols = ri === 0 ? 3 : row.apps.length;
@@ -616,7 +1922,7 @@ export default function App() {
             <div style={{ marginBottom: 10 }}>
               <div style={{ color: C.amberDark, fontSize: 8, fontWeight: 700, fontFamily: fnt, marginBottom: 6, letterSpacing: 1, textAlign: "center" }}>{"\u25A0"} FUNDA\u00C7\u00C3O</div>
               {(() => {
-                const fPkgs = PKGS.filter(p => p.layer === "f");
+                const fPkgs = pkgs.filter(p => p.layer === "f");
                 const pkgRows = [fPkgs.slice(0, 5), fPkgs.slice(5, 9), fPkgs.slice(9)];
                 const paddings = ["0 4%", "0 12%", "0 25%"];
                 return pkgRows.map((pr, i) => (
@@ -647,7 +1953,7 @@ export default function App() {
             <div>
               <div style={{ color: C.cyan, fontSize: 8, fontWeight: 700, fontFamily: fnt, marginBottom: 6, letterSpacing: 1, textAlign: "center" }}>{"\u25CF"} COMPOSI\u00C7\u00C3O</div>
               {(() => {
-                const cPkgs = PKGS.filter(p => p.layer === "c");
+                const cPkgs = pkgs.filter(p => p.layer === "c");
                 const pkgRows = [cPkgs.slice(0, 4), cPkgs.slice(4)];
                 const paddings = ["0 14%", "0 22%"];
                 return pkgRows.map((pr, i) => (
@@ -692,23 +1998,61 @@ export default function App() {
             <span style={{ color: C.supabase, fontWeight: 800, fontSize: 14, fontFamily: fnt }}>SUPABASE</span>
           </div>
           <p style={{ color: C.textSec, fontSize: 9, fontFamily: fnt, margin: "2px 0 0" }}>Cerbero \u00B7 PostgreSQL + RLS + Auth + Realtime + Storage</p>
-          <button onClick={() => setDbModal(true)} style={{
+          <button onClick={() => { setMode("eng"); setEngTab("supabase"); }} style={{
             marginTop: 10, background: C.bgCard, border: `1px solid ${C.supabase}30`,
             borderRadius: 6, padding: "6px 16px", cursor: "pointer",
             display: "inline-flex", alignItems: "center", gap: 6,
             transition: "all 0.2s",
           }}>
             <span style={{ fontSize: 10 }}>{"\uD83D\uDDC4\uFE0F"}</span>
-            <span style={{ color: C.supabase, fontWeight: 700, fontSize: 10, fontFamily: fnt }}>Ver Schema \u00B7 40+ tables \u00B7 {DB.length} prefixos</span>
+            <span style={{ color: C.supabase, fontWeight: 700, fontSize: 10, fontFamily: fnt }}>Explorar Schema · {schema.reduce((s,g) => s+g.t.length, 0)} tables · {schema.length} grupos</span>
           </button>
         </div>
 
         <p style={{ textAlign: "center", color: C.textMuted, fontSize: 9, fontFamily: fnt, marginTop: 14, fontStyle: "italic" }}>
-          Clique em um app para ver detalhes \u00B7 Clique em um package para ver dependentes
+          Clique em um app para ver detalhes · Clique em um package para ver dependentes
         </p>
-      </>
+      </>)}
 
-      {/* ═══ INTELIG\u00CANCIA ═══ */}
+      {/* ═══ PITCH: VISÃO 2037 ═══ */}
+      {mode === "pitch" && pitchTab === "vision" && <VisaoTab />}
+
+      {/* ═══ ENG: ARQUITETURA TÉCNICA ═══ */}
+      {mode === "eng" && engTab === "arch" && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ textAlign: "center", marginBottom: 10 }}>
+            <span style={{ color: C.dark, fontWeight: 800, fontSize: 11, fontFamily: fnt, letterSpacing: 1.5 }}>TECHNICAL DEEP DIVE</span>
+            <p style={{ color: C.textMuted, fontSize: 9, fontFamily: fnt, margin: "3px 0 0" }}>investigação real do monorepo · dados atualizados</p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, maxWidth: 700, margin: "0 auto" }}>
+            {TECH_TABS.map(tab => (
+              <button key={tab.id} onClick={() => { setTechModal(tab); setTechSection("overview"); }} style={{
+                background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 9, padding: "12px 8px 10px",
+                cursor: "pointer", transition: "all 0.2s", textAlign: "center", borderTop: `2.5px solid ${tab.color}`,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+              }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{tab.icon}</div>
+                <div style={{ fontWeight: 700, fontSize: 11, fontFamily: fnt, color: C.text, marginBottom: 3, lineHeight: 1.3 }}>{tab.name}</div>
+                <div style={{ color: C.textMuted, fontSize: 8, fontFamily: fnt, lineHeight: 1.4 }}>{tab.summary.split(" · ")[0]}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ ENG: SUPABASE EXPLORER ═══ */}
+      {mode === "eng" && engTab === "supabase" && <SupabaseExplorer schemaData={schema} />}
+
+      {/* ═══ PORTAL TABS ═══ */}
+      {mode === "portal" && portalTab === "docs" && <DocBrowser />}
+      {mode === "portal" && portalTab === "deps" && <DepsMatrix />}
+      {mode === "portal" && portalTab === "migrations" && <MigrationTimeline />}
+      {mode === "portal" && portalTab === "health" && <HealthChecks />}
+
+      {/* ═══ PITCH: INTELIGÊNCIA (part of Ecossistema) ═══ */}
+      {mode === "pitch" && pitchTab === "eco" && (
+      <>
+      {/* ═══ INTELIGÊNCIA ═══ */}
       {(() => {
         const OUTPUT_ROWS = [
           { label: "PRUMO IA", version: "2027+ \u00B7 modelo propriet\u00E1rio", color: C.purple, apps: [
@@ -800,6 +2144,7 @@ export default function App() {
           </div>
         );
       })()}
+      </>)}
 
       <div style={{ textAlign: "center", marginTop: 28, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
         <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 6 }}>

@@ -1,3 +1,6 @@
+/* Tailwind utilities for @onsite/auth-ui components */
+@tailwind utilities;
+
 /* ============================================
    OnSite Calculator - CSS
    CORREÇÕES: Layout mobile compacto, display fixo

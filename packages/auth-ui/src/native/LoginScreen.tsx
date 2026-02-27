@@ -16,6 +16,7 @@ import { authStyles as s } from './shared/styles';
 export interface LoginScreenProps {
   appName: string;
   icon?: React.ReactNode;
+  logo?: React.ReactNode;
   subtitle?: string;
   footer?: string;
   showForgotPassword?: boolean;
@@ -35,6 +36,7 @@ export interface LoginScreenProps {
 export function LoginScreen({
   appName,
   icon,
+  logo,
   subtitle = 'Sign in to continue',
   footer = 'OnSite Club — Built for the trades',
   showForgotPassword = true,
@@ -67,6 +69,8 @@ export function LoginScreen({
       const msg = err instanceof Error ? err.message : 'Sign in failed';
       if (msg.includes('Invalid login')) {
         setError('Incorrect email or password');
+      } else if (msg.includes('Email not confirmed') || msg.includes('email_not_confirmed')) {
+        setError('Please check your email and click the confirmation link before signing in.');
       } else {
         setError(msg);
       }
@@ -77,7 +81,7 @@ export function LoginScreen({
 
   return (
     <>
-      <AuthHeader appName={appName} icon={icon} subtitle={subtitle} />
+      <AuthHeader appName={appName} icon={icon} logo={logo} subtitle={subtitle} />
 
       <View style={s.form}>
         <ErrorBanner message={error} />

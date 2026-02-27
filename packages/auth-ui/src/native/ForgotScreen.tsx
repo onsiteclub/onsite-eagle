@@ -13,6 +13,7 @@ import { authStyles as s } from './shared/styles';
 export interface ForgotScreenProps {
   appName: string;
   icon?: React.ReactNode;
+  logo?: React.ReactNode;
   icons?: { email?: React.ReactNode };
   email?: string;
   onSubmit: (email: string) => Promise<void>;
@@ -22,6 +23,7 @@ export interface ForgotScreenProps {
 export function ForgotScreen({
   appName,
   icon,
+  logo,
   icons,
   email: initialEmail = '',
   onSubmit,
@@ -57,6 +59,7 @@ export function ForgotScreen({
       <AuthHeader
         appName={appName}
         icon={icon}
+        logo={logo}
         subtitle={sent ? 'Check your email for a reset link' : 'Enter your email to reset your password'}
       />
 

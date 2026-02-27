@@ -9,3 +9,4 @@ export { AuthInput } from './shared/AuthInput';
 export { PasswordInput } from './shared/PasswordInput';
 export { AuthButton } from './shared/AuthButton';
 export { ErrorBanner, SuccessBanner } from './shared/ErrorBanner';
+export { SelectInput } from './shared/SelectInput';

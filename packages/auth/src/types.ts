@@ -36,6 +36,14 @@ export interface SignUpCredentials extends SignInCredentials {
   name: string
   role: UserRole
   phone?: string
+  firstName?: string
+  lastName?: string
+  /** YYYY-MM-DD */
+  dateOfBirth?: string
+  /** Trade UUID (from ref_trades) or free-text name */
+  trade?: string
+  /** male | female | undeclared */
+  gender?: string
 }
 
 // Session for electronic signatures

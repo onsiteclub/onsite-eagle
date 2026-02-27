@@ -59,6 +59,9 @@ yarn-error.log*
 
 # .env.example IS committed (template without secrets)
 
+# architecture dashboard generated data
+apps/architecture/data/
+
 # vercel
 .vercel
 

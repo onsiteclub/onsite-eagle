@@ -1,3 +1,12 @@
+<!--
+  @ai-rules
+  1. NUNCA delete entradas de "Troubleshooting" ou sessoes de build — apenas ADICIONE novas com data.
+  2. Ao corrigir um erro de build, SEMPRE adicione ao troubleshooting com:
+     data, sintoma, causa raiz, fix, e arquivos alterados.
+  3. Mantenha as secoes na ordem. Nao reorganize.
+  4. Este arquivo e a UNICA FONTE DE VERDADE para build e deploy deste app.
+-->
+
 # OnSite Field — Pipeline & Build Guide
 
 > Device: Samsung SM_G990W (Android) — cabo USB direto

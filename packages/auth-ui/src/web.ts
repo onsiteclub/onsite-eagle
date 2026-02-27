@@ -8,6 +8,7 @@ export type {
   AuthFlowCallbacks,
   AuthFlowProps,
   AuthScreenMode,
+  SignupProfile,
 } from './types';
 
 // Web components
@@ -17,4 +18,4 @@ export {
   SignupForm,
   ForgotForm,
   AuthModal,
-} from './web';
+} from './web/index';

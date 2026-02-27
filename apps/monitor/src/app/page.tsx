@@ -7,9 +7,18 @@ import {
   BarChart3, AlertTriangle, ChevronRight, FolderOpen
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import AuthGate from '@/components/AuthGate'
 import type { Site, House } from '@onsite/shared'
 
 export default function Overview() {
+  return (
+    <AuthGate>
+      <OverviewPage />
+    </AuthGate>
+  )
+}
+
+function OverviewPage() {
   const router = useRouter()
   const [sites, setSites] = useState<Site[]>([])
   const [allHouses, setAllHouses] = useState<House[]>([])

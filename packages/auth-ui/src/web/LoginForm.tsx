@@ -47,7 +47,13 @@ export function LoginForm({
       onSuccess?.();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Sign in failed';
-      setError(msg.includes('Invalid login') ? 'Incorrect email or password' : msg);
+      if (msg.includes('Invalid login')) {
+        setError('Incorrect email or password');
+      } else if (msg.includes('Email not confirmed') || msg.includes('email_not_confirmed')) {
+        setError('Please check your email and click the confirmation link before signing in.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

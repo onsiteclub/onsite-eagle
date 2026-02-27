@@ -1,3 +1,12 @@
+<!--
+  @ai-rules
+  1. NUNCA delete entradas de "Erros Conhecidos" ou troubleshooting — apenas ADICIONE novos com data.
+  2. Ao corrigir um erro de build, SEMPRE adicione a secao de erros com:
+     data, sintoma, causa raiz, fix, e arquivos alterados.
+  3. Mantenha as secoes na ordem. Nao reorganize.
+  4. Este arquivo e a UNICA FONTE DE VERDADE para build e deploy deste app.
+-->
+
 # OnSite Inspect — Build Pipeline
 
 > **Device:** Samsung SM_G990W (Android) — cabo USB direto
