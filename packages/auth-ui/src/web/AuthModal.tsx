@@ -24,7 +24,7 @@ export interface AuthModalProps extends AuthFlowCallbacks {
 }
 
 export function AuthModal({
-  appName = 'Club',
+  appName: _appName = 'Club',
   logo,
   subtitle,
   message,

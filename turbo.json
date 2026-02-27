@@ -9,7 +9,10 @@
     "EXPO_PUBLIC_SUPABASE_URL",
     "EXPO_PUBLIC_SUPABASE_ANON_KEY",
     "VITE_SUPABASE_URL",
-    "VITE_SUPABASE_ANON_KEY"
+    "VITE_SUPABASE_ANON_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_PRICE_ID",
+    "STRIPE_WEBHOOK_SECRET"
   ],
   "tasks": {
     "build": {
@@ -28,6 +31,13 @@
       "cache": false
     },
     "analyze": {
+      "cache": false
+    },
+    "format": {
+      "cache": false
+    },
+    "test": {
+      "dependsOn": ["^build"],
       "cache": false
     }
   }
