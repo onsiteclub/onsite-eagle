@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
     const context = contextData as ReportContext
     const prompt = buildReportPrompt(context, reportType)
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: 'You are Eagle AI, a construction site analysis expert. Always respond with valid JSON.' },
