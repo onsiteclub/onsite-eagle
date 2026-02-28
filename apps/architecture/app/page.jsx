@@ -1858,44 +1858,59 @@ export default function App() {
         {/* ══ TRIANGLE FUNNEL ══ */}
         <div style={{ position: "relative" }}>
           <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} viewBox="0 0 100 100" preserveAspectRatio="none">
-            <polygon points="0,0 100,0 62,100 38,100" fill="none" stroke={C.amber} strokeWidth="0.3" opacity="0.25" strokeDasharray="1 0.8" />
+            <polygon points="0,0 100,0 68,100 32,100" fill="none" stroke={C.amber} strokeWidth="0.3" opacity="0.25" strokeDasharray="1 0.8" />
           </svg>
 
           <div style={{ position: "relative", zIndex: 1 }}>
             {rows.map((row, ri) => {
-              const insets = [0, 10, 18];
-              const inset = insets[ri] || 0;
-              const cols = ri === 0 ? 3 : row.apps.length;
+              /* Split large rows into sub-rows of 3 for progressive funnel narrowing */
+              const subRows = [];
+              const chunkSize = ri === 0 ? 3 : row.apps.length;
+              for (let i = 0; i < row.apps.length; i += chunkSize) {
+                subRows.push(row.apps.slice(i, i + chunkSize));
+              }
+              /* Base inset per runtime row, increases for each sub-row */
+              const baseInsets = [0, 12, 22];
+              const baseInset = baseInsets[ri] || 22;
               return (
-                <div key={row.label} style={{ padding: `0 ${inset}%`, marginBottom: ri < rowCount - 1 ? 8 : 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7, paddingLeft: 2 }}>
-                    <span style={{ background: `${row.color}12`, border: `1px solid ${row.color}30`, borderRadius: 4, padding: "1px 8px", fontSize: 10, fontWeight: 700, fontFamily: fnt, color: row.color, lineHeight: "20px" }}>{row.label}</span>
-                    <span style={{ color: C.textMuted, fontSize: 10 }}>{row.version}</span>
+                <div key={row.label} style={{ marginBottom: ri < rowCount - 1 ? 8 : 0 }}>
+                  <div style={{ padding: `0 ${baseInset}%` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7, paddingLeft: 2 }}>
+                      <span style={{ background: `${row.color}12`, border: `1px solid ${row.color}30`, borderRadius: 4, padding: "1px 8px", fontSize: 10, fontWeight: 700, fontFamily: fnt, color: row.color, lineHeight: "20px" }}>{row.label}</span>
+                      <span style={{ color: C.textMuted, fontSize: 10 }}>{row.version}</span>
+                    </div>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 6 }}>
-                    {row.apps.map(app => (
-                      <div key={app.id} onClick={() => !app.isPlanned && setAppModal(app)} style={{
-                        background: C.bgCard,
-                        border: `1.5px ${app.isPlanned ? "dashed" : "solid"} ${app.isPlanned ? `${C.planned}50` : C.border}`,
-                        borderRadius: 9, padding: "12px 12px 10px", cursor: app.isPlanned ? "default" : "pointer",
-                        opacity: app.isPlanned ? 0.5 : 1,
-                        transition: "all 0.2s", position: "relative",
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
-                          <div style={{ width: 9, height: 9, borderRadius: "50%", background: app.color, flexShrink: 0 }} />
-                          <span style={{ color: C.text, fontWeight: 700, fontSize: 13, fontFamily: fnt, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{app.name}</span>
-                          {app.isNew && <Badge variant="new">NOVO</Badge>}
-                          {app.isPlanned && <Badge variant="planned">TBD</Badge>}
-                          {!app.isNew && !app.isPlanned && <StatusBadge status={app.status} />}
-                        </div>
-                        <div style={{ color: C.textMuted, fontSize: 10, fontFamily: fnt, marginLeft: 14 }}>{app.sub}</div>
-                        <div style={{ marginLeft: 14 }}>
-                          <ProgressBar value={app.progress} color={app.color} />
+                  {subRows.map((chunk, si) => {
+                    const inset = baseInset + si * 5;
+                    return (
+                      <div key={si} style={{ padding: `0 ${inset}%`, marginBottom: si < subRows.length - 1 ? 6 : 0 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${chunk.length}, 1fr)`, gap: 6 }}>
+                          {chunk.map(app => (
+                            <div key={app.id} onClick={() => !app.isPlanned && setAppModal(app)} style={{
+                              background: C.bgCard,
+                              border: `1.5px ${app.isPlanned ? "dashed" : "solid"} ${app.isPlanned ? `${C.planned}50` : C.border}`,
+                              borderRadius: 9, padding: "12px 12px 10px", cursor: app.isPlanned ? "default" : "pointer",
+                              opacity: app.isPlanned ? 0.5 : 1,
+                              transition: "all 0.2s", position: "relative",
+                              boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+                            }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                                <div style={{ width: 9, height: 9, borderRadius: "50%", background: app.color, flexShrink: 0 }} />
+                                <span style={{ color: C.text, fontWeight: 700, fontSize: 13, fontFamily: fnt, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{app.name}</span>
+                                {app.isNew && <Badge variant="new">NOVO</Badge>}
+                                {app.isPlanned && <Badge variant="planned">TBD</Badge>}
+                                {!app.isNew && !app.isPlanned && <StatusBadge status={app.status} />}
+                              </div>
+                              <div style={{ color: C.textMuted, fontSize: 10, fontFamily: fnt, marginLeft: 14 }}>{app.sub}</div>
+                              <div style={{ marginLeft: 14 }}>
+                                <ProgressBar value={app.progress} color={app.color} />
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               );
             })}
