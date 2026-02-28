@@ -3,6 +3,16 @@ name: Build Android (EAS)
 on:
   workflow_dispatch:
     inputs:
+      app:
+        description: 'Expo app to build'
+        required: true
+        default: 'inspect'
+        type: choice
+        options:
+          - inspect
+          - timekeeper
+          - operator
+          - field
       profile:
         description: 'Build profile'
         required: true
@@ -15,11 +25,11 @@ on:
 
 jobs:
   build:
-    name: EAS Build (${{ inputs.profile }})
+    name: EAS Build — ${{ inputs.app }} (${{ inputs.profile }})
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/timekeeper
+        working-directory: apps/${{ inputs.app }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
