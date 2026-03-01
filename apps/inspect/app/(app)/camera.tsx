@@ -2,7 +2,7 @@
  * Camera screen — fullscreen modal for taking site photos.
  *
  * Uses expo-camera for preview and expo-image-picker as fallback.
- * Uploads to egl-media bucket via Supabase Storage.
+ * Uploads to frm-media bucket via Supabase Storage.
  */
 
 import { useState, useRef } from 'react';
@@ -20,6 +20,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useAuth } from '@onsite/auth';
+import { sendMessage } from '@onsite/timeline';
 import { supabase } from '../../src/lib/supabase';
 
 const ACCENT = '#0F766E';
@@ -28,7 +29,11 @@ export default function CameraScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { houseId, siteId } = useLocalSearchParams<{ houseId?: string; siteId?: string }>();
+  const { houseId, siteId, currentPhase } = useLocalSearchParams<{
+    houseId?: string;
+    siteId?: string;
+    currentPhase?: string;
+  }>();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [uploading, setUploading] = useState(false);
@@ -87,7 +92,7 @@ export default function CameraScreen() {
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
-        .from('egl-media')
+        .from('frm-media')
         .upload(storagePath, decode(base64), {
           contentType: 'image/jpeg',
         });
@@ -96,18 +101,35 @@ export default function CameraScreen() {
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from('egl-media')
+        .from('frm-media')
         .getPublicUrl(storagePath);
 
-      // Insert into egl_photos
-      const { error: insertError } = await supabase.from('egl_photos').insert({
-        house_id: houseId,
+      // Insert into frm_photos
+      const { error: insertError } = await supabase.from('frm_photos').insert({
+        lot_id: houseId,
         uploaded_by: user?.id || null,
         photo_url: urlData.publicUrl,
         ai_validation_status: 'pending',
       });
 
       if (insertError) throw insertError;
+
+      // Post photo to lot timeline
+      if (siteId) {
+        await sendMessage(supabase as never, {
+          site_id: siteId,
+          house_id: houseId,
+          sender_type: 'supervisor',
+          sender_id: user?.id,
+          sender_name: user?.email || 'Inspector',
+          content: 'Photo uploaded',
+          attachments: [{ type: 'photo', url: urlData.publicUrl }],
+          phase_at_creation: Number(currentPhase) || 1,
+          source_app: 'inspect',
+        }).catch((err: unknown) => {
+          console.warn('[camera] Timeline post failed (non-fatal):', err);
+        });
+      }
 
       Alert.alert('Success', 'Photo uploaded successfully', [
         { text: 'OK', onPress: () => router.back() },

@@ -6,6 +6,7 @@ const nextConfig = {
     '@onsite/utils',
     '@onsite/auth',
     '@onsite/shared',
+    '@onsite/framing',
     '@onsite/ui',
   ],
   images: {

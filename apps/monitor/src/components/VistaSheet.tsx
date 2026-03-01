@@ -43,9 +43,9 @@ export default function VistaSheet({ siteId, siteName }: VistaSheetProps) {
 
     // Get all houses for this site
     const { data: houses } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id, lot_number, address, sqft_total, sqft_basement')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
       .order('lot_number')
 
     if (!houses?.length) {
@@ -69,9 +69,9 @@ export default function VistaSheet({ siteId, siteName }: VistaSheetProps) {
 
     // Get phase assignments (worker_id UUID FK → core_profiles)
     const { data: assignments } = await supabase
-      .from('egl_phase_assignments')
-      .select('house_id, phase_id, worker_id')
-      .in('house_id', houseIds)
+      .from('frm_phase_assignments')
+      .select('lot_id, phase_id, worker_id')
+      .in('lot_id', houseIds)
 
     // Get worker profiles for assigned workers
     const workerIds = [...new Set((assignments || []).map(a => a.worker_id).filter(Boolean))]
@@ -88,24 +88,24 @@ export default function VistaSheet({ siteId, siteName }: VistaSheetProps) {
 
     // Get phase rates (phase_id UUID, not phase_name)
     const { data: rates } = await supabase
-      .from('egl_phase_rates')
+      .from('frm_phase_payments')
       .select('phase_id, rate_per_sqft, rate_per_sqft_basement')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
 
     // Get schedules for CAP (assigned_worker_name or assigned_worker_id)
     const { data: schedules } = await supabase
-      .from('egl_schedules')
-      .select('house_id, assigned_worker_id, assigned_worker_name')
-      .in('house_id', houseIds)
+      .from('frm_schedules')
+      .select('lot_id, assigned_worker_id, assigned_worker_name')
+      .in('lot_id', houseIds)
 
-    // Build assignment map: house_id → { trade → worker_name }
+    // Build assignment map: lot_id → { trade → worker_name }
     const assignmentMap = new Map<string, Map<string, string>>()
     for (const a of assignments || []) {
-      if (!assignmentMap.has(a.house_id)) assignmentMap.set(a.house_id, new Map())
+      if (!assignmentMap.has(a.lot_id)) assignmentMap.set(a.lot_id, new Map())
       const trade = phaseTradeMap.get(a.phase_id)
       if (!trade) continue
       const workerName = workerNameMap.get(a.worker_id) || ''
-      assignmentMap.get(a.house_id)!.set(trade, workerName)
+      assignmentMap.get(a.lot_id)!.set(trade, workerName)
     }
 
     // Build rate map: trade → { sqft, bsmt }
@@ -127,7 +127,7 @@ export default function VistaSheet({ siteId, siteName }: VistaSheetProps) {
       if (s.assigned_worker_id && workerNameMap.has(s.assigned_worker_id)) {
         capName = workerNameMap.get(s.assigned_worker_id) || capName
       }
-      scheduleMap.set(s.house_id, capName)
+      scheduleMap.set(s.lot_id, capName)
     }
 
     // Build rows

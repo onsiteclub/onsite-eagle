@@ -79,19 +79,16 @@ Copiar a anon key de `apps/operator/.env.local` — mesmo projeto Supabase.
 
 ## Metro Config — O Que Faz e Por Que
 
-### watchFolders (10 packages)
+### watchFolders (7 packages — somente os importados)
 
 ```javascript
 config.watchFolders = [
   'packages/auth',      // AuthProvider, useAuth
+  'packages/auth-ui',   // AuthFlow login screen
+  'packages/tokens',    // Design tokens (dep of auth-ui)
   'packages/shared',    // Types: Site, House, HouseStatus
-  'packages/timeline',  // fetchMessages, sendMessage
-  'packages/media',     // fetchDocuments, uploadFile
-  'packages/agenda',    // fetchAgendaEvents
-  'packages/camera',    // Photo capture + metadata
+  'packages/timeline',  // fetchMessages, sendMessage, SENDER_CONFIG
   'packages/offline',   // Queue + useOfflineSync
-  'packages/sharing',   // QR-based access grants
-  'packages/ai',        // AI specialists
   'packages/logger',    // Structured logging
 ];
 ```
@@ -256,10 +253,11 @@ Estes erros ja foram resolvidos no Operator. O Inspect herda as mesmas protecoes
 | Aspecto | Operator | Inspect |
 |---------|----------|---------|
 | Porta Metro | 8081 | **8082** |
-| Navegacao | 3 root tabs | Stack + tabs internos por site |
-| Packages | 6 | **10** (+media, +agenda, +ai, +logger) |
-| Camera | QR scanner | **Fotos de inspecao + upload** |
-| Orientacao | portrait | **default** (landscape em tablet) |
+| Navegacao | 3 root tabs | Stack (home → lot timeline) |
+| Packages | 6 | **7** (auth, auth-ui, tokens, shared, timeline, offline, logger) |
+| Camera | QR scanner | **Fotos de inspecao + upload + timeline post** |
+| Home | Lista de pedidos | **Site dashboard** (features + lots grid) |
+| Lot Detail | N/A | **Timeline WhatsApp-style + ActionBar** |
 | Splash bg | #1F2937 (dark) | **#F6F7F9** (light/Enterprise v3) |
 
 ---
@@ -316,10 +314,11 @@ adb reverse tcp:8082 tcp:8082
 
 - [ ] App abre sem crash
 - [ ] Login funciona
-- [ ] Lista de sites carrega
-- [ ] Tap em site → 8 tabs aparecem
-- [ ] Tap em lote → detail com fases
-- [ ] Camera abre e tira foto
+- [ ] Home mostra site name + 4 feature cards + lots grid
+- [ ] Tap em lote → timeline WhatsApp-style com ActionBar
+- [ ] Enviar mensagem na timeline
+- [ ] Camera abre, tira foto, posta na timeline
+- [ ] Feature cards (Agenda/Team/Timeline/Docs) navegam
 - [ ] Voltar funciona em todas as telas
 
 ---
@@ -338,4 +337,73 @@ adb reverse tcp:8082 tcp:8082
 
 ---
 
+## Build Log
+
+### Sessao 2026-02-27 — Primeiro build + refactor lot-centric
+
+**Contexto:** Primeiro build do Inspect no device fisico + refactor completo da arquitetura.
+
+**Build 1:** `npx expo prebuild --clean && npx expo run:android`
+- **Erro:** Kotlin version mismatch — Compose Compiler 1.5.15 requires 1.9.25 but got 1.9.24
+- **Fix:** `android.kotlinVersion=1.9.25` em gradle.properties + `$kotlinVersion` no build.gradle classpath
+- **Resultado:** BUILD SUCCESSFUL (1m24s, 495 tasks)
+
+**Runtime errors (pos-build):**
+1. `Do not call Hooks inside useMemo` — AuthFlow em `@onsite/auth-ui` chamava `useAuth()` dentro de `useMemo()`
+   - **Fix:** Movido hook para top-level do componente (`packages/auth-ui/src/native/AuthFlow.tsx`)
+2. `Property storage exceeds 196607 properties` — limite do Hermes VM estourado pelo auto-refresh loop
+   - **Fix:** `autoRefreshToken: false` em `apps/inspect/src/lib/supabase.ts`
+   - **Fix adicional:** Removidos 5 packages nao importados do watchFolders (media, agenda, camera, sharing, ai)
+
+**Build 2:** `npx expo prebuild --clean && npx expo run:android` (apos fixes)
+- **Erro:** Kotlin version mismatch novamente (prebuild --clean regenera android/, perdendo fix)
+- **Fix:** Reaplicar `android.kotlinVersion=1.9.25` em gradle.properties + `$kotlinVersion` no build.gradle
+- **Resultado:** BUILD SUCCESSFUL
+
+**Refactor aplicado (6 fases):**
+
+| Fase | O que mudou |
+|------|-------------|
+| 1 | Adicionado `'inspect'` ao SourceApp em `@onsite/timeline` |
+| 2 | 6 novos componentes: DateDivider, MessageBubble, ActionBar, EventTypePicker, LotHeader, LotTimeline |
+| 3 | `lot/[lotId].tsx` reescrito — timeline-centric (WhatsApp-style) com AI mediation |
+| 4 | `site/[id].tsx` simplificado — removidos 8 tabs, so Header + LotsView |
+| 5 | Camera integrada com timeline — foto upload posta mensagem via `sendMessage` |
+| 6 | 7 componentes deletados: TabBar, ScheduleView, TimelineView, TeamView, DocumentsView, PaymentsView, ReportsView |
+
+**Redesign Home Screen:**
+- `index.tsx` reescrito: site switcher dropdown + 4 feature cards (Agenda, Team, Timeline, Documents) + lots grid
+- 4 telas placeholder criadas: agenda.tsx, team.tsx, site-timeline.tsx, documents.tsx
+- `site-new.tsx` deletado (sites criados no Monitor)
+
+**Metro watchFolders final (7 packages):**
+```
+auth, auth-ui, tokens, shared, timeline, offline, logger
+```
+
+**Modules bundled:** 1592
+**Native modules:** expo-camera, expo-file-system, expo-image-picker, expo-notifications + 10 others
+
+**Arquivos modificados (android/ — reaplicar apos cada prebuild --clean):**
+| Arquivo | Mudanca |
+|---------|---------|
+| `android/gradle.properties` | `android.kotlinVersion=1.9.25` |
+| `android/build.gradle` | `classpath("...kotlin-gradle-plugin:$kotlinVersion")` |
+
+### Checklist Verificacao (pos-redesign)
+
+- [x] App abre sem crash
+- [x] Login funciona
+- [x] Home mostra site name + feature cards + lots
+- [ ] Dropdown troca de site (se usuario tem >1)
+- [ ] Feature cards navegam para telas placeholder
+- [ ] Tap em lote → timeline WhatsApp-style
+- [ ] Enviar mensagem → aparece na timeline
+- [ ] Camera → foto → aparece como msg na timeline
+- [ ] Event picker → evento tipado na timeline
+- [ ] Back funciona em todas as telas
+
+---
+
 *Criado: 2026-02-25 — Baseado no historico de 12 erros do Operator v2*
+*Atualizado: 2026-02-27 — Primeiro build + refactor lot-centric + redesign home*

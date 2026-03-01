@@ -63,7 +63,7 @@ export default function DocumentsScreen() {
     try {
       // Load house info
       const { data: houseData } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('id, lot_number')
         .eq('id', id)
         .single();
@@ -73,9 +73,9 @@ export default function DocumentsScreen() {
       // Load documents from timeline_events where event_type = 'document'
       // or has source_link
       const { data: docsData } = await supabase
-        .from('egl_timeline')
+        .from('frm_timeline')
         .select('*')
-        .eq('house_id', id)
+        .eq('lot_id', id)
         .or('event_type.eq.document,source_link.not.is.null')
         .order('created_at', { ascending: false });
 

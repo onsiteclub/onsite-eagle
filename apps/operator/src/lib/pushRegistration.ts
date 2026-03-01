@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { logger } from '@onsite/logger';
 import { supabase } from './supabase';
 
 /**
@@ -20,7 +21,7 @@ import { supabase } from './supabase';
 export async function registerPushToken(): Promise<string | null> {
   // Push notifications only work on physical devices
   if (!Device.isDevice) {
-    console.log('[push] Skipping push registration on emulator/simulator');
+    logger.debug('NOTIFY', 'Skipping push registration on emulator/simulator');
     return null;
   }
 
@@ -34,7 +35,7 @@ export async function registerPushToken(): Promise<string | null> {
   }
 
   if (finalStatus !== 'granted') {
-    console.log('[push] Permission not granted');
+    logger.info('NOTIFY', 'Push permission not granted');
     return null;
   }
 
@@ -68,7 +69,7 @@ export async function registerPushToken(): Promise<string | null> {
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     const token = tokenData.data;
 
-    console.log('[push] Expo push token:', token);
+    logger.info('NOTIFY', 'Expo push token obtained', { token });
 
     // Save token to core_devices
     await savePushToken(token);
@@ -141,7 +142,7 @@ async function savePushToken(token: string): Promise<void> {
         });
     }
 
-    console.log('[push] Token saved to core_devices');
+    logger.info('NOTIFY', 'Token saved to core_devices');
   } catch (error) {
     console.error('[push] Failed to save push token:', error);
   }

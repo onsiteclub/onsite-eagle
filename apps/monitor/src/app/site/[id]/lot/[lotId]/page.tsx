@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Search, Clock, ExternalLink, Calendar as CalendarIcon, X,
-  Upload, File, Loader2, Sparkles, Users, Copy, Check, Package
+  Upload, File, Loader2, Sparkles, Users, Copy, Check, Package,
+  AlertTriangle, ClipboardCheck, Shield
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { House, FormFieldSuggestion, CalendarEvent, SiteWorker } from '@onsite/shared'
@@ -12,16 +13,21 @@ import { createCalendarEvent } from '@onsite/shared'
 import { Calendar } from '@onsite/ui/web'
 import ChatTimeline from '@/components/ChatTimeline'
 import MaterialRequestsView from '@/components/MaterialRequestsView'
+import HouseItemsList from '@/components/HouseItemsList'
+import GateCheckView from '@/components/GateCheckView'
+import SafetyPanel from '@/components/SafetyPanel'
+import LotStatusBar from '@/components/LotStatusBar'
+import type { PhaseId } from '@onsite/framing'
 import { useAICopilot } from '@/hooks/useAICopilot'
 import AISuggestionPanel from '@/components/AISuggestionPanel'
 
 // Sidebar section types
-type SidebarSection = 'timeline' | 'documents' | 'schedule' | 'materials' | 'team'
+type SidebarSection = 'timeline' | 'items' | 'gate-checks' | 'safety' | 'documents' | 'schedule' | 'materials' | 'team'
 
 interface LotDocument {
   id: string
-  house_id: string | null
-  site_id?: string | null
+  lot_id: string | null
+  jobsite_id?: string | null
   name: string
   file_url: string
   file_type: string
@@ -33,19 +39,23 @@ interface LotDocument {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  not_started: 'Not Started',
+  pending: 'Pending',
+  released: 'Released',
   in_progress: 'In Progress',
-  delayed: 'Delayed',
+  paused_for_trades: 'Paused for Trades',
+  backframe: 'Backframe',
+  inspection: 'Inspection',
   completed: 'Completed',
-  on_hold: 'On Hold',
 }
 
 const LIGHT_STATUS_COLORS: Record<string, string> = {
-  not_started: '#8E8E93',
+  pending: '#8E8E93',
+  released: '#007AFF',
   in_progress: '#FF9500',
-  delayed: '#FF3B30',
+  paused_for_trades: '#AF52DE',
+  backframe: '#5AC8FA',
+  inspection: '#FF3B30',
   completed: '#34C759',
-  on_hold: '#AF52DE',
 }
 
 export default function LotDetail() {
@@ -66,7 +76,7 @@ export default function LotDetail() {
   useEffect(() => {
     const tab = searchParams.get('tab')
     if (tab) {
-      const validTabs: SidebarSection[] = ['timeline', 'documents', 'schedule', 'materials', 'team']
+      const validTabs: SidebarSection[] = ['timeline', 'items', 'gate-checks', 'safety', 'documents', 'schedule', 'materials', 'team']
       if (validTabs.includes(tab as SidebarSection)) {
         setActiveSection(tab as SidebarSection)
       }
@@ -83,7 +93,7 @@ export default function LotDetail() {
     try {
       // Load house
       const { data: houseData } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('*')
         .eq('id', lotId)
         .single()
@@ -172,18 +182,9 @@ export default function LotDetail() {
           )}
         </div>
 
-        {/* Progress */}
+        {/* Phase Progress Bar */}
         <div className="p-4 border-b border-[#E5E5EA]">
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-[#6E6E73]">Progress</span>
-            <span className="text-[#007AFF] font-medium">{house.progress_percentage}%</span>
-          </div>
-          <div className="h-2 bg-[#E5E5EA] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#007AFF] rounded-full transition-all"
-              style={{ width: `${house.progress_percentage}%` }}
-            />
-          </div>
+          <LotStatusBar lotId={lotId} currentPhase={house.current_phase as PhaseId | undefined} />
         </div>
 
         {/* Navigation */}
@@ -200,6 +201,42 @@ export default function LotDetail() {
               >
                 <Clock className="w-5 h-5" />
                 <span className="font-medium">Timeline</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('items')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  activeSection === 'items'
+                    ? 'bg-[#FF9500] text-white'
+                    : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                }`}
+              >
+                <AlertTriangle className="w-5 h-5" />
+                <span className="font-medium">Items</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('gate-checks')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  activeSection === 'gate-checks'
+                    ? 'bg-[#5856D6] text-white'
+                    : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                }`}
+              >
+                <ClipboardCheck className="w-5 h-5" />
+                <span className="font-medium">Gate Checks</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('safety')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  activeSection === 'safety'
+                    ? 'bg-[#FF3B30] text-white'
+                    : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                }`}
+              >
+                <Shield className="w-5 h-5" />
+                <span className="font-medium">Safety</span>
               </button>
 
               <button
@@ -288,9 +325,18 @@ export default function LotDetail() {
               houseLotNumber={house.lot_number}
               siteName={`Lot ${house.lot_number}`}
               currentUserName="Supervisor"
-              currentPhase={house.current_phase}
+              currentPhase={house.current_phase as unknown as number}
               onLotUpdate={loadLotData}
             />
+          )}
+          {activeSection === 'items' && (
+            <HouseItemsList lotId={lotId} />
+          )}
+          {activeSection === 'gate-checks' && (
+            <GateCheckView lotId={lotId} />
+          )}
+          {activeSection === 'safety' && (
+            <SafetyPanel lotId={lotId} />
           )}
           {activeSection === 'documents' && (
             <DocumentsSection documents={documents} siteId={siteId} houseId={lotId} onRefresh={loadLotData} />
@@ -427,7 +473,7 @@ function DocumentsSection({
       formData.append('file', file)
       formData.append('siteId', siteId)
       formData.append('houseId', houseId)
-      formData.append('bucket', 'egl-media')
+      formData.append('bucket', 'frm-media')
 
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
@@ -446,8 +492,8 @@ function DocumentsSection({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          site_id: siteId,
-          house_id: houseId,
+          jobsite_id: siteId,
+          lot_id: houseId,
           name: file.name,
           file_url: uploadData.url,
           file_path: uploadData.path,
@@ -936,8 +982,8 @@ function DocumentsSection({
 // External event type from database
 interface ExternalEvent {
   id: string
-  site_id: string | null
-  house_id: string | null
+  jobsite_id: string | null
+  lot_id: string | null
   event_type: string
   title: string
   description: string | null
@@ -1020,7 +1066,7 @@ function ScheduleSection({
     setSaving(true)
     try {
       const { error } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .update({
           priority_score: formData.priority_score,
           target_date: formData.target_date || null,

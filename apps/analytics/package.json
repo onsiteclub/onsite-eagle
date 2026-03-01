@@ -12,6 +12,7 @@
   "dependencies": {
     "@onsite/auth": "*",
     "@onsite/auth-ui": "*",
+    "@onsite/logger": "*",
     "@onsite/supabase": "*",
     "@onsite/utils": "*",
     "@onsite/hooks": "*",

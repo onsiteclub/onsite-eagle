@@ -59,8 +59,8 @@
 Pedidos → [Entregue] → deliver/[id].tsx
   → Botão "Tirar Foto" (expo-image-picker)
   → Preview + opção trocar/remover
-  → Upload ao egl-media (Supabase Storage)
-  → Confirmar → foto_url no egl_timeline (material_delivery)
+  → Upload ao frm-media (Supabase Storage)
+  → Confirmar → foto_url no frm_timeline (material_delivery)
   → Mensagem site-level via sendMessage
 ```
 
@@ -72,13 +72,13 @@ Pedidos → FAB camera (canto inferior direito)
     • Tipo: Entrega, Acidente, Bloqueio, Roubo, Dano, Progresso, Outro
     • Lote: chips com todos os lotes do site + "Geral"
     • Comentário (opcional)
-  → Upload ao egl-media
+  → Upload ao frm-media
   → Timeline event (house-level se lote selecionado)
   → Mensagem site-level via sendMessage
 ```
 
 **Storage path:** `{siteId}/{houseId|'site-level'}/{timestamp}_{random}.jpg`
-**Bucket:** `egl-media` (public)
+**Bucket:** `frm-media` (public)
 
 ---
 
@@ -574,7 +574,7 @@ Operator não tinha tela de login. Criados:
 
 #### Feature 2: Realtime Material Requests
 
-- Migration: `ALTER PUBLICATION supabase_realtime ADD TABLE egl_material_requests`
+- Migration: `ALTER PUBLICATION supabase_realtime ADD TABLE frm_material_requests`
 - `(tabs)/index.tsx` refatorado: `getMaterialRequests` → `getOperatorQueue` (filtra por sites atribuídos)
 - Subscription realtime via `supabase.channel('operator-requests')` com `postgres_changes`
 - Badge "Live" no header
@@ -596,7 +596,7 @@ Arquivos: `apps/monitor/src/app/api/timeline/mediate/route.ts`, `packages/ai/src
 **deliver/[id].tsx** — Reescrito com:
 - Botão "Tirar Foto" (expo-image-picker, quality 0.8)
 - Preview da foto + trocar/remover
-- Upload ao `egl-media` bucket via Supabase Storage
+- Upload ao `frm-media` bucket via Supabase Storage
 - Foto URL incluída no timeline event (`metadata.photo_url`)
 - Entrega funciona com ou sem foto (opcional)
 
@@ -613,4 +613,55 @@ Arquivos: `apps/monitor/src/app/api/timeline/mediate/route.ts`, `packages/ai/src
 cd apps/operator
 npx expo prebuild --clean --platform android
 npx expo run:android
+```
+
+---
+
+### Sessão: 2026-02-27 — Rebuild após prebuild --clean
+
+#### Problema 13: Kotlin version mismatch (recorrente após prebuild --clean)
+
+**Sintoma:** Mesmo erro do Problema 7:
+```
+e: This version (1.5.15) of the Compose Compiler requires Kotlin version 1.9.25
+but you appear to be using Kotlin version 1.9.24
+```
+
+**Causa raiz:** `npx expo prebuild --clean` **deleta e recria** a pasta `android/` do zero. Os fixes manuais aplicados no Problema 7 (`gradle.properties` + `build.gradle`) são perdidos. O Gradle volta a resolver Kotlin 1.9.24 do cache.
+
+**Fix (mesmo do Problema 7 — reaplicar após cada prebuild --clean):**
+
+1. `android/gradle.properties` — adicionar no final:
+```properties
+android.kotlinVersion=1.9.25
+```
+
+2. `android/build.gradle` — corrigir classpath:
+```diff
+- classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
++ classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+```
+
+**Nota:** Este fix precisa ser reaplicado toda vez que rodar `prebuild --clean`, pois o diretório `android/` é regenerado. Considerar criar um `expo-plugin` custom para automatizar no futuro.
+
+#### Resultado: BUILD SUCCESS
+
+Após reaplicar o fix do Kotlin, `npx expo run:android` compilou com sucesso e instalou no device Samsung SM_G990W via USB.
+
+**Módulos nativos carregados:**
+- expo-application (6.0.2), expo-asset (11.0.5), expo-camera (16.0.18)
+- expo-constants (17.0.8), expo-device (7.0.3), expo-file-system (18.0.12)
+- expo-font (13.0.4), expo-image-loader (5.0.0), expo-image-picker (16.0.6)
+- expo-keep-awake (14.0.3), expo-linking (7.0.5), expo-modules-core (2.2.3)
+- expo-notifications (0.29.14)
+
+**APK debug:** `android/app/build/outputs/apk/debug/app-debug.apk`
+
+**Sequência completa usada:**
+```bash
+cd apps/operator
+npx expo prebuild --clean --platform android
+# → Fix Kotlin: gradle.properties + build.gradle
+npx expo run:android
+# → BUILD SUCCESSFUL → instalado no device
 ```

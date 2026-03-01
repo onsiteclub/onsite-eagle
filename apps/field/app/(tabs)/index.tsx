@@ -1,7 +1,8 @@
 /**
  * My Lots — Worker's assigned lots
  *
- * Queries egl_houses via org membership.
+ * Sprint 2: Filters lots by crew assignment (worker sees only their crew's lots).
+ * Uses new LotStatus values and PhaseId text labels.
  * Enterprise v3 light theme.
  */
 
@@ -11,35 +12,39 @@ import { useEffect, useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@onsite/auth';
 import { supabase } from '../../src/lib/supabase';
+import { FRAMING_PHASES } from '@onsite/framing';
 
 interface House {
   id: string;
   lot_number: string;
   address: string | null;
   status: string;
-  current_phase: number;
-  progress_percentage: number;
-  site_id: string;
-  site: {
+  current_phase: string | null;
+  jobsite_id: string;
+  jobsite: {
     id: string;
     name: string;
   } | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  not_started: '#6B7280',
+  pending: '#6B7280',
+  released: '#3B82F6',
   in_progress: '#F59E0B',
-  delayed: '#EF4444',
+  paused_for_trades: '#8B5CF6',
+  backframe: '#06B6D4',
+  inspection: '#EF4444',
   completed: '#10B981',
-  on_hold: '#8B5CF6',
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  not_started: 'Not Started',
+  pending: 'Pending',
+  released: 'Released',
   in_progress: 'In Progress',
-  delayed: 'Delayed',
+  paused_for_trades: 'Trades',
+  backframe: 'Backframe',
+  inspection: 'Inspection',
   completed: 'Completed',
-  on_hold: 'On Hold',
 };
 
 const ACCENT = '#0F766E';
@@ -56,23 +61,57 @@ export default function MyLotsScreen() {
 
   async function loadHouses() {
     try {
-      // Load houses from the worker's assigned sites
-      // For now, load all houses the user has access to via org membership
+      if (!user) return;
+
+      // 1. Find crews this worker belongs to
+      const { data: crewMemberships } = await supabase
+        .from('frm_crew_workers')
+        .select('crew_id')
+        .eq('worker_id', user.id)
+        .is('left_at', null);
+
+      const crewIds = (crewMemberships || []).map(m => m.crew_id);
+
+      if (crewIds.length === 0) {
+        // Fallback: load all lots the user has access to via org membership
+        const { data, error } = await supabase
+          .from('frm_lots')
+          .select(`
+            id, lot_number, address, status, current_phase, jobsite_id,
+            jobsite:frm_jobsites(id, name)
+          `)
+          .order('lot_number', { ascending: true });
+
+        if (!error && data) {
+          setHouses(normalizeData(data));
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 2. Find lots assigned to worker's crews
+      const { data: assignments } = await supabase
+        .from('frm_phase_assignments')
+        .select('lot_id')
+        .in('crew_id', crewIds)
+        .neq('status', 'cancelled');
+
+      const lotIds = [...new Set((assignments || []).map(a => a.lot_id))];
+
+      if (lotIds.length === 0) {
+        setHouses([]);
+        setLoading(false);
+        return;
+      }
+
+      // 3. Load lot details
       const { data, error } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select(`
-          id,
-          lot_number,
-          address,
-          status,
-          current_phase,
-          progress_percentage,
-          site_id,
-          site:egl_sites (
-            id,
-            name
-          )
+          id, lot_number, address, status, current_phase, jobsite_id,
+          jobsite:frm_jobsites(id, name)
         `)
+        .in('id', lotIds)
         .order('lot_number', { ascending: true });
 
       if (error) {
@@ -81,13 +120,7 @@ export default function MyLotsScreen() {
         return;
       }
 
-      // Normalize site from array to single object
-      const normalized = (data || []).map((h: any) => ({
-        ...h,
-        site: Array.isArray(h.site) ? h.site[0] : h.site,
-      }));
-
-      setHouses(normalized);
+      setHouses(normalizeData(data || []));
     } catch (error) {
       console.error('Error loading houses:', error);
       setHouses([]);
@@ -96,11 +129,18 @@ export default function MyLotsScreen() {
     }
   }
 
+  function normalizeData(data: any[]): House[] {
+    return data.map((h: any) => ({
+      ...h,
+      jobsite: Array.isArray(h.jobsite) ? h.jobsite[0] : h.jobsite,
+    }));
+  }
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadHouses();
     setRefreshing(false);
-  }, []);
+  }, [user]);
 
   if (loading) {
     return (
@@ -155,7 +195,10 @@ export default function MyLotsScreen() {
           />
         }
         renderItem={({ item }) => {
-          const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.not_started;
+          const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.pending;
+          const phaseName = item.current_phase
+            ? FRAMING_PHASES.find(p => p.id === item.current_phase)?.name || item.current_phase
+            : 'Not Started';
 
           return (
             <TouchableOpacity
@@ -172,30 +215,17 @@ export default function MyLotsScreen() {
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.siteName}>{item.site?.name || 'Unknown Site'}</Text>
+                <Text style={styles.siteName}>{item.jobsite?.name || 'Unknown Site'}</Text>
                 {item.address && (
                   <Text style={styles.address}>{item.address}</Text>
                 )}
               </View>
 
-              {/* Progress Bar */}
-              <View style={styles.progressSection}>
-                <View style={styles.progressInfo}>
-                  <Text style={styles.progressText}>
-                    Phase {item.current_phase} of 7
-                  </Text>
-                  <Text style={styles.progressPercent}>
-                    {item.progress_percentage}%
-                  </Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      { width: `${item.progress_percentage}%` }
-                    ]}
-                  />
-                </View>
+              {/* Phase info */}
+              <View style={styles.phaseSection}>
+                <Text style={styles.phaseText}>
+                  Phase: {phaseName}
+                </Text>
               </View>
 
               <View style={styles.lotFooter}>
@@ -329,34 +359,13 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
-  // Progress
-  progressSection: {
+  // Phase
+  phaseSection: {
     marginBottom: 8,
   },
-  progressInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  progressText: {
+  phaseText: {
     fontSize: 13,
-    color: '#6B7280',
-  },
-  progressPercent: {
-    fontSize: 13,
-    color: ACCENT,
-    fontWeight: '600',
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: ACCENT,
-    borderRadius: 4,
+    color: '#667085',
   },
   lotFooter: {
     alignItems: 'flex-end',

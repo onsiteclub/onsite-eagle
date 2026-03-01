@@ -13,6 +13,8 @@
  * - Local LLMs (Ollama)
  */
 
+import { logger } from '@onsite/logger';
+
 export interface AIAnalysisRequest {
   type: 'summary' | 'anomaly' | 'prediction' | 'insight';
   data: Record<string, any>[];
@@ -43,7 +45,7 @@ export async function analyzeWithAI(
   request: AIAnalysisRequest
 ): Promise<AIAnalysisResponse> {
   // TODO: Implement when AI keys are configured
-  console.log('AI Analysis requested:', request.type);
+  logger.debug('AI', 'AI Analysis requested', { type: request.type });
   
   return {
     success: false,

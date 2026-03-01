@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { isValidApp, getAppConfig, createCheckoutSession, AppName } from '@/lib/stripe';
 import { CheckoutMessage } from './CheckoutMessage';
 import { validateCheckoutToken } from '@/lib/checkout-token';
+import { logger } from '@onsite/logger';
 
 interface CheckoutPageProps {
   params: { app: string };
@@ -70,14 +71,14 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
   if (prefilled_email) {
     // Email-only or short code flow
     // user_id is optional - webhook will resolve it from Supabase Auth if not provided
-    console.log('[Checkout] Email flow for:', prefilled_email, 'user_id:', user_id || 'will be resolved by webhook');
+    logger.info('AUTH', 'Email flow checkout', { prefilled_email, user_id: user_id || 'will be resolved by webhook' });
     userId = user_id; // May be undefined, and that's OK
     userEmail = prefilled_email;
   } else if (token) {
     // Token flow - validate JWT (legacy support)
-    console.log('[Checkout] Token flow, validating for app:', app);
+    logger.info('AUTH', 'Token flow checkout, validating', { app });
     const tokenResult = await validateCheckoutToken(token);
-    console.log('[Checkout] Token validation result:', JSON.stringify(tokenResult));
+    logger.debug('AUTH', 'Token validation result', { tokenResult });
 
     if (!tokenResult.valid) {
       console.error('[Checkout] Invalid checkout token:', tokenResult.error);
@@ -113,14 +114,14 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
   let stripeUrl: string | null = null;
 
   try {
-    console.log('[Checkout] Creating Stripe session for:', { app, userId, userEmail, returnRedirect });
+    logger.info('AUTH', 'Creating Stripe session', { app, userId, userEmail, returnRedirect });
     const session = await createCheckoutSession({
       app: app as AppName,
       userId: userId,
       userEmail: userEmail,
       returnRedirect: returnRedirect,
     });
-    console.log('[Checkout] Stripe session created:', session.id);
+    logger.info('AUTH', 'Stripe session created', { sessionId: session.id });
     stripeUrl = session.url;
   } catch (error) {
     console.error('[Checkout] Stripe error:', error);

@@ -1,7 +1,7 @@
 /**
  * Phase progress list for a house/lot.
  *
- * Fetches phases from egl_progress and ref_eagle_phases.
+ * Fetches phases from frm_progress and ref_eagle_phases.
  */
 
 import { useState, useEffect } from 'react';
@@ -48,9 +48,9 @@ export default function PhaseProgress({ houseId }: PhaseProgressProps) {
       try {
         // Fetch progress entries joined with phase names
         const { data: progress, error: progressError } = await supabase
-          .from('egl_progress')
+          .from('frm_progress')
           .select('*, ref_eagle_phases(name, order_index)')
-          .eq('house_id', houseId)
+          .eq('lot_id', houseId)
           .order('created_at', { ascending: true });
 
         if (progressError) throw progressError;

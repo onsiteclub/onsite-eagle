@@ -17,6 +17,7 @@ config.watchFolders = [
   path.resolve(monorepoRoot, 'packages', 'offline'),
   path.resolve(monorepoRoot, 'packages', 'sharing'),
   path.resolve(monorepoRoot, 'packages', 'camera'),
+  path.resolve(monorepoRoot, 'packages', 'logger'),
 ];
 
 // 2. Let Metro know where to resolve packages and in what order

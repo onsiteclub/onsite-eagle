@@ -32,7 +32,7 @@ function OverviewPage() {
   async function loadData() {
     try {
       const { data: sitesData } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .select('*')
         .order('name')
 
@@ -41,7 +41,7 @@ function OverviewPage() {
       }
 
       const { data: housesData } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('*')
 
       if (housesData) {
@@ -60,14 +60,14 @@ function OverviewPage() {
     const totalHouses = allHouses.length
 
     // Group houses by site to count sites with specific statuses
-    const sitesWithInProgress = new Set(allHouses.filter(h => h.status === 'in_progress').map(h => h.site_id)).size
+    const sitesWithInProgress = new Set(allHouses.filter(h => h.status === 'in_progress').map(h => h.jobsite_id)).size
     const housesInProgress = allHouses.filter(h => h.status === 'in_progress').length
 
-    const sitesWithCompleted = new Set(allHouses.filter(h => h.status === 'completed').map(h => h.site_id)).size
+    const sitesWithCompleted = new Set(allHouses.filter(h => h.status === 'completed').map(h => h.jobsite_id)).size
     const housesCompleted = allHouses.filter(h => h.status === 'completed').length
 
-    const sitesWithDelayed = new Set(allHouses.filter(h => h.status === 'delayed').map(h => h.site_id)).size
-    const housesDelayed = allHouses.filter(h => h.status === 'delayed').length
+    const sitesWithDelayed = new Set(allHouses.filter(h => h.status === 'paused_for_trades').map(h => h.jobsite_id)).size
+    const housesDelayed = allHouses.filter(h => h.status === 'paused_for_trades').length
 
     return {
       totalSites, totalHouses,

@@ -10,10 +10,10 @@ export interface Site {
 
 export interface House {
   id: string
-  site_id: string
+  jobsite_id: string
   lot_number: string
   address: string | null
-  status: 'not_started' | 'in_progress' | 'delayed' | 'completed'
+  status: 'pending' | 'released' | 'in_progress' | 'paused_for_trades' | 'backframe' | 'inspection' | 'completed'
   current_phase: number
   progress_percentage: number
   coordinates: { x: number; y: number } | null
@@ -40,7 +40,7 @@ export interface PhaseItem {
 
 export interface HouseProgress {
   id: string
-  house_id: string
+  lot_id: string
   phase_id: string
   status: 'pending' | 'in_progress' | 'ai_review' | 'approved' | 'rejected'
   approved_at: string | null
@@ -50,7 +50,7 @@ export interface HouseProgress {
 
 export interface PhasePhoto {
   id: string
-  house_id: string
+  lot_id: string
   phase_id: string
   uploaded_by: string
   photo_url: string
@@ -63,7 +63,7 @@ export interface PhasePhoto {
 
 export interface TimelineEvent {
   id: string
-  house_id: string
+  lot_id: string
   event_type: 'photo' | 'email' | 'calendar' | 'note' | 'alert' | 'ai_validation' | 'status_change'
   title: string
   description: string | null
@@ -76,7 +76,7 @@ export interface TimelineEvent {
 
 export interface Issue {
   id: string
-  house_id: string
+  lot_id: string
   phase_id: string | null
   reported_by: string
   title: string

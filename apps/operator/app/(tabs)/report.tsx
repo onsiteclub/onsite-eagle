@@ -95,14 +95,14 @@ export default function ReportScreen() {
   async function loadSiteInfo(userId: string) {
     // Get operator's assigned site
     const { data: assignment } = await supabase
-      .from('egl_operator_assignments')
-      .select('site_id')
+      .from('frm_operator_assignments')
+      .select('jobsite_id')
       .eq('operator_id', userId)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (assignment?.site_id) {
-      setSiteId(assignment.site_id);
+    if (assignment?.jobsite_id) {
+      setSiteId(assignment.jobsite_id);
     }
   }
 

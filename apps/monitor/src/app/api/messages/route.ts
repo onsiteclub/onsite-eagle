@@ -16,15 +16,15 @@ export async function GET(request: NextRequest) {
   }
 
   let query = supabase
-    .from('egl_messages')
+    .from('frm_messages')
     .select('*')
-    .eq('site_id', siteId)
+    .eq('jobsite_id', siteId)
     .order('created_at', { ascending: true })
 
   if (houseId) {
-    query = query.eq('house_id', houseId)
+    query = query.eq('lot_id', houseId)
   } else {
-    query = query.is('house_id', null)
+    query = query.is('lot_id', null)
   }
 
   const { data, error } = await query
@@ -40,13 +40,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { site_id, house_id, sender_type, sender_id, sender_name, content, attachments, is_ai_response, ai_question, phase_at_creation } = body
+    const { jobsite_id, lot_id, sender_type, sender_id, sender_name, content, attachments, is_ai_response, ai_question, phase_at_creation } = body
 
-    // Require site_id and sender_name. Content can be empty if there are attachments.
+    // Require jobsite_id and sender_name. Content can be empty if there are attachments.
     const hasAttachments = attachments && attachments.length > 0
-    if (!site_id || !sender_name) {
+    if (!jobsite_id || !sender_name) {
       return NextResponse.json(
-        { error: 'Missing required fields: site_id, sender_name' },
+        { error: 'Missing required fields: jobsite_id, sender_name' },
         { status: 400 }
       )
     }
@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
     const messageContent = content || (hasAttachments ? '📎 Attachment' : '')
 
     const { data, error } = await supabase
-      .from('egl_messages')
+      .from('frm_messages')
       .insert({
-        site_id,
-        house_id: house_id || null,
+        jobsite_id,
+        lot_id: lot_id || null,
         sender_type: sender_type || 'supervisor',
         sender_id: sender_id || null,
         sender_name,

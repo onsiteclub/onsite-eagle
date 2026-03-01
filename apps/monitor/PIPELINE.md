@@ -191,23 +191,30 @@ apps/monitor/
 
 1. Abrir [vercel.com/new](https://vercel.com/new)
 2. Importar repositorio `onsite-eagle`
-3. Em **Root Directory**, clicar Edit e selecionar: `apps/monitor`
-4. Framework Preset: **Next.js** (auto-detectado)
-5. Build Command: deixar default (`turbo build`)
-6. Clicar **Deploy**
+3. **Project Name**: `onsite-eagle-monitor`
+4. Em **Root Directory**, clicar Edit e selecionar: `apps/monitor`
+5. Framework Preset: **Next.js** (auto-detectado)
+6. Expandir **Build and Output Settings** e ativar Override:
+   - **Build Command**: `npx turbo build --filter=@onsite/monitor`
+   - **Output Directory**: `apps/monitor/.next`
+7. Clicar **Deploy**
+
+> **IMPORTANTE:** Sem o `--filter`, Turborepo builda TODOS os 28 packages do monorepo.
+> Sem o Output Directory override, Vercel procura `.next` na raiz e nao encontra.
 
 ### 9.2 Environment Variables
 
-Em **Settings > Environment Variables**, adicionar para Production + Preview:
+**Team-level (Shared)** — configurar 1x, todos os projetos herdam:
 
-| Variavel | Tipo | Valor |
-|----------|------|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Plain | `https://dbasazrdbtigrdntaehb.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Plain | *(anon key do projeto)* |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret | *(service role key)* |
-| `OPENAI_API_KEY` | Secret | *(OpenAI key)* |
+| Variavel | Tipo |
+|----------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Plain |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Plain |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret |
+| `OPENAI_API_KEY` | Secret |
 
-> Dica: Use **Shared Environment Variables** no nivel do Team para as variaveis Supabase.
+**Project-level** — nenhuma variavel extra necessaria para o Monitor.
+Todas as 4 variaveis vem do Team shared.
 
 ### 9.3 Custom Domain
 
@@ -237,4 +244,22 @@ Isso pula o build se nenhum arquivo relevante mudou.
 
 ## 10. Historico de Erros
 
-*(Nenhum erro documentado ainda. Adicionar conforme surgirem.)*
+### Sessao: 2026-02-27 — Primeiro Deploy Vercel
+
+#### Aprendizado 1: Build Command precisa de --filter
+| Campo | Detalhe |
+|-------|---------|
+| **Data** | 2026-02-27 |
+| **Sintoma** | Build falhava com erro do calculator (PostCSS ESM) matando todos os apps |
+| **Causa Raiz** | `turbo build` sem `--filter` builda TODOS os 28 packages do monorepo. Erro em qualquer app cancela todos |
+| **Fix** | Build Command override: `npx turbo build --filter=@onsite/monitor` |
+| **Arquivos** | Vercel Dashboard > Settings > Build and Deployment |
+
+#### Aprendizado 2: Output Directory precisa de override
+| Campo | Detalhe |
+|-------|---------|
+| **Data** | 2026-02-27 |
+| **Sintoma** | `The Next.js output directory ".next" was not found at "/vercel/path0/.next"` |
+| **Causa Raiz** | Vercel procura `.next` na raiz do repo, mas o build gera em `apps/monitor/.next` |
+| **Fix** | Output Directory override: `apps/monitor/.next` |
+| **Arquivos** | Vercel Dashboard > Settings > Build and Deployment |

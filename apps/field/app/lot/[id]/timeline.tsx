@@ -48,20 +48,20 @@ export default function TimelineScreen() {
 
   async function loadHouseAndMessages() {
     try {
-      // Get house to know site_id
+      // Get lot to know jobsite_id
       const { data: house } = await supabase
-        .from('egl_houses')
-        .select('id, lot_number, site_id')
+        .from('frm_lots')
+        .select('id, lot_number, jobsite_id')
         .eq('id', id)
         .single();
 
       if (!house) return;
-      setSiteId(house.site_id);
+      setSiteId(house.jobsite_id);
       setLotNumber(house.lot_number);
 
       // Fetch messages
       const { data, error } = await fetchMessages(supabase as never, {
-        site_id: house.site_id,
+        site_id: house.jobsite_id,
         house_id: id,
         limit: 100,
       });

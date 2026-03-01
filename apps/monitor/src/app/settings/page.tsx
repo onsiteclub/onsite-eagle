@@ -275,7 +275,7 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
     setLoading(true)
     try {
       const { data, error } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .insert({
           name: formData.name.trim(),
           address: formData.address.trim() || null,
@@ -297,9 +297,9 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
         const lotsToCreate = []
         for (let i = 1; i <= totalLots; i++) {
           lotsToCreate.push({
-            site_id: data.id,
+            jobsite_id: data.id,
             lot_number: String(i),
-            status: 'not_started',
+            status: 'pending',
             current_phase: 1,
             progress_percentage: 0,
             is_issued: false,
@@ -314,7 +314,7 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
           const chunk = lotsToCreate.slice(i, i + chunkSize)
 
           const { data: insertedData, error: insertError } = await supabase
-            .from('egl_houses')
+            .from('frm_lots')
             .insert(chunk)
             .select()
 
@@ -329,7 +329,7 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
 
         // Update total_lots count with actual created count
         await supabase
-          .from('egl_sites')
+          .from('frm_jobsites')
           .update({ total_lots: created })
           .eq('id', data.id)
       }

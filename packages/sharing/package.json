@@ -10,8 +10,18 @@
     "./qr": "./src/qr.ts",
     "./types": "./src/types.ts"
   },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {},
   "peerDependencies": {
     "@supabase/supabase-js": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5",
+    "typescript-eslint": "^8.0.0"
   }
 }

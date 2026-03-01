@@ -31,7 +31,8 @@ const URGENCY_COLORS: Record<UrgencyLevel, string> = {
 }
 
 const STATUS_COLORS: Record<MaterialRequestStatus, string> = {
-  pending: '#FF9500',
+  requested: '#FF9500',
+  authorized: '#AF52DE',
   acknowledged: '#007AFF',
   in_transit: '#5856D6',
   delivered: '#34C759',
@@ -39,7 +40,8 @@ const STATUS_COLORS: Record<MaterialRequestStatus, string> = {
 }
 
 const STATUS_ICONS: Record<MaterialRequestStatus, React.ElementType> = {
-  pending: Clock,
+  requested: Clock,
+  authorized: CheckCircle2,
   acknowledged: CheckCircle2,
   in_transit: Truck,
   delivered: CheckCircle2,
@@ -77,8 +79,8 @@ export default function MaterialRequestsView({
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'egl_material_requests',
-        filter: isLotLevel ? `house_id=eq.${houseId}` : `site_id=eq.${siteId}`
+        table: 'frm_material_requests',
+        filter: isLotLevel ? `lot_id=eq.${houseId}` : `jobsite_id=eq.${siteId}`
       }, () => {
         loadRequests()
       })
@@ -120,20 +122,20 @@ export default function MaterialRequestsView({
     return requests.filter(req => {
       if (statusFilter !== 'all' && req.status !== statusFilter) return false
       if (urgencyFilter !== 'all' && req.urgency_level !== urgencyFilter) return false
-      if (lotFilter !== 'all' && req.house_id !== lotFilter) return false
+      if (lotFilter !== 'all' && req.lot_id !== lotFilter) return false
       return true
     })
   }, [requests, statusFilter, urgencyFilter, lotFilter])
 
   const stats = useMemo(() => {
-    const pending = requests.filter(r => r.status === 'pending').length
+    const pending = requests.filter(r => r.status === 'requested').length
     const inTransit = requests.filter(r => r.status === 'in_transit').length
     const deliveredToday = requests.filter(r => {
       if (r.status !== 'delivered' || !r.delivered_at) return false
       const deliveredDate = new Date(r.delivered_at).toDateString()
       return deliveredDate === new Date().toDateString()
     }).length
-    const critical = requests.filter(r => r.urgency_level === 'critical' && r.status === 'pending').length
+    const critical = requests.filter(r => r.urgency_level === 'critical' && r.status === 'requested').length
     return { pending, inTransit, deliveredToday, critical }
   }, [requests])
 
@@ -385,7 +387,7 @@ function MaterialRequestCard({ request, onStatusChange }: MaterialRequestCardPro
                       onClick={() => setShowActions(false)}
                     />
                     <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5EA] rounded-lg shadow-lg z-20 py-1 min-w-[160px]">
-                      {request.status === 'pending' && (
+                      {request.status === 'requested' && (
                         <>
                           <button
                             onClick={() => {

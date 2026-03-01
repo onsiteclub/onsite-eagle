@@ -44,9 +44,9 @@ export default function SteelPostsSheet({ siteId, siteName }: SteelPostsSheetPro
 
     // Get all houses for this site
     const { data: houses } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id, lot_number')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
       .order('lot_number')
 
     if (!houses?.length) {
@@ -57,12 +57,12 @@ export default function SteelPostsSheet({ siteId, siteName }: SteelPostsSheetPro
 
     const houseMap = new Map(houses.map(h => [h.id, h.lot_number]))
 
-    // Get material tracking records — filter by site_id directly (table has site_id column)
+    // Get material tracking records — filter by jobsite_id directly (table has jobsite_id column)
     const { data: materials } = await supabase
-      .from('egl_material_tracking')
-      .select('id, house_id, material_type, quantity, length_inches, ordered_at, delivered_at, installed_at, welded_at')
-      .eq('site_id', siteId)
-      .order('house_id')
+      .from('frm_material_tracking')
+      .select('id, lot_id, material_type, quantity, length_inches, ordered_at, delivered_at, installed_at, welded_at')
+      .eq('jobsite_id', siteId)
+      .order('lot_id')
 
     if (!materials?.length) {
       setRows([])
@@ -72,7 +72,7 @@ export default function SteelPostsSheet({ siteId, siteName }: SteelPostsSheetPro
 
     const steelRows: SteelPostRow[] = materials.map(m => ({
       id: m.id,
-      lot_number: houseMap.get(m.house_id) || '',
+      lot_number: houseMap.get(m.lot_id) || '',
       quantity: m.quantity || 0,
       post_type: m.material_type || '',
       length_inches: m.length_inches || null,

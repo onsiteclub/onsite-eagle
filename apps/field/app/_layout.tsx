@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider, useAuth } from '@onsite/auth';
 import { initQueue, useOfflineSync } from '@onsite/offline';
+import { logger } from '@onsite/logger';
 import { supabase } from '../src/lib/supabase';
 
 // Initialize offline queue with AsyncStorage
@@ -34,7 +35,7 @@ function AppContent() {
     netInfo: NetInfo,
     onFlush: (result) => {
       if (result.flushed > 0) {
-        console.log(`[offline] Flushed ${result.flushed} queued items`);
+        logger.info('SYNC', 'Flushed queued items', { flushed: result.flushed });
       }
     },
   });
@@ -42,7 +43,7 @@ function AppContent() {
   // Log connectivity status changes
   useEffect(() => {
     if (queueSize > 0) {
-      console.log(`[offline] ${queueSize} items pending, online: ${isOnline}`);
+      logger.debug('SYNC', 'Offline queue status', { queueSize, isOnline });
     }
   }, [queueSize, isOnline]);
 

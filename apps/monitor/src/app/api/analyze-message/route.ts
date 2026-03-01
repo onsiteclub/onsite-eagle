@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     let lotContext = ''
     if (houseId) {
       const { data: house } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('*')
         .eq('id', houseId)
         .single()

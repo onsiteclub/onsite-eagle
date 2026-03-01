@@ -76,7 +76,7 @@ export default function ScheduleTab({ siteId, siteName }: ScheduleTabProps) {
     setLoading(true)
     const range = getMonthRange(currentMonth)
     const result = await fetchAgendaEvents(supabase as never, {
-      site_id: siteId,
+      jobsite_id: siteId,
       start_date: range.start,
       end_date: range.end,
     })
@@ -331,7 +331,7 @@ function CreateEventModal({
     const { data: userData } = await supabase.auth.getUser()
 
     const result = await createAgendaEvent(supabase as never, {
-      site_id: siteId,
+      jobsite_id: siteId,
       event_type: eventType,
       title: title.trim(),
       description: description.trim() || undefined,

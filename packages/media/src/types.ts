@@ -7,15 +7,15 @@
  * - Document storage (per house/site)
  * - Prumo training metadata (photo quality, eligibility)
  *
- * Storage: Supabase Storage (buckets: egl-media, tmk-exports)
- * Metadata: egl_photos, egl_documents, egl_document_links
+ * Storage: Supabase Storage (buckets: frm-media, tmk-exports)
+ * Metadata: frm_photos, frm_documents, frm_document_links
  */
 
 // ─── Photo ──────────────────────────────────────────────────
 
 export interface Photo {
   id: string;
-  house_id: string;
+  lot_id: string;
   phase_id: string | null;
   uploaded_by: string;
   photo_url: string;
@@ -50,8 +50,8 @@ export interface PhotoMetadata {
 
 export interface Document {
   id: string;
-  site_id: string | null;
-  house_id: string | null;
+  jobsite_id: string | null;
+  lot_id: string | null;
   name: string;
   description: string | null;
   file_url: string;
@@ -71,8 +71,8 @@ export type DocumentCategory =
 /** A plan distributed to workers via Timekeeper. */
 export interface ConstructionPlan {
   id: string;
-  site_id: string;
-  house_id: string | null;
+  jobsite_id: string;
+  lot_id: string | null;
   name: string;
   file_url: string;
   file_type: 'pdf' | 'png' | 'jpg';
@@ -86,9 +86,9 @@ export interface ConstructionPlan {
 
 export interface UploadOptions {
   bucket: string;
-  /** Path template: {site_id}/{house_id}/{timestamp}_{random}_{filename} */
-  site_id: string;
-  house_id?: string;
+  /** Path template: {jobsite_id}/{lot_id}/{timestamp}_{random}_{filename} */
+  jobsite_id: string;
+  lot_id?: string;
   file_name: string;
   content_type: string;
 }
@@ -104,8 +104,8 @@ export interface UploadResult {
 // ─── Storage Buckets ────────────────────────────────────────
 
 export const BUCKETS = {
-  EGL_MEDIA: 'egl-media',       // Photos, documents, plans (public)
-  EGL_REPORTS: 'egl-reports',   // AI-generated reports (private)
+  FRM_MEDIA: 'frm-media',       // Photos, documents, plans (public)
+  FRM_REPORTS: 'frm-reports',   // AI-generated reports (private)
   TMK_EXPORTS: 'tmk-exports',  // Hour exports CSV/PDF (private)
   CCL_AUDIO: 'ccl-audio',      // Voice recordings (private)
   SHP_PRODUCTS: 'shp-products', // Product images (public)

@@ -67,9 +67,9 @@
 | `/api/messages` | CRUD de mensagens da timeline |
 | `/api/documents` | Lista documentos do lote/site |
 | `/api/upload` | Upload de arquivos para Supabase Storage |
-| `/api/lots/[id]` | CRUD de lotes (egl_houses) |
-| `/api/lots/[id]/issue` | Criar issue (egl_issues) |
-| `/api/schedules` | Dados de schedule (egl_schedules) |
+| `/api/lots/[id]` | CRUD de lotes (frm_lots) |
+| `/api/lots/[id]/issue` | Criar issue (frm_house_items) |
+| `/api/schedules` | Dados de schedule (frm_schedules) |
 | `/api/events` | Eventos externos (weather, permits) |
 | `/api/push/send` | Enviar push notification |
 | `/api/public/site/[id]` | API publica para links compartilhados |
@@ -94,17 +94,17 @@
 
 | Tabela | Uso |
 |--------|-----|
-| `egl_sites` | Sites de construcao |
-| `egl_houses` | Lotes com status e progresso |
-| `egl_progress` | Fases por lote |
-| `egl_photos` | Fotos com validacao AI |
-| `egl_timeline` / `egl_messages` | Timeline colaborativa |
-| `egl_issues` | Defeitos reportados |
-| `egl_documents` | Documentos por lote |
-| `egl_schedules` | Cronograma por lote |
-| `egl_schedule_phases` | Fases do cronograma |
-| `egl_external_events` | Clima, permits, inspecoes |
-| `egl_material_requests` | Pedidos de materiais |
+| `frm_jobsites` | Sites de construcao |
+| `frm_lots` | Lotes com status e progresso |
+| `frm_progress` | Fases por lote |
+| `frm_photos` | Fotos com validacao AI |
+| `frm_timeline` / `frm_messages` | Timeline colaborativa |
+| `frm_house_items` | Defeitos reportados |
+| `frm_documents` | Documentos por lote |
+| `frm_schedules` | Cronograma por lote |
+| `frm_schedule_phases` | Fases do cronograma |
+| `frm_external_events` | Clima, permits, inspecoes |
+| `frm_material_requests` | Pedidos de materiais |
 | `core_profiles` | Perfis de usuarios |
 | `ref_eagle_phases` | 7 fases padrao |
 | `ref_eagle_phase_items` | 66 itens de checklist |
@@ -113,19 +113,19 @@
 
 | Tabela | Uso |
 |--------|-----|
-| `egl_houses` | Criar/editar lotes |
-| `egl_timeline` | Postar eventos |
-| `egl_photos` | Upload + resultado AI |
-| `egl_issues` | Criar issues |
-| `egl_progress` | Aprovar fases |
-| `egl_documents` | Upload documentos |
-| `egl_material_requests` | Criar pedidos de material |
+| `frm_lots` | Criar/editar lotes |
+| `frm_timeline` | Postar eventos |
+| `frm_photos` | Upload + resultado AI |
+| `frm_house_items` | Criar issues |
+| `frm_progress` | Aprovar fases |
+| `frm_documents` | Upload documentos |
+| `frm_material_requests` | Criar pedidos de material |
 
 ### Storage
 
 | Bucket | Uso |
 |--------|-----|
-| `egl-media` | Fotos, documentos, plantas |
+| `frm-media` | Fotos, documentos, plantas |
 
 ### Componentes Principals (20+)
 
@@ -145,9 +145,9 @@
 ### Conexao com Outros Apps
 
 ```
-Field (worker) ──[fotos]──→ egl_photos ──→ Monitor (supervisor valida)
-Monitor ──[pedido material]──→ egl_material_requests ──→ Operator (entrega)
-Monitor ──[timeline msg]──→ AI mediate → egl_timeline ──→ Field + Operator (veem)
+Field (worker) ──[fotos]──→ frm_photos ──→ Monitor (supervisor valida)
+Monitor ──[pedido material]──→ frm_material_requests ──→ Operator (entrega)
+Monitor ──[timeline msg]──→ AI mediate → frm_timeline ──→ Field + Operator (veem)
 Timekeeper ──[horas]──→ tmk_entries ──→ Monitor (HoursSheet consulta)
 ```
 

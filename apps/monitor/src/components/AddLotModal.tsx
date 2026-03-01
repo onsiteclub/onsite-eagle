@@ -32,9 +32,9 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
 
   async function fetchExistingLots() {
     const { data } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('lot_number')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
 
     if (data) {
       const lots = data.map(h => h.lot_number)
@@ -70,12 +70,12 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
 
     try {
       const { error: insertError } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .insert({
-          site_id: siteId,
+          jobsite_id: siteId,
           lot_number: lotNumber.trim(),
           address: address.trim() || null,
-          status: 'not_started',
+          status: 'pending',
           current_phase: 1,
           progress_percentage: 0,
           is_issued: false, // Locked until issued with worker & plans
@@ -130,7 +130,7 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
 
     try {
       // Check for conflicts first
-      const lotsToCreate: { lot_number: string; site_id: string; status: string; current_phase: number; progress_percentage: number; is_issued: boolean }[] = []
+      const lotsToCreate: { lot_number: string; jobsite_id: string; status: string; current_phase: number; progress_percentage: number; is_issued: boolean }[] = []
       const conflicts: string[] = []
 
       for (let i = 0; i < count; i++) {
@@ -139,9 +139,9 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
           conflicts.push(lotNum)
         } else {
           lotsToCreate.push({
-            site_id: siteId,
+            jobsite_id: siteId,
             lot_number: lotNum,
-            status: 'not_started',
+            status: 'pending',
             current_phase: 1,
             progress_percentage: 0,
             is_issued: false, // Locked until issued with worker & plans
@@ -167,7 +167,7 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
         logger.debug('EAGLE', 'Inserting chunk', { chunkSize: chunk.length })
 
         const { data: insertedData, error: insertError } = await supabase
-          .from('egl_houses')
+          .from('frm_lots')
           .insert(chunk)
           .select()
 
@@ -213,22 +213,22 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
   async function updateSiteTotalLots(addCount: number) {
     // Count actual lots in the database to ensure accuracy
     const { count, error: countError } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('*', { count: 'exact', head: true })
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
 
     if (countError) {
       console.error('[AddLotModal] Error counting lots:', countError)
       // Fallback to incremental update
       const { data: siteData } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .select('total_lots')
         .eq('id', siteId)
         .single()
 
       if (siteData) {
         await supabase
-          .from('egl_sites')
+          .from('frm_jobsites')
           .update({ total_lots: (siteData.total_lots || 0) + addCount })
           .eq('id', siteId)
       }
@@ -236,7 +236,7 @@ export default function AddLotModal({ isOpen, onClose, siteId, onSuccess }: AddL
       // Use actual count from database
       logger.info('EAGLE', 'Syncing total_lots to actual count', { count: count ?? 0 })
       await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .update({ total_lots: count || 0 })
         .eq('id', siteId)
     }

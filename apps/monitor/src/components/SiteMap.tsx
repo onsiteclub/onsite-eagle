@@ -57,11 +57,13 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?:
 
 // Light theme status colors
 const LIGHT_STATUS_COLORS: Record<HouseStatus, string> = {
-  not_started: STATUS_CONFIG.not_started.color,
+  pending: STATUS_CONFIG.pending?.color ?? '#E5E5EA',
+  released: STATUS_CONFIG.released?.color ?? '#5AC8FA',
   in_progress: STATUS_CONFIG.in_progress.color,
-  delayed: STATUS_CONFIG.delayed.color,
+  paused_for_trades: STATUS_CONFIG.paused_for_trades?.color ?? '#FF9500',
+  backframe: STATUS_CONFIG.backframe?.color ?? '#AF52DE',
+  inspection: STATUS_CONFIG.inspection?.color ?? '#007AFF',
   completed: STATUS_CONFIG.completed.color,
-  on_hold: STATUS_CONFIG.on_hold.color,
 }
 
 export default function SiteMap({
@@ -96,7 +98,7 @@ export default function SiteMap({
     try {
       // Fetch site SVG
       const { data: site } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .select('svg_data')
         .eq('id', siteId)
         .single()
@@ -107,9 +109,9 @@ export default function SiteMap({
 
       // Fetch houses
       const { data: housesData } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('*')
-        .eq('site_id', siteId)
+        .eq('jobsite_id', siteId)
         .order('lot_number')
 
       if (housesData) {
@@ -118,9 +120,9 @@ export default function SiteMap({
 
       // Fetch timeline events for all houses in site
       const { data: eventsData } = await supabase
-        .from('egl_timeline')
+        .from('frm_timeline')
         .select('*')
-        .in('house_id', housesData?.map(h => h.id) || [])
+        .in('lot_id', housesData?.map(h => h.id) || [])
         .order('created_at', { ascending: false })
         .limit(100)
 
@@ -130,9 +132,9 @@ export default function SiteMap({
 
       // Fetch issues for all houses in site
       const { data: issuesData } = await supabase
-        .from('egl_issues')
+        .from('frm_house_items')
         .select('*')
-        .in('house_id', housesData?.map(h => h.id) || [])
+        .in('lot_id', housesData?.map(h => h.id) || [])
         .eq('status', 'open')
 
       if (issuesData) {
@@ -162,7 +164,7 @@ export default function SiteMap({
         if (house) {
           const rect = lot.querySelector('.lot-rect')
           if (rect) {
-            rect.setAttribute('fill', LIGHT_STATUS_COLORS[house.status] || LIGHT_STATUS_COLORS.not_started)
+            rect.setAttribute('fill', LIGHT_STATUS_COLORS[house.status] || LIGHT_STATUS_COLORS.pending)
             rect.setAttribute('data-house-id', house.id)
           }
 
@@ -176,13 +178,13 @@ export default function SiteMap({
   // Get events for a specific house
   const getHouseEvents = (houseId: string) => {
     return events
-      .filter(e => e.house_id === houseId)
+      .filter(e => e.lot_id === houseId)
       .slice(0, 3)
   }
 
   // Get open issues count for a house
   const getOpenIssuesCount = (houseId: string) => {
-    return issues.filter(i => i.house_id === houseId && i.status === 'open').length
+    return issues.filter(i => i.lot_id === houseId && i.status === 'open').length
   }
 
   // Format relative time

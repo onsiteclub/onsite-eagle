@@ -2,7 +2,7 @@
  * @onsite/media — Data layer for documents and plans.
  *
  * Pure functions receiving supabase client (adapter pattern).
- * Queries egl_documents and egl_document_links tables.
+ * Queries frm_documents and frm_document_links tables.
  */
 
 import type { Document, ConstructionPlan } from './types';
@@ -23,14 +23,14 @@ type SupabaseClient = {
 // ─── Fetch Options ──────────────────────────────────────────
 
 export interface FetchDocumentsOptions {
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   category?: string;
 }
 
 export interface FetchPlansOptions {
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
 }
 
 // ─── Result type ────────────────────────────────────────────
@@ -45,8 +45,8 @@ interface QueryResult<T> {
 function mapRowToDocument(row: Record<string, unknown>): Document {
   return {
     id: row.id as string,
-    site_id: (row.site_id as string) || null,
-    house_id: (row.house_id as string) || null,
+    jobsite_id: (row.jobsite_id as string) || null,
+    lot_id: (row.lot_id as string) || null,
     name: (row.name as string) || '',
     description: (row.description as string) || null,
     file_url: row.file_url as string,
@@ -61,8 +61,8 @@ function mapRowToDocument(row: Record<string, unknown>): Document {
 function mapRowToPlan(row: Record<string, unknown>): ConstructionPlan {
   return {
     id: row.id as string,
-    site_id: (row.site_id as string) || '',
-    house_id: (row.house_id as string) || null,
+    jobsite_id: (row.jobsite_id as string) || '',
+    lot_id: (row.lot_id as string) || null,
     name: (row.name as string) || '',
     file_url: row.file_url as string,
     file_type: (row.file_type as string as ConstructionPlan['file_type']) || 'pdf',
@@ -76,8 +76,8 @@ function mapRowToPlan(row: Record<string, unknown>): ConstructionPlan {
 // ─── Public API ─────────────────────────────────────────────
 
 /**
- * Fetch documents from egl_documents.
- * Optionally filter by site_id, house_id, and/or category.
+ * Fetch documents from frm_documents.
+ * Optionally filter by jobsite_id, lot_id, and/or category.
  */
 export async function fetchDocuments(
   supabase: SupabaseClient,
@@ -85,16 +85,16 @@ export async function fetchDocuments(
 ): Promise<QueryResult<Document>> {
   try {
     let query = supabase
-      .from('egl_documents')
+      .from('frm_documents')
       .select('*')
-      .eq('site_id', options.site_id) as unknown as {
+      .eq('jobsite_id', options.jobsite_id) as unknown as {
         eq: (col: string, val: unknown) => unknown;
         is: (col: string, val: unknown) => unknown;
         order: (col: string, opts?: { ascending?: boolean }) => unknown;
       };
 
-    if (options.house_id) {
-      query = query.eq('house_id', options.house_id) as typeof query;
+    if (options.lot_id) {
+      query = query.eq('lot_id', options.lot_id) as typeof query;
     }
 
     if (options.category) {
@@ -129,17 +129,17 @@ export async function fetchPlans(
 ): Promise<QueryResult<ConstructionPlan>> {
   try {
     let query = supabase
-      .from('egl_documents')
+      .from('frm_documents')
       .select('*')
-      .eq('site_id', options.site_id) as unknown as {
+      .eq('jobsite_id', options.jobsite_id) as unknown as {
         eq: (col: string, val: unknown) => unknown;
         is: (col: string, val: unknown) => unknown;
         in: (col: string, vals: unknown[]) => unknown;
         order: (col: string, opts?: { ascending?: boolean }) => unknown;
       };
 
-    if (options.house_id) {
-      query = query.eq('house_id', options.house_id) as typeof query;
+    if (options.lot_id) {
+      query = query.eq('lot_id', options.lot_id) as typeof query;
     }
 
     query = query.in('category', ['plan', 'blueprint']) as typeof query;
@@ -162,18 +162,18 @@ export async function fetchPlans(
 }
 
 /**
- * Fetch plans linked to a specific house via egl_document_links.
- * Complements fetchPlans for houses that have plans linked via bulk upload.
+ * Fetch plans linked to a specific lot via frm_document_links.
+ * Complements fetchPlans for lots that have plans linked via bulk upload.
  */
 export async function fetchLinkedPlans(
   supabase: SupabaseClient,
-  houseId: string,
+  lotId: string,
 ): Promise<QueryResult<ConstructionPlan>> {
   try {
     const result = await (supabase
-      .from('v_house_documents')
+      .from('v_lot_documents')
       .select('*')
-      .eq('house_id', houseId) as unknown as
+      .eq('lot_id', lotId) as unknown as
       Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>);
 
     if (result.error) {
@@ -183,8 +183,8 @@ export async function fetchLinkedPlans(
     return {
       data: (result.data || []).map((row) => ({
         id: row.document_id as string,
-        site_id: '',
-        house_id: houseId,
+        jobsite_id: '',
+        lot_id: lotId,
         name: (row.file_name as string) || '',
         file_url: row.file_url as string,
         file_type: (row.file_type as string as ConstructionPlan['file_type']) || 'pdf',

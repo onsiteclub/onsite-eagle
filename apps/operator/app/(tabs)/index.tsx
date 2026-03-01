@@ -70,15 +70,15 @@ export default function RequestsQueue() {
     if (siteIds.length === 0) return;
 
     const channelConfig = siteIds.length === 1
-      ? { event: '*' as const, schema: 'public', table: 'egl_material_requests', filter: `site_id=eq.${siteIds[0]}` }
-      : { event: '*' as const, schema: 'public', table: 'egl_material_requests' };
+      ? { event: '*' as const, schema: 'public', table: 'frm_material_requests', filter: `jobsite_id=eq.${siteIds[0]}` }
+      : { event: '*' as const, schema: 'public', table: 'frm_material_requests' };
 
     const channel = supabase
       .channel('operator-requests')
       .on('postgres_changes', channelConfig, (payload) => {
         // Multi-site: check if change belongs to our sites
         if (siteIds.length > 1) {
-          const siteId = (payload.new as any)?.site_id || (payload.old as any)?.site_id;
+          const siteId = (payload.new as any)?.jobsite_id || (payload.old as any)?.jobsite_id;
           if (siteId && !siteIds.includes(siteId)) return;
         }
         loadRequestsRef.current?.();
@@ -93,13 +93,13 @@ export default function RequestsQueue() {
   async function loadAssignments(userId: string) {
     // Load assigned site IDs for realtime filter
     const { data: assignments } = await supabase
-      .from('egl_operator_assignments')
-      .select('site_id')
+      .from('frm_operator_assignments')
+      .select('jobsite_id')
       .eq('operator_id', userId)
       .eq('is_active', true);
 
     if (assignments && assignments.length > 0) {
-      setSiteIds(assignments.map((a: any) => a.site_id));
+      setSiteIds(assignments.map((a: any) => a.jobsite_id));
     }
 
     // Initial load

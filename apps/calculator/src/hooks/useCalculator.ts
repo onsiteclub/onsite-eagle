@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { calculate, type CalculationResult } from '../lib/calculator';
 import { saveCalculation, type InputMethod } from '../lib/calculations';
 import { logger } from '../lib/logger';
+import { logger as pkgLogger } from '@onsite/logger';
 
 interface SaveOptions {
   userId?: string;
@@ -177,7 +178,7 @@ export function useCalculator(): UseCalculatorReturn {
         finalExpression = `${previousResult} ${operator.trim()} ${rest}`;
       }
 
-      console.log('[useCalculator] Voice continuation detected:', {
+      pkgLogger.debug('VOICE', 'Voice continuation detected', {
         original: value,
         previousResult,
         finalExpression,

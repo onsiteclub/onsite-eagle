@@ -20,7 +20,7 @@ export default async function StatsPage() {
       .eq('user_id', user.id)
       .is('deleted_at', null),
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('id', { count: 'exact', head: true })
       .eq('uploaded_by', user.id),
     supabase

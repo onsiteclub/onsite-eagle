@@ -25,6 +25,9 @@ import {
   Network,
   FileText,
   LucideIcon,
+  Building2,
+  MapPin,
+  ClipboardList,
 } from 'lucide-react'
 
 interface SidebarSection {
@@ -52,6 +55,15 @@ const sections: SidebarSection[] = [
       { name: 'Rewards', href: '/club/rewards', icon: Award },
       { name: 'Wallet', href: '/club/wallet', icon: Wallet },
       { name: 'News', href: '/club/news', icon: Newspaper },
+    ],
+  },
+  {
+    title: 'Framing',
+    items: [
+      { name: 'Overview', href: '/app/framing', icon: HardHat },
+      { name: 'Jobsites', href: '/app/framing/jobsites', icon: MapPin },
+      { name: 'Crews', href: '/app/framing/crews', icon: Users },
+      { name: 'Assignments', href: '/app/framing/assignments', icon: ClipboardList },
     ],
   },
   {

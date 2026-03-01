@@ -5,7 +5,7 @@
  * Monitor, Timekeeper, and Operator. Nobody chats directly — all text goes
  * through AI and becomes a typed event.
  *
- * Data lives in `egl_messages` (chat-style) and `egl_timeline` (events).
+ * Data lives in `frm_messages` (chat-style) and `frm_timeline` (events).
  */
 
 // ─── Message (Chat-style feed) ──────────────────────────────
@@ -14,8 +14,8 @@ export type SenderType = 'worker' | 'supervisor' | 'operator' | 'ai' | 'system';
 
 export interface TimelineMessage {
   id: string;
-  site_id: string;
-  house_id: string | null;
+  jobsite_id: string;
+  lot_id: string | null;
   sender_type: SenderType;
   sender_id: string | null;
   sender_name: string;
@@ -36,7 +36,7 @@ export interface MessageAttachment {
   name?: string;
 }
 
-export type SourceApp = 'monitor' | 'timekeeper' | 'operator';
+export type SourceApp = 'monitor' | 'timekeeper' | 'operator' | 'inspect';
 
 // ─── AI Mediation ───────────────────────────────────────────
 
@@ -46,8 +46,8 @@ export interface AIMediationInput {
   sender_type: SenderType;
   sender_id: string;
   sender_name: string;
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   source_app: SourceApp;
 }
 
@@ -65,7 +65,7 @@ export interface AIMediationResult {
     quantity?: number;
     unit?: string;
     urgency: 'low' | 'medium' | 'high' | 'critical';
-    house_id?: string;
+    lot_id?: string;
   };
   /** Optional: alert to send to foreman */
   alert?: {
@@ -125,8 +125,8 @@ export type TimelineEventType =
 // ─── Fetch/Subscribe Options ────────────────────────────────
 
 export interface TimelineFetchOptions {
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   limit?: number;
   offset?: number;
   before?: string;
@@ -134,8 +134,8 @@ export interface TimelineFetchOptions {
 }
 
 export interface TimelineSubscribeOptions {
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   onMessage: (message: TimelineMessage) => void;
 }
 

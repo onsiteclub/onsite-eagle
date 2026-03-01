@@ -218,14 +218,14 @@ Return JSON:
     { "title": "string", "content": "string", "type": "progress|alert|external|worker|prediction", "data": {} }
   ],
   "metrics": {
-    "houses_on_track": number,
-    "houses_at_risk": number,
-    "houses_delayed": number,
+    "lots_on_track": number,
+    "lots_at_risk": number,
+    "lots_delayed": number,
     "weather_days_lost": number,
     "avg_progress_pct": number
   },
   "alerts": [
-    { "severity": "low|medium|high|critical", "message": "string", "house_id": "string|null" }
+    { "severity": "low|medium|high|critical", "message": "string", "lot_id": "string|null" }
   ]
 }
 

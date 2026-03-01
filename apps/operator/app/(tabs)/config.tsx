@@ -49,8 +49,8 @@ export default function ConfigScreen() {
     try {
       // Load assignment + availability
       const { data: assignment } = await supabase
-        .from('egl_operator_assignments')
-        .select('id, site_id, is_available, site:egl_sites(name)')
+        .from('frm_operator_assignments')
+        .select('id, jobsite_id, is_available, jobsite:frm_jobsites(name)')
         .eq('operator_id', userId)
         .eq('is_active', true)
         .maybeSingle();
@@ -58,7 +58,7 @@ export default function ConfigScreen() {
       if (assignment) {
         setAssignmentId(assignment.id);
         setIsAvailable(assignment.is_available !== false);
-        setSiteName((assignment as any).site?.name || null);
+        setSiteName((assignment as any).jobsite?.name || null);
       }
     } catch (err) {
       console.error('Error loading config:', err);
@@ -78,7 +78,7 @@ export default function ConfigScreen() {
 
     try {
       const { error } = await supabase
-        .from('egl_operator_assignments')
+        .from('frm_operator_assignments')
         .update({
           is_available: value,
           available_since: value ? new Date().toISOString() : null,

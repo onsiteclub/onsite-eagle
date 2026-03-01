@@ -32,9 +32,9 @@ export default function FramersSheet({ siteId, siteName }: FramersSheetProps) {
 
     // Get all houses for this site
     const { data: houses } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
 
     if (!houses?.length) {
       setRows([])
@@ -56,9 +56,9 @@ export default function FramersSheet({ siteId, siteName }: FramersSheetProps) {
 
     // Get phase assignments — worker_id UUID FK, phase_id UUID FK
     const { data: assignments } = await supabase
-      .from('egl_phase_assignments')
-      .select('house_id, phase_id, worker_id')
-      .in('house_id', houseIds)
+      .from('frm_phase_assignments')
+      .select('lot_id, phase_id, worker_id')
+      .in('lot_id', houseIds)
 
     if (!assignments?.length) {
       setRows([])
@@ -89,11 +89,11 @@ export default function FramersSheet({ siteId, siteName }: FramersSheetProps) {
         workerCountMap.set(workerId, { frame: new Set(), roof: new Set(), all: new Set() })
       }
       const w = workerCountMap.get(workerId)!
-      w.all.add(a.house_id)
+      w.all.add(a.lot_id)
 
       const trade = phaseTradeMap.get(a.phase_id)
-      if (trade === 'framing') w.frame.add(a.house_id)
-      else if (trade === 'roofing') w.roof.add(a.house_id)
+      if (trade === 'framing') w.frame.add(a.lot_id)
+      else if (trade === 'roofing') w.roof.add(a.lot_id)
     }
 
     // Build rows sorted by total desc

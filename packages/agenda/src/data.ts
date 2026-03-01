@@ -1,8 +1,8 @@
 /**
  * @onsite/agenda — Data layer for Agenda events.
  *
- * Fetches from `egl_external_events` (calendar events) and
- * `egl_schedule_phases` (phase deadlines).
+ * Fetches from `frm_external_events` (calendar events) and
+ * `frm_schedule_phases` (phase deadlines).
  *
  * All functions accept supabase client as parameter.
  */
@@ -24,11 +24,11 @@ export async function fetchAgendaEvents(
   supabase: { from: (table: string) => unknown },
   options: AgendaFetchOptions,
 ): Promise<{ data: AgendaEvent[]; error: string | null }> {
-  const { site_id, house_id, start_date, end_date, event_types } = options;
+  const { jobsite_id, lot_id, start_date, end_date, event_types } = options;
 
   try {
-    // Build query for egl_external_events
-    let query = (supabase.from('egl_external_events') as {
+    // Build query for frm_external_events
+    let query = (supabase.from('frm_external_events') as {
       select: (s: string) => unknown;
     }).select('*') as {
       eq: (col: string, val: string) => unknown;
@@ -38,12 +38,12 @@ export async function fetchAgendaEvents(
       order: (col: string, opts: { ascending: boolean }) => unknown;
     };
 
-    query = query.eq('site_id', site_id) as typeof query;
+    query = query.eq('jobsite_id', jobsite_id) as typeof query;
     query = query.gte('event_date', start_date) as typeof query;
     query = query.lte('event_date', end_date) as typeof query;
 
-    if (house_id) {
-      query = query.eq('house_id', house_id) as typeof query;
+    if (lot_id) {
+      query = query.eq('lot_id', lot_id) as typeof query;
     }
 
     if (event_types && event_types.length > 0) {
@@ -69,18 +69,18 @@ export async function fetchAgendaEvents(
  */
 export async function fetchPhaseDeadlines(
   supabase: { from: (table: string) => unknown },
-  site_id: string,
+  jobsite_id: string,
   start_date: string,
   end_date: string,
 ): Promise<{ data: PhaseDeadline[]; error: string | null }> {
   try {
-    const query = (supabase.from('egl_schedule_phases') as {
+    const query = (supabase.from('frm_schedule_phases') as {
       select: (s: string) => unknown;
     }).select(`
       id, schedule_id, phase_id, status,
       expected_start_date, expected_end_date,
       actual_start_date, actual_end_date,
-      egl_schedules!inner(house_id, egl_houses!inner(lot_number, site_id)),
+      frm_schedules!inner(lot_id, frm_lots!inner(lot_number, jobsite_id)),
       ref_eagle_phases!inner(name)
     `) as {
       gte: (col: string, val: string) => unknown;
@@ -99,8 +99,8 @@ export async function fetchPhaseDeadlines(
     // Transform to PhaseDeadline shape
     const deadlines: PhaseDeadline[] = (result.data || []).map((row: unknown) => {
       const r = row as Record<string, unknown>;
-      const schedule = r.egl_schedules as Record<string, unknown>;
-      const house = schedule?.egl_houses as Record<string, unknown>;
+      const schedule = r.frm_schedules as Record<string, unknown>;
+      const lot = schedule?.frm_lots as Record<string, unknown>;
       const phase = r.ref_eagle_phases as Record<string, unknown>;
 
       return {
@@ -108,8 +108,8 @@ export async function fetchPhaseDeadlines(
         schedule_id: r.schedule_id as string,
         phase_id: r.phase_id as string,
         phase_name: (phase?.name as string) || 'Unknown',
-        house_id: (schedule?.house_id as string) || '',
-        lot_number: (house?.lot_number as string) || '',
+        lot_id: (schedule?.lot_id as string) || '',
+        lot_number: (lot?.lot_number as string) || '',
         expected_start_date: r.expected_start_date as string | null,
         expected_end_date: r.expected_end_date as string | null,
         actual_start_date: r.actual_start_date as string | null,
@@ -127,8 +127,8 @@ export async function fetchPhaseDeadlines(
 // ─── Create Agenda Event ────────────────────────────────────
 
 export interface CreateAgendaEventInput {
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   event_type: string;
   title: string;
   description?: string;
@@ -154,10 +154,10 @@ export async function createAgendaEvent(
 ): Promise<{ data: AgendaEvent | null; error: string | null }> {
   try {
     const { data, error } = await supabase
-      .from('egl_external_events')
+      .from('frm_external_events')
       .insert({
-        site_id: input.site_id,
-        house_id: input.house_id || null,
+        jobsite_id: input.jobsite_id,
+        lot_id: input.lot_id || null,
         event_type: input.event_type,
         title: input.title,
         description: input.description || null,

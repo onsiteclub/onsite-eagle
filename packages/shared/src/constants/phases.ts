@@ -1,45 +1,17 @@
-export const CONSTRUCTION_PHASES = [
-  {
-    id: 1,
-    name: 'First Floor',
-    description: 'First floor framing - joists, subfloor, blocking',
-  },
-  {
-    id: 2,
-    name: '1st Floor Walls',
-    description: 'First floor wall framing',
-  },
-  {
-    id: 3,
-    name: 'Second Floor',
-    description: 'Second floor framing',
-  },
-  {
-    id: 4,
-    name: '2nd Floor Walls',
-    description: 'Second floor wall framing',
-  },
-  {
-    id: 5,
-    name: 'Roof',
-    description: 'Roof framing and sheathing',
-  },
-  {
-    id: 6,
-    name: 'Stairs Landing',
-    description: 'Stair framing and landing',
-  },
-  {
-    id: 7,
-    name: 'Backing Frame',
-    description: 'Backing for fixtures and finishes',
-  },
-] as const
+// Re-export framing phases
+export { FRAMING_PHASES, PHASE_ORDER, MAIN_PHASES, BACKFRAME_PHASES, getPhaseById, getNextPhase } from '@onsite/framing'
 
-export type PhaseName = typeof CONSTRUCTION_PHASES[number]['name']
+// Legacy alias (old code used CONSTRUCTION_PHASES)
+export { FRAMING_PHASES as CONSTRUCTION_PHASES } from '@onsite/framing'
 
-// Checklist item for AI-detected construction phases
-export interface ConstructionPhaseItem {
+// Legacy types (old code used ConstructionPhaseItem)
+export type { FrmPhase as ConstructionPhaseItem } from '@onsite/framing'
+export type { PhaseId as PhaseName } from '@onsite/framing'
+
+// Legacy phase items (AI checklist) — kept for backward compat
+// These were hardcoded construction checklist items, not database-driven
+// TODO: Move to @onsite/framing/constants or remove after Sprint 2
+export interface LegacyPhaseItem {
   id: string
   name: string
   description: string
@@ -47,9 +19,7 @@ export interface ConstructionPhaseItem {
   requiresPhoto: boolean
 }
 
-// Phase items - approximately 66 items total
-// AI can detect multiple items from a single photo
-export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
+export const PHASE_ITEMS: LegacyPhaseItem[][] = [
   // Phase 1: First Floor (10 items)
   [
     { id: 'ff-1', name: 'Floor Joists', description: 'Floor joists installed at proper spacing (16" or 24" OC)', isCritical: true, requiresPhoto: true },
@@ -63,7 +33,6 @@ export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
     { id: 'ff-9', name: 'Cantilever Support', description: 'Cantilever framing if applicable', isCritical: true, requiresPhoto: false },
     { id: 'ff-10', name: 'No Visible Damage', description: 'No cracked or damaged lumber', isCritical: true, requiresPhoto: false },
   ],
-
   // Phase 2: First Floor Walls (12 items)
   [
     { id: 'fw-1', name: 'Wall Studs', description: 'Studs at proper spacing (16" or 24" OC)', isCritical: true, requiresPhoto: true },
@@ -79,7 +48,6 @@ export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
     { id: 'fw-11', name: 'Door Rough Opening', description: 'Door RO per plans', isCritical: true, requiresPhoto: false },
     { id: 'fw-12', name: 'Plumb & Square', description: 'Walls plumb and square', isCritical: true, requiresPhoto: false },
   ],
-
   // Phase 3: Second Floor (8 items)
   [
     { id: 'sf-1', name: 'Floor Joists', description: 'Second floor joists installed', isCritical: true, requiresPhoto: true },
@@ -91,7 +59,6 @@ export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
     { id: 'sf-7', name: 'Joist Hangers', description: 'Joist hangers at stair opening', isCritical: true, requiresPhoto: false },
     { id: 'sf-8', name: 'Rim Board', description: 'Rim board installed', isCritical: true, requiresPhoto: false },
   ],
-
   // Phase 4: Second Floor Walls (9 items)
   [
     { id: 'sw-1', name: 'Wall Studs', description: 'Studs properly spaced', isCritical: true, requiresPhoto: true },
@@ -104,7 +71,6 @@ export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
     { id: 'sw-8', name: 'Window RO', description: 'Window rough openings correct', isCritical: true, requiresPhoto: false },
     { id: 'sw-9', name: 'Plumb & Square', description: 'Walls plumb and square', isCritical: true, requiresPhoto: false },
   ],
-
   // Phase 5: Roof (10 items)
   [
     { id: 'rf-1', name: 'Roof Trusses', description: 'Roof trusses or rafters installed', isCritical: true, requiresPhoto: true },
@@ -118,7 +84,6 @@ export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
     { id: 'rf-9', name: 'Hurricane Ties', description: 'Hurricane ties/straps installed', isCritical: true, requiresPhoto: false },
     { id: 'rf-10', name: 'Sheathing H-Clips', description: 'H-clips between sheathing panels', isCritical: false, requiresPhoto: false },
   ],
-
   // Phase 6: Stairs Landing (7 items)
   [
     { id: 'st-1', name: 'Stair Stringers', description: 'Stair stringers installed', isCritical: true, requiresPhoto: true },
@@ -129,7 +94,6 @@ export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
     { id: 'st-6', name: 'Guard Rail Framing', description: 'Guard rail framing at landing', isCritical: true, requiresPhoto: false },
     { id: 'st-7', name: 'Stringer Attachment', description: 'Stringers properly attached', isCritical: true, requiresPhoto: false },
   ],
-
   // Phase 7: Backing Frame (10 items)
   [
     { id: 'bf-1', name: 'Bathroom Blocking', description: 'Blocking for bathroom fixtures', isCritical: true, requiresPhoto: true },
@@ -145,21 +109,12 @@ export const PHASE_ITEMS: ConstructionPhaseItem[][] = [
   ],
 ]
 
-// Items that require photos (AI validation) - approximately 15 items
 export const REQUIRED_PHOTO_ITEMS = PHASE_ITEMS.flat().filter(item => item.requiresPhoto)
-
-// Critical items that must be verified
 export const CRITICAL_ITEMS = PHASE_ITEMS.flat().filter(item => item.isCritical)
-
-// Get items for a specific phase
-export function getConstructionPhaseItems(phaseIndex: number): ConstructionPhaseItem[] {
+export function getConstructionPhaseItems(phaseIndex: number): LegacyPhaseItem[] {
   return PHASE_ITEMS[phaseIndex] || []
 }
-
-// Get phase by index
 export function getPhase(index: number) {
-  return CONSTRUCTION_PHASES[index]
+  return { id: index + 1, name: ['First Floor', '1st Floor Walls', 'Second Floor', '2nd Floor Walls', 'Roof', 'Stairs Landing', 'Backing Frame'][index], description: '' }
 }
-
-// Total items count
 export const TOTAL_ITEMS = PHASE_ITEMS.flat().length

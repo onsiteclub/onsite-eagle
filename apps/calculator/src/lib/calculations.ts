@@ -3,6 +3,7 @@
 // Schema definido por Blueprint (Blue)
 
 import { supabase, isSupabaseEnabled } from './supabase';
+import { logger } from '@onsite/logger';
 import type { CalculationResult } from '../types/calculator';
 
 // Tipos do schema calculations
@@ -84,17 +85,17 @@ export async function saveCalculation(
 ): Promise<string | null> {
   // Não salvar se Supabase não está disponível
   if (!isSupabaseEnabled() || !supabase) {
-    console.log('[Calculations] Supabase not enabled, skipping save');
+    logger.debug('DB', 'Supabase not enabled, skipping save');
     return null;
   }
 
   // Não salvar se não tiver usuário (modo anônimo)
   if (!options.userId) {
-    console.log('[Calculations] No userId provided, skipping save');
+    logger.debug('DB', 'No userId provided, skipping save');
     return null;
   }
 
-  console.log('[Calculations] Saving calculation');
+  logger.debug('DB', 'Saving calculation');
 
   try {
     const record: CalculationRecord = {
@@ -123,7 +124,7 @@ export async function saveCalculation(
       return null;
     }
 
-    console.log('[Calculations] Saved successfully:', data?.id);
+    logger.debug('DB', 'Calculation saved successfully', { id: data?.id });
     return data?.id || null;
   } catch (err) {
     console.error('[Calculations] Exception saving:', err);

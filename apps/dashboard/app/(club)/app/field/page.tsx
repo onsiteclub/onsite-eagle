@@ -12,13 +12,13 @@ export default async function FieldAppPage() {
 
   const [{ data: photos }, { count: totalPhotos }] = await Promise.all([
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('id, ai_validation_status, photo_type, created_at')
       .eq('uploaded_by', user.id)
       .order('created_at', { ascending: false })
       .limit(20),
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('*', { count: 'exact', head: true })
       .eq('uploaded_by', user.id),
   ])

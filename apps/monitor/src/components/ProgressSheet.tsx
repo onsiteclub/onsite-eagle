@@ -17,7 +17,7 @@ interface ProgressSheetProps {
 
 interface LotProgress {
   lot_number: string
-  house_id: string
+  lot_id: string
   model: string
   framing: number
   roofing: number
@@ -48,9 +48,9 @@ export default function ProgressSheet({ siteId, siteName }: ProgressSheetProps) 
     setLoading(true)
 
     const { data: houses } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id, lot_number, address')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
       .order('lot_number')
 
     if (!houses?.length) {
@@ -63,16 +63,16 @@ export default function ProgressSheet({ siteId, siteName }: ProgressSheetProps) 
 
     // Get schedules
     const { data: schedules } = await supabase
-      .from('egl_schedules')
-      .select('id, house_id')
-      .in('house_id', houseIds)
+      .from('frm_schedules')
+      .select('id, lot_id')
+      .in('lot_id', houseIds)
 
     const scheduleIds = (schedules || []).map(s => s.id)
-    const scheduleToHouse = new Map((schedules || []).map(s => [s.id, s.house_id]))
+    const scheduleToHouse = new Map((schedules || []).map(s => [s.id, s.lot_id]))
 
     // Get schedule phases
     const { data: spData } = await supabase
-      .from('egl_schedule_phases')
+      .from('frm_schedule_phases')
       .select('schedule_id, phase_id, status')
       .in('schedule_id', scheduleIds)
 
@@ -120,7 +120,7 @@ export default function ProgressSheet({ siteId, siteName }: ProgressSheetProps) 
       const trades = houseTradeMap.get(h.id) || { framing: [], roofing: [], backing: [], inspection: [] }
       return {
         lot_number: h.lot_number,
-        house_id: h.id,
+        lot_id: h.id,
         model: h.address || '',
         framing: calcPct(trades.framing),
         roofing: calcPct(trades.roofing),
@@ -213,7 +213,7 @@ export default function ProgressSheet({ siteId, siteName }: ProgressSheetProps) 
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.house_id} className="border-b border-[#E5E5EA] hover:bg-[#F9F9FB]">
+              <tr key={r.lot_id} className="border-b border-[#E5E5EA] hover:bg-[#F9F9FB]">
                 <td className="px-3 py-2.5 text-sm font-mono font-semibold text-[#1D1D1F] sticky left-0 bg-white z-10">{r.lot_number}</td>
                 <td className="px-3 py-2.5 text-sm text-[#6E6E73] whitespace-nowrap">{r.model || '—'}</td>
                 {[r.framing, r.roofing, r.backing, r.inspection].map((val, i) => (

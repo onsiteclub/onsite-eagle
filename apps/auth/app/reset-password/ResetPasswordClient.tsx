@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@onsite/supabase/client';
+import { logger } from '@onsite/logger';
 
 type Status = 'loading' | 'ready' | 'submitting' | 'success' | 'error';
 
@@ -24,10 +25,10 @@ export function ResetPasswordClient() {
       try {
         // 1. Extrair tokens do hash fragment
         const hash = window.location.hash;
-        console.log('[ResetPassword] Hash:', hash ? 'present' : 'empty');
+        logger.debug('AUTH', 'ResetPassword hash check', { hashPresent: !!hash });
 
         if (!hash || !hash.includes('access_token')) {
-          console.log('[ResetPassword] No access_token in hash');
+          logger.debug('AUTH', 'ResetPassword: No access_token in hash');
           setError('Link inválido. Falta o token de recuperação.');
           setStatus('error');
           return;
@@ -39,19 +40,17 @@ export function ResetPasswordClient() {
         const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type');
 
-        console.log('[ResetPassword] Token type:', type);
-        console.log('[ResetPassword] Has access_token:', !!accessToken);
-        console.log('[ResetPassword] Has refresh_token:', !!refreshToken);
+        logger.debug('AUTH', 'ResetPassword token parsed', { type, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
 
         if (!accessToken || !refreshToken) {
-          console.log('[ResetPassword] Missing tokens');
+          logger.debug('AUTH', 'ResetPassword: Missing tokens');
           setError('Link inválido. Tokens incompletos.');
           setStatus('error');
           return;
         }
 
         // 3. Criar sessão com os tokens
-        console.log('[ResetPassword] Setting session with tokens...');
+        logger.debug('AUTH', 'ResetPassword: Setting session with tokens');
         const { data, error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
@@ -65,12 +64,12 @@ export function ResetPasswordClient() {
         }
 
         if (data.session) {
-          console.log('[ResetPassword] Session created:', data.session.user?.email);
+          logger.info('AUTH', 'ResetPassword: Session created', { email: data.session.user?.email });
           // Limpa o hash da URL por segurança
           window.history.replaceState(null, '', window.location.pathname);
           setStatus('ready');
         } else {
-          console.log('[ResetPassword] No session returned');
+          logger.debug('AUTH', 'ResetPassword: No session returned');
           setError('Não foi possível validar o link.');
           setStatus('error');
         }

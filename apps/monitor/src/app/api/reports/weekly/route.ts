@@ -20,26 +20,26 @@ function getOpenAIClient() {
  *
  * Generates an AI-powered weekly progress report for a site.
  *
- * Body: { site_id: string }
+ * Body: { jobsite_id: string }
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const { site_id } = await request.json();
+    const { jobsite_id } = await request.json();
 
-    if (!site_id) {
+    if (!jobsite_id) {
       return NextResponse.json(
-        { error: 'Missing required field: site_id' },
+        { error: 'Missing required field: jobsite_id' },
         { status: 400 },
       );
     }
 
     // Fetch site info
     const { data: site } = await supabase
-      .from('egl_sites')
+      .from('frm_jobsites')
       .select('name, total_lots, completed_lots')
-      .eq('id', site_id)
+      .eq('id', jobsite_id)
       .single();
 
     if (!site) {
@@ -48,30 +48,30 @@ export async function POST(request: NextRequest) {
 
     // Fetch all houses with status
     const { data: houses } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id, lot_number, status, current_phase, progress_percentage')
-      .eq('site_id', site_id)
+      .eq('jobsite_id', jobsite_id)
       .is('deleted_at', null);
 
     // Fetch schedules for deviation info
     const { data: schedules } = await supabase
-      .from('egl_schedules')
-      .select('house_id, status, deviation_days, assigned_worker_name')
-      .eq('site_id', site_id);
+      .from('frm_schedules')
+      .select('lot_id, status, deviation_days, assigned_worker_name')
+      .eq('jobsite_id', jobsite_id);
 
     // Fetch recent external events (weather, etc.) from last 7 days
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const { data: events } = await supabase
-      .from('egl_external_events')
+      .from('frm_external_events')
       .select('event_type, title, impact_severity, estimated_delay_days')
-      .eq('site_id', site_id)
+      .eq('jobsite_id', jobsite_id)
       .gte('event_date', weekAgo);
 
     // Fetch recent timeline messages (last 7 days) for context
     const { data: recentMessages } = await supabase
-      .from('egl_messages')
+      .from('frm_messages')
       .select('content, sender_type, sender_name, ai_interpretation, created_at')
-      .eq('site_id', site_id)
+      .eq('jobsite_id', jobsite_id)
       .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: false })
       .limit(30);
@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
         phase: h.current_phase,
         progress: h.progress_percentage,
       })),
-      schedules: (schedules || []).map((s: { house_id: string; status: string; deviation_days: number | null; assigned_worker_name: string | null }) => ({
-        house_id: s.house_id,
+      schedules: (schedules || []).map((s: { lot_id: string; status: string; deviation_days: number | null; assigned_worker_name: string | null }) => ({
+        lot_id: s.lot_id,
         status: s.status,
         deviation_days: s.deviation_days,
         worker: s.assigned_worker_name,
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     // Save to int_ai_reports
     await supabase.from('int_ai_reports').insert({
-      site_id,
+      jobsite_id,
       report_type: 'weekly_summary',
       period_start: weekAgo,
       period_end: new Date().toISOString().split('T')[0],

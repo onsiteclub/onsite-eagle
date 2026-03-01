@@ -18,9 +18,9 @@ import type {
 import { buildPhotoMetadata, isTrainingEligible } from './metadata';
 import type { DeviceInfo, GPSData } from './types';
 
-const DEFAULT_BUCKET = 'egl-media';
-const DEFAULT_PHOTOS_TABLE = 'egl_photos';
-const DEFAULT_TIMELINE_TABLE = 'egl_timeline';
+const DEFAULT_BUCKET = 'frm-media';
+const DEFAULT_PHOTOS_TABLE = 'frm_photos';
+const DEFAULT_TIMELINE_TABLE = 'frm_timeline';
 
 /**
  * Convert a base64 string to Uint8Array.
@@ -40,13 +40,13 @@ export function base64ToBytes(base64: string): Uint8Array {
 /**
  * Build the storage path for a photo.
  *
- * Pattern: {siteId|'unsorted'}/{houseId}/{timestamp}_{random}.jpg
+ * Pattern: {jobsiteId|'unsorted'}/{lotId}/{timestamp}_{random}.jpg
  */
 function buildStoragePath(ctx: PhotoContext): string {
-  const siteFolder = ctx.siteId ?? 'unsorted';
+  const jobsiteFolder = ctx.jobsiteId ?? 'unsorted';
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 7);
-  return `${siteFolder}/${ctx.houseId}/${timestamp}_${random}.jpg`;
+  return `${jobsiteFolder}/${ctx.lotId}/${timestamp}_${random}.jpg`;
 }
 
 /**
@@ -56,7 +56,7 @@ function buildStoragePath(ctx: PhotoContext): string {
  *
  * @param supabase - Authenticated Supabase client
  * @param photo - Image data (base64 or bytes)
- * @param context - House, phase, user context
+ * @param context - Lot, phase, user context
  * @param options - Optional: device info, GPS, config overrides
  *
  * @example
@@ -69,10 +69,10 @@ function buildStoragePath(ctx: PhotoContext): string {
  * });
  *
  * const result = await uploadPhoto(supabase, { base64 }, {
- *   houseId: house.id,
+ *   lotId: lot.id,
  *   phaseId: phase.id,
  *   uploadedBy: userId,
- *   siteId: site.id,
+ *   jobsiteId: jobsite.id,
  *   photoType: 'progress',
  * });
  * ```
@@ -131,7 +131,7 @@ export async function uploadPhoto(
   const { data: photoRecord, error: photoError } = await supabase
     .from(photosTable)
     .insert({
-      house_id: context.houseId,
+      lot_id: context.lotId,
       phase_id: context.phaseId,
       uploaded_by: context.uploadedBy,
       organization_id: context.organizationId ?? null,
@@ -156,7 +156,7 @@ export async function uploadPhoto(
     const { data: timelineRecord, error: timelineError } = await supabase
       .from(timelineTable)
       .insert({
-        house_id: context.houseId,
+        lot_id: context.lotId,
         event_type: 'photo',
         title: `Photo uploaded — ${photoType}`,
         description: `Photo uploaded for phase validation`,

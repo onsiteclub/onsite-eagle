@@ -255,29 +255,29 @@ export async function unlinkWorker(
 /**
  * Join a site as operator/worker after scanning a QR code.
  * Does NOT use pending_tokens/access_grants — the supervisor is
- * physically present showing the QR, so the payload contains siteId directly.
+ * physically present showing the QR, so the payload contains jobsiteId directly.
  * RLS ensures operator_id = auth.uid().
  *
  * Called by: Any Expo app after scanning a join_site QR from Monitor.
  */
 export async function joinSite(
   supabase: SupabaseClientLike,
-  payload: Pick<QRJoinSitePayload, 'siteId' | 'siteName' | 'role'>,
+  payload: Pick<QRJoinSitePayload, 'jobsiteId' | 'jobsiteName' | 'role'>,
 ): Promise<JoinSiteResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return { success: false, message: 'Voce precisa estar logado' };
   }
 
-  const { siteId, siteName, role } = payload;
+  const { jobsiteId, jobsiteName, role } = payload;
 
   if (role === 'operator') {
-    // Check if already assigned to this site
+    // Check if already assigned to this jobsite
     const { data: existing } = await supabase
-      .from('egl_operator_assignments')
+      .from('frm_operator_assignments')
       .select('id, is_active')
       .eq('operator_id', user.id)
-      .eq('site_id', siteId)
+      .eq('jobsite_id', jobsiteId)
       .maybeSingle();
 
     if (existing) {
@@ -285,15 +285,15 @@ export async function joinSite(
       if (row.is_active) {
         return {
           success: false,
-          message: `Voce ja esta atribuido a "${siteName}"`,
-          siteId,
-          siteName,
+          message: `Voce ja esta atribuido a "${jobsiteName}"`,
+          jobsiteId,
+          jobsiteName,
         };
       }
 
       // Re-activate previously deactivated assignment
       const { error } = await supabase
-        .from('egl_operator_assignments')
+        .from('frm_operator_assignments')
         .update({
           is_active: true,
           is_available: true,
@@ -305,19 +305,19 @@ export async function joinSite(
 
       return {
         success: true,
-        message: `Reconectado a "${siteName}"!`,
-        siteId,
-        siteName,
+        message: `Reconectado a "${jobsiteName}"!`,
+        jobsiteId,
+        jobsiteName,
         assignmentId: row.id,
       };
     }
 
     // Create new assignment
     const { error } = await supabase
-      .from('egl_operator_assignments')
+      .from('frm_operator_assignments')
       .insert({
         operator_id: user.id,
-        site_id: siteId,
+        jobsite_id: jobsiteId,
         is_active: true,
         is_available: true,
         available_since: new Date().toISOString(),
@@ -329,14 +329,14 @@ export async function joinSite(
 
     return {
       success: true,
-      message: `Conectado a "${siteName}"!`,
-      siteId,
-      siteName,
+      message: `Conectado a "${jobsiteName}"!`,
+      jobsiteId,
+      jobsiteName,
     };
   }
 
-  // For worker/inspector roles — create egl_site_workers record
-  if (role === 'worker' || role === 'inspector') {
+  // For worker/crew_lead roles — create frm_jobsite_workers record
+  if (role === 'worker' || role === 'crew_lead') {
     const { data: profile } = await supabase
       .from('core_profiles')
       .select('full_name, first_name')
@@ -346,9 +346,9 @@ export async function joinSite(
     const workerName = (profile as any)?.full_name || (profile as any)?.first_name || 'Worker';
 
     const { error } = await supabase
-      .from('egl_site_workers')
+      .from('frm_jobsite_workers')
       .insert({
-        site_id: siteId,
+        jobsite_id: jobsiteId,
         worker_id: user.id,
         worker_name: workerName,
         is_active: true,
@@ -363,9 +363,9 @@ export async function joinSite(
 
     return {
       success: true,
-      message: `Adicionado a "${siteName}" como ${role}!`,
-      siteId,
-      siteName,
+      message: `Adicionado a "${jobsiteName}" como ${role}!`,
+      jobsiteId,
+      jobsiteName,
     };
   }
 

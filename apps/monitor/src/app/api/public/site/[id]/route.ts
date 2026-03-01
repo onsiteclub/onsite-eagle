@@ -23,7 +23,7 @@ export async function GET(
 
     // Fetch site data
     const { data: site, error: siteError } = await supabase
-      .from('egl_sites')
+      .from('frm_jobsites')
       .select('id, name, city, svg_data, total_lots, completed_lots')
       .eq('id', id)
       .single()
@@ -37,9 +37,9 @@ export async function GET(
 
     // Fetch houses with minimal data (only what's needed for the map)
     const { data: houses, error: housesError } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id, lot_number, status, progress_percentage, coordinates')
-      .eq('site_id', id)
+      .eq('jobsite_id', id)
       .order('lot_number')
 
     if (housesError) {

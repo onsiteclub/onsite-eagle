@@ -4,7 +4,7 @@
  * Flow:
  * 1. Camera opens with scan overlay
  * 2. Scans QR → parseQRPayload()
- * 3. If join_site → joinSite() creates egl_operator_assignments
+ * 3. If join_site → joinSite() creates frm_operator_assignments
  * 4. Success alert → back to Settings
  */
 

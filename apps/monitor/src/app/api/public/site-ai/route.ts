@@ -39,16 +39,16 @@ interface AIResponse {
 async function getContext(supabase: ReturnType<typeof getSupabaseClient>, siteId: string) {
   // Get site info
   const { data: site } = await supabase
-    .from('egl_sites')
+    .from('frm_jobsites')
     .select('*')
     .eq('id', siteId)
     .single()
 
   // Get all houses in site
   const { data: houses } = await supabase
-    .from('egl_houses')
+    .from('frm_lots')
     .select('*')
-    .eq('site_id', siteId)
+    .eq('jobsite_id', siteId)
     .order('lot_number')
 
   // Calculate stats
@@ -56,9 +56,9 @@ async function getContext(supabase: ReturnType<typeof getSupabaseClient>, siteId
     total: houses?.length || 0,
     completed: houses?.filter(h => h.status === 'completed').length || 0,
     in_progress: houses?.filter(h => h.status === 'in_progress').length || 0,
-    delayed: houses?.filter(h => h.status === 'delayed').length || 0,
-    not_started: houses?.filter(h => h.status === 'not_started').length || 0,
-    on_hold: houses?.filter(h => h.status === 'on_hold').length || 0,
+    delayed: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
+    not_started: houses?.filter(h => h.status === 'pending').length || 0,
+    on_hold: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
     avg_progress: houses?.length
       ? Math.round(houses.reduce((sum, h) => sum + (h.progress_percentage || 0), 0) / houses.length)
       : 0,

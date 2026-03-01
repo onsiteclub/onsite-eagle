@@ -238,9 +238,9 @@ export default function FrameCheckSheet({ siteId, siteName }: FrameCheckSheetPro
   const loadLots = useCallback(async () => {
     setLoading(true)
     const { data: houses } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id, lot_number')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
       .order('lot_number')
 
     setLots(houses || [])
@@ -254,11 +254,11 @@ export default function FrameCheckSheet({ siteId, siteName }: FrameCheckSheetPro
   const loadInspection = useCallback(async () => {
     if (!selectedLotId) return
 
-    // Try to load inspection results from egl_progress or dedicated table
+    // Try to load inspection results from frm_progress or dedicated table
     const { data: progress } = await supabase
-      .from('egl_progress')
+      .from('frm_progress')
       .select('phase_id, status, notes')
-      .eq('house_id', selectedLotId)
+      .eq('lot_id', selectedLotId)
 
     // Map phase results to inspection items (best-effort matching)
     const resultMap: Record<string, 'pass' | 'fail'> = {}

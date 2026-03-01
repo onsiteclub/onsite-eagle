@@ -13,6 +13,10 @@
     "./download": "./src/download.ts",
     "./branding": "./src/branding.ts"
   },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@onsite/tokens": "*"
   },
@@ -27,6 +31,9 @@
     "xlsx": { "optional": true }
   },
   "devDependencies": {
-    "typescript": "^5"
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5",
+    "typescript-eslint": "^8.0.0"
   }
 }

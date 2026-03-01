@@ -65,11 +65,11 @@ interface ReportContext {
     event_type: string
     title: string
     description?: string
-    house_id: string
+    lot_id: string
     created_at: string
   }>
   photos: Array<{
-    house_id: string
+    lot_id: string
     phase_id: string
     ai_validation_status: string
     created_at: string
@@ -86,7 +86,7 @@ function buildReportPrompt(context: ReportContext, reportType: string) {
     : 0
 
   // Identify delayed lots
-  const delayedLots = houses.filter(h => h.status === 'delayed')
+  const delayedLots = houses.filter(h => h.status === 'paused_for_trades')
 
   // Count events by type
   const eventCounts = timeline.reduce((acc, e) => {
@@ -182,23 +182,23 @@ export async function POST(request: NextRequest) {
     // Get context using the database function
     const { data: contextData, error: contextError } = await supabase
       .rpc('get_report_context', {
-        p_site_id: siteId,
-        p_house_id: houseId || null,
+        p_jobsite_id: siteId,
+        p_lot_id: houseId || null,
         p_days: days,
       })
 
     if (contextError) {
       // Fallback: get data manually if function doesn't exist yet
       const { data: site } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .select('*')
         .eq('id', siteId)
         .single()
 
       const { data: houses } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('*')
-        .eq('site_id', siteId)
+        .eq('jobsite_id', siteId)
 
       const context: ReportContext = {
         site: site || { id: siteId, name: 'Unknown', city: '', total_lots: 0, completed_lots: 0, start_date: null, expected_end_date: null },
@@ -207,9 +207,9 @@ export async function POST(request: NextRequest) {
           total_houses: houses?.length || 0,
           completed: houses?.filter(h => h.status === 'completed').length || 0,
           in_progress: houses?.filter(h => h.status === 'in_progress').length || 0,
-          delayed: houses?.filter(h => h.status === 'delayed').length || 0,
-          not_started: houses?.filter(h => h.status === 'not_started').length || 0,
-          on_hold: houses?.filter(h => h.status === 'on_hold').length || 0,
+          delayed: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
+          not_started: houses?.filter(h => h.status === 'pending').length || 0,
+          on_hold: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
           avg_progress: houses?.length ? houses.reduce((sum, h) => sum + (h.progress_percentage || 0), 0) / houses.length : 0,
         },
         messages: [],
@@ -242,10 +242,10 @@ export async function POST(request: NextRequest) {
 
       // Save report to database
       const { data: report, error: saveError } = await supabase
-        .from('egl_ai_reports')
+        .from('frm_ai_reports')
         .insert({
-          site_id: siteId,
-          house_id: houseId || null,
+          jobsite_id: siteId,
+          lot_id: houseId || null,
           report_type: reportType,
           title: reportContent.title || `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`,
           summary: reportContent.summary || 'Report generated successfully.',
@@ -310,10 +310,10 @@ export async function POST(request: NextRequest) {
 
     // Save report to database
     const { data: report, error: saveError } = await supabase
-      .from('egl_ai_reports')
+      .from('frm_ai_reports')
       .insert({
-        site_id: siteId,
-        house_id: houseId || null,
+        jobsite_id: siteId,
+        lot_id: houseId || null,
         report_type: reportType,
         title: reportContent.title || `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`,
         summary: reportContent.summary || 'Report generated successfully.',
@@ -369,14 +369,14 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseClient()
 
     let query = supabase
-      .from('egl_ai_reports')
+      .from('frm_ai_reports')
       .select('*')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
       .order('created_at', { ascending: false })
       .limit(limit)
 
     if (houseId) {
-      query = query.eq('house_id', houseId)
+      query = query.eq('lot_id', houseId)
     }
 
     if (reportType) {

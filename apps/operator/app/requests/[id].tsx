@@ -45,11 +45,11 @@ export default function RequestDetail() {
   async function loadRequest() {
     try {
       const { data, error } = await supabase
-        .from('egl_material_requests')
+        .from('frm_material_requests')
         .select(`
           *,
-          house:egl_houses(lot_number, address),
-          site:egl_sites(name, address)
+          lot:frm_lots(lot_number, address),
+          jobsite:frm_jobsites(name, address)
         `)
         .eq('id', id)
         .single();
@@ -61,8 +61,8 @@ export default function RequestDetail() {
 
       setRequest({
         ...data,
-        lot_number: data.house?.lot_number,
-        site_name: data.site?.name,
+        lot_number: data.lot?.lot_number,
+        site_name: data.jobsite?.name,
       });
     } catch (err) {
       console.error('Error:', err);

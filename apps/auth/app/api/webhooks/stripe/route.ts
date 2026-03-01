@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { createAdminClient } from '@onsite/supabase/server';
+import { logger } from '@onsite/logger';
 
 /**
  * Stripe Webhook Handler
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logger.debug('STRIPE', 'Unhandled event type', { eventType: event.type });
     }
 
     return NextResponse.json({ received: true });
@@ -120,13 +121,13 @@ async function handleCheckoutCompleted(
 
   // If user_id not in metadata, resolve from Supabase Auth by email
   if (!userId && customer.email) {
-    console.log(`[Webhook] No user_id in metadata, looking up by email: ${customer.email}`);
+    logger.info('STRIPE', 'No user_id in metadata, looking up by email', { email: customer.email });
     const { data: authData } = await supabase.auth.admin.listUsers();
     const authUser = authData?.users?.find(u => u.email === customer.email);
 
     if (authUser) {
       userId = authUser.id;
-      console.log(`[Webhook] Found user_id from Supabase Auth: ${userId}`);
+      logger.info('STRIPE', 'Found user_id from Supabase Auth', { userId });
     } else {
       console.error(`[Webhook] No user found in Supabase Auth for email: ${customer.email}`);
       throw new Error(`User not found in Supabase Auth for email: ${customer.email}`);
@@ -175,8 +176,7 @@ async function handleCheckoutCompleted(
     throw error;
   }
 
-  console.log(`Subscription created/updated for user ${userId}, app ${app}`);
-  console.log(`Customer: ${customer.name}, ${customer.email}, ${customer.phone}`);
+  logger.info('STRIPE', 'Subscription created/updated', { userId, app, customerName: customer.name, customerEmail: customer.email, customerPhone: customer.phone });
 
   // Insert into payment_history
   const paymentHistoryData = {
@@ -209,7 +209,7 @@ async function handleCheckoutCompleted(
     console.error('Error inserting payment history:', historyError);
     // Don't throw - payment_history is supplementary, subscription is primary
   } else {
-    console.log(`Payment history recorded for user ${userId}, app ${app}`);
+    logger.info('STRIPE', 'Payment history recorded', { userId, app });
   }
 }
 
@@ -254,7 +254,7 @@ async function handleSubscriptionUpdated(
       throw error;
     }
 
-    console.log(`Subscription updated for subscription ${subscription.id}`);
+    logger.info('STRIPE', 'Subscription updated by subscription ID', { subscriptionId: subscription.id });
     return;
   }
 
@@ -275,7 +275,7 @@ async function handleSubscriptionUpdated(
     throw error;
   }
 
-  console.log(`Subscription updated for user ${userId}, app ${app}: ${subscription.status}`);
+  logger.info('STRIPE', 'Subscription updated for user', { userId, app, status: subscription.status });
 }
 
 /**
@@ -299,7 +299,7 @@ async function handleSubscriptionDeleted(
     throw error;
   }
 
-  console.log(`Subscription canceled: ${subscription.id}`);
+  logger.info('STRIPE', 'Subscription canceled', { subscriptionId: subscription.id });
 }
 
 /**
@@ -329,7 +329,7 @@ async function handlePaymentFailed(
     throw error;
   }
 
-  console.log(`Payment failed for subscription: ${subscriptionId}`);
+  logger.info('STRIPE', 'Payment failed for subscription', { subscriptionId });
 }
 
 /**
@@ -344,7 +344,7 @@ async function handleInvoicePaid(
   const customerId = invoice.customer as string;
 
   if (!subscriptionId) {
-    console.log('[invoice.paid] No subscription ID, skipping');
+    logger.debug('STRIPE', 'invoice.paid: No subscription ID, skipping');
     return;
   }
 
@@ -392,7 +392,7 @@ async function handleInvoicePaid(
   if (error) {
     console.error('Error inserting payment history for invoice.paid:', error);
   } else {
-    console.log(`[invoice.paid] Payment history recorded for user ${existingSub.user_id}, invoice ${invoice.id}`);
+    logger.info('STRIPE', 'invoice.paid: Payment history recorded', { userId: existingSub.user_id, invoiceId: invoice.id });
   }
 }
 
@@ -407,7 +407,7 @@ async function handleChargeRefunded(
   const paymentIntentId = charge.payment_intent as string;
 
   if (!paymentIntentId) {
-    console.log('[charge.refunded] No payment_intent ID, skipping');
+    logger.debug('STRIPE', 'charge.refunded: No payment_intent ID, skipping');
     return;
   }
 
@@ -420,8 +420,8 @@ async function handleChargeRefunded(
   if (error) {
     console.error('Error updating payment history for refund:', error);
   } else if (count === 0) {
-    console.log(`[charge.refunded] No payment_history found for payment_intent ${paymentIntentId}`);
+    logger.debug('STRIPE', 'charge.refunded: No payment_history found', { paymentIntentId });
   } else {
-    console.log(`[charge.refunded] Payment marked as refunded for payment_intent ${paymentIntentId}`);
+    logger.info('STRIPE', 'charge.refunded: Payment marked as refunded', { paymentIntentId });
   }
 }

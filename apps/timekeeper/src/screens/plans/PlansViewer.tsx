@@ -29,14 +29,14 @@ async function resolveWorkerSiteId(): Promise<string | null> {
   if (!data.user) return null;
 
   const { data: link } = await supabase
-    .from('egl_site_workers')
-    .select('site_id')
+    .from('frm_site_workers')
+    .select('jobsite_id')
     .eq('worker_id', data.user.id)
     .eq('is_active', true)
     .limit(1)
     .maybeSingle();
 
-  return link?.site_id || null;
+  return link?.jobsite_id || null;
 }
 
 function getFileIcon(fileType: string): string {

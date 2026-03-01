@@ -274,28 +274,37 @@ apps/dashboard/
 
 1. Abrir [vercel.com/new](https://vercel.com/new)
 2. Importar repositorio `onsite-eagle`
-3. Em **Root Directory**, clicar Edit e selecionar: `apps/dashboard`
-4. Framework Preset: **Next.js** (auto-detectado)
-5. Build Command: deixar default (`turbo build`)
-6. Clicar **Deploy**
+3. **Project Name**: `onsite-eagle-dashboard` (ou `onsite-dashboard`)
+4. Em **Root Directory**, clicar Edit e selecionar: `apps/dashboard`
+5. Framework Preset: **Next.js** (auto-detectado)
+6. Expandir **Build and Output Settings** e ativar Override:
+   - **Build Command**: `npx turbo build --filter=@onsite/dashboard`
+   - **Output Directory**: `apps/dashboard/.next`
+7. Clicar **Deploy**
+
+> **IMPORTANTE:** Sem o `--filter`, Turborepo builda TODOS os 28 packages.
+> Sem o Output Directory override, Vercel procura `.next` na raiz e nao encontra.
 
 ### 10.2 Environment Variables
 
-Em **Settings > Environment Variables**, adicionar para Production + Preview:
+**Team-level (Shared)** — configurar 1x no Team Settings, todos herdam:
+
+| Variavel | Tipo |
+|----------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Plain |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Plain |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret |
+| `OPENAI_API_KEY` | Secret |
+
+**Project-level** — especificas do Dashboard:
 
 | Variavel | Tipo | Valor |
 |----------|------|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Plain | `https://dbasazrdbtigrdntaehb.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Plain | *(anon key do projeto)* |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret | *(service role key)* |
 | `STRIPE_SECRET_KEY` | Secret | *(Stripe secret key)* |
 | `STRIPE_PRICE_ID` | Plain | *(Stripe price ID)* |
 | `STRIPE_WEBHOOK_SECRET` | Secret | *(Stripe webhook signing secret)* |
-| `OPENAI_API_KEY` | Secret | *(OpenAI key)* |
 | `NEXT_PUBLIC_APP_URL` | Plain | `https://app.onsiteclub.ca` |
 | `TRIAL_PERIOD_DAYS` | Plain | `180` |
-
-> Dica: Use **Shared Environment Variables** no nivel do Team para as variaveis Supabase.
 
 ### 10.3 Custom Domain
 
@@ -332,4 +341,22 @@ npx turbo-ignore
 
 ## 11. Historico de Erros
 
-*(Nenhum erro documentado ainda. Adicionar conforme surgirem.)*
+### Sessao: 2026-02-27 — Primeiro Deploy Vercel
+
+#### Aprendizado 1: Build Command precisa de --filter
+| Campo | Detalhe |
+|-------|---------|
+| **Data** | 2026-02-27 |
+| **Sintoma** | Build falhava — erro no calculator matava todos os apps |
+| **Causa Raiz** | `turbo build` sem `--filter` builda TODOS os 28 packages. Erro em qualquer app cancela todos |
+| **Fix** | Build Command override: `npx turbo build --filter=@onsite/dashboard` |
+| **Arquivos** | Vercel Dashboard > Settings > Build and Deployment |
+
+#### Aprendizado 2: Output Directory precisa de override
+| Campo | Detalhe |
+|-------|---------|
+| **Data** | 2026-02-27 |
+| **Sintoma** | `The Next.js output directory ".next" was not found at "/vercel/path0/.next"` |
+| **Causa Raiz** | Vercel procura `.next` na raiz do repo, mas o build gera em `apps/dashboard/.next` |
+| **Fix** | Output Directory override: `apps/dashboard/.next` |
+| **Arquivos** | Vercel Dashboard > Settings > Build and Deployment |

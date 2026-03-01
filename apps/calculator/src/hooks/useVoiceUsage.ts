@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
+import { logger } from '@onsite/logger';
 
 const STORAGE_KEY = 'voice_usage_count';
 const MAX_FREE_USES = 50;
@@ -64,7 +65,7 @@ export function useVoiceUsage(): UseVoiceUsageReturn {
       const newCount = prev + 1;
       // Salva assincronamente (fire and forget)
       saveUsage(newCount);
-      console.log(`[VoiceUsage] Usage incremented: ${newCount}/${MAX_FREE_USES}`);
+      logger.debug('VOICE', 'Usage incremented', { newCount, maxFreeUses: MAX_FREE_USES });
       return newCount;
     });
   }, [saveUsage]);
@@ -73,7 +74,7 @@ export function useVoiceUsage(): UseVoiceUsageReturn {
   const resetUsage = useCallback(async () => {
     setUsageCount(0);
     await saveUsage(0);
-    console.log('[VoiceUsage] Usage reset');
+    logger.debug('VOICE', 'Usage reset');
   }, [saveUsage]);
 
   return {

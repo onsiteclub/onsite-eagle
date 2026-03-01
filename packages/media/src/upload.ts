@@ -9,16 +9,16 @@ import type { UploadOptions, UploadResult } from './types';
 
 /**
  * Build the storage path following multi-tenant convention:
- * {bucket}/{site_id}/{house_id?}/{timestamp}_{random}_{filename}
+ * {bucket}/{jobsite_id}/{lot_id?}/{timestamp}_{random}_{filename}
  */
 export function buildStoragePath(options: UploadOptions): string {
-  const { site_id, house_id, file_name } = options;
+  const { jobsite_id, lot_id, file_name } = options;
   const timestamp = Math.floor(Date.now() / 1000);
   const random = Math.random().toString(36).slice(2, 7);
   const safeName = file_name.replace(/[^a-zA-Z0-9._-]/g, '_');
 
-  const parts = [site_id];
-  if (house_id) parts.push(house_id);
+  const parts = [jobsite_id];
+  if (lot_id) parts.push(lot_id);
   parts.push(`${timestamp}_${random}_${safeName}`);
 
   return parts.join('/');

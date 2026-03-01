@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@onsite/supabase/server';
+import { logger } from '@onsite/logger';
 
 /**
  * GET /r/:code - Short code redirect for checkout
@@ -32,7 +33,7 @@ export async function GET(
 
   // 3. Código expirado (TTL 60s)
   if (new Date(data.expires_at) < new Date()) {
-    console.log(`[/r/${code}] Expired code for ${data.email}`);
+    logger.info('AUTH', 'Expired checkout code', { code, email: data.email });
     return NextResponse.redirect(
       new URL('/checkout/calculator?error=expired_code', request.url)
     );
@@ -40,7 +41,7 @@ export async function GET(
 
   // 4. Código já usado (one-time)
   if (data.used) {
-    console.log(`[/r/${code}] Already used code for ${data.email}`);
+    logger.info('AUTH', 'Already used checkout code', { code, email: data.email });
     return NextResponse.redirect(
       new URL('/checkout/calculator?error=used_code', request.url)
     );
@@ -67,6 +68,6 @@ export async function GET(
     checkoutUrl.searchParams.set('redirect', data.redirect_url);
   }
 
-  console.log(`[/r/${code}] Redirecting user ${data.user_id} (${data.email}) to ${data.app} checkout`);
+  logger.info('AUTH', 'Redirecting to checkout', { code, userId: data.user_id, email: data.email, app: data.app });
   return NextResponse.redirect(checkoutUrl);
 }

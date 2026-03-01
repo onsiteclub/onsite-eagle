@@ -9,6 +9,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider, useAuth } from '@onsite/auth';
 import { registerPushToken, configureForegroundHandler } from '../src/lib/pushRegistration';
 import { initQueue, useOfflineSync } from '@onsite/offline';
+import { logger } from '@onsite/logger';
 import { supabase } from '../src/lib/supabase';
 
 // Configure foreground notification display
@@ -40,14 +41,14 @@ function AppContent() {
     netInfo: NetInfo,
     onFlush: (result) => {
       if (result.flushed > 0) {
-        console.log(`[offline] Flushed ${result.flushed} queued items`);
+        logger.info('SYNC', 'Flushed queued items', { flushed: result.flushed });
       }
     },
   });
 
   useEffect(() => {
     if (queueSize > 0) {
-      console.log(`[offline] ${queueSize} items pending, online: ${isOnline}`);
+      logger.debug('SYNC', 'Offline queue status', { queueSize, isOnline });
     }
   }, [queueSize, isOnline]);
 
@@ -77,7 +78,7 @@ function AppContent() {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, string> | undefined;
       if (data?.type === 'inspection' && data?.house_id) {
-        console.log('[push] Tapped inspection notification:', data.house_id);
+        logger.info('INSPECTION', 'Tapped inspection notification', { houseId: data.house_id });
       }
     });
     return () => sub.remove();

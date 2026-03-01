@@ -13,6 +13,7 @@ import {
 import AddLotModal from '@/components/AddLotModal'
 import BulkDocumentUpload from '@/components/BulkDocumentUpload'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@onsite/logger'
 import type { Site, House, HouseStatus } from '@onsite/shared'
 import ChatTimeline from '@/components/ChatTimeline'
 import ScheduleTab from '@/components/ScheduleTab'
@@ -37,7 +38,7 @@ type ViewType = 'lots' | 'schedule' | 'gantt' | 'chat' | 'team' | 'documents' | 
 interface TeamMember {
   id: string
   name: string
-  role: 'worker' | 'supervisor' | 'inspector'
+  role: 'worker' | 'crew_lead' | 'supervisor' | 'operator' | 'builder'
   trade?: string
 }
 
@@ -57,20 +58,24 @@ interface MenuItem {
 }
 
 const STATUS_LABELS: Record<HouseStatus, string> = {
-  not_started: 'Not Started',
+  pending: 'Pending',
+  released: 'Released',
   in_progress: 'In Progress',
-  delayed: 'Delayed',
+  paused_for_trades: 'Paused for Trades',
+  backframe: 'Backframe',
+  inspection: 'Inspection',
   completed: 'Completed',
-  on_hold: 'On Hold',
 }
 
 // Light theme status colors
 const LIGHT_STATUS_COLORS: Record<HouseStatus, string> = {
-  not_started: '#8E8E93',
+  pending: '#8E8E93',
+  released: '#007AFF',
   in_progress: '#FF9500',
-  delayed: '#FF3B30',
+  paused_for_trades: '#AF52DE',
+  backframe: '#5AC8FA',
+  inspection: '#FF3B30',
   completed: '#34C759',
-  on_hold: '#AF52DE',
 }
 
 export default function SiteDetail() {
@@ -140,11 +145,11 @@ export default function SiteDetail() {
 
   async function loadSiteData() {
     try {
-      console.log('[loadSiteData] Loading site:', siteId)
+      logger.debug('EAGLE', 'Loading site', { siteId })
 
       // Load site
       const { data: siteData, error: siteError } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .select('*')
         .eq('id', siteId)
         .single()
@@ -152,38 +157,35 @@ export default function SiteDetail() {
       if (siteError) {
         console.error('[loadSiteData] Error loading site:', siteError)
       } else {
-        console.log('[loadSiteData] Site loaded:', siteData?.name)
+        logger.debug('EAGLE', 'Site loaded', { name: siteData?.name })
         setSite(siteData)
       }
 
       // Load houses
       const { data: housesData, error: housesError } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('*')
-        .eq('site_id', siteId)
+        .eq('jobsite_id', siteId)
         .order('lot_number')
 
       if (housesError) {
         console.error('[loadSiteData] Error loading houses:', housesError)
       } else {
-        console.log('[loadSiteData] Houses loaded:', housesData?.length, 'lots')
+        logger.debug('EAGLE', 'Houses loaded', { count: housesData?.length })
         setHouses(housesData || [])
 
         // Auto-sync total_lots counter if mismatch detected
         const actualCount = housesData?.length || 0
         if (siteData && siteData.total_lots !== actualCount) {
-          console.log('[loadSiteData] Counter mismatch detected!', {
-            stored: siteData.total_lots,
-            actual: actualCount
-          })
+          logger.info('EAGLE', 'Counter mismatch detected', { stored: siteData.total_lots, actual: actualCount })
           // Sync the counter
           const { error: syncError } = await supabase
-            .from('egl_sites')
+            .from('frm_jobsites')
             .update({ total_lots: actualCount })
             .eq('id', siteId)
 
           if (!syncError) {
-            console.log('[loadSiteData] Counter synced to:', actualCount)
+            logger.info('EAGLE', 'Counter synced', { actualCount })
             setSite(prev => prev ? { ...prev, total_lots: actualCount } : prev)
           } else {
             console.error('[loadSiteData] Error syncing counter:', syncError)
@@ -239,7 +241,7 @@ export default function SiteDetail() {
     const total = houses.length
     const inProgress = houses.filter(h => h.status === 'in_progress').length
     const completed = houses.filter(h => h.status === 'completed').length
-    const delayed = houses.filter(h => h.status === 'delayed').length
+    const delayed = houses.filter(h => h.status === 'paused_for_trades').length
     return { total, inProgress, completed, delayed }
   }, [houses])
 
@@ -827,13 +829,13 @@ function LotesView({
                   {/* Progress */}
                   <div className="mb-4">
                     <div className="flex items-center justify-between text-sm mb-1.5">
-                      <span className="text-[#6E6E73] font-medium">{Math.round(house.progress_percentage)}% Complete</span>
-                      <span className="text-[#86868B]">Phase {house.current_phase}/7</span>
+                      <span className="text-[#6E6E73] font-medium">{Math.round(house.progress_percentage ?? 0)}% Complete</span>
+                      <span className="text-[#86868B]">Phase {house.current_phase ?? '-'}/7</span>
                     </div>
                     <div className="h-2 bg-[#E5E5EA] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#007AFF] rounded-full transition-all"
-                        style={{ width: `${house.progress_percentage}%` }}
+                        style={{ width: `${house.progress_percentage ?? 0}%` }}
                       />
                     </div>
                   </div>
@@ -911,16 +913,16 @@ function SettingsTeamView({ siteId, siteName, onAddTeam }: { siteId: string; sit
     try {
       // Load operators assigned to this site
       const { data: operators } = await supabase
-        .from('egl_operator_assignments')
+        .from('frm_operator_assignments')
         .select('id, operator_id, is_active, is_available')
-        .eq('site_id', siteId)
+        .eq('jobsite_id', siteId)
         .eq('is_active', true)
 
       // Load workers assigned to this site
       const { data: workers } = await supabase
-        .from('egl_site_workers')
+        .from('frm_site_workers')
         .select('id, worker_id, worker_name, is_active')
-        .eq('site_id', siteId)
+        .eq('jobsite_id', siteId)
         .eq('is_active', true)
 
       const teamMembers: typeof members = []
@@ -1053,8 +1055,8 @@ function AddTeamModal({ siteId, siteName, onClose }: { siteId: string; siteName:
     if (!supervisorName) return
     import('@onsite/sharing').then(({ createJoinSitePayload }) => {
       const payload = createJoinSitePayload({
-        siteId,
-        siteName,
+        jobsiteId: siteId,
+        jobsiteName: siteName,
         role,
         invitedBy: '',
         invitedByName: supervisorName,
@@ -1285,9 +1287,9 @@ function IssueLotModal({
 
         // 1. Check documents directly linked to house (legacy)
         const { data: directDocs } = await supabase
-          .from('egl_documents')
+          .from('frm_documents')
           .select('id, name, file_url')
-          .eq('house_id', house.id)
+          .eq('lot_id', house.id)
           .in('category', ['plan', 'plans', 'blueprint'])
           .is('deleted_at', null)
           .limit(20)
@@ -1301,11 +1303,11 @@ function IssueLotModal({
           }
         }
 
-        // 2. Check documents linked via egl_document_links (bulk upload system)
+        // 2. Check documents linked via frm_document_links (bulk upload system)
         const { data: linkedDocs } = await supabase
           .from('v_house_documents')
           .select('document_id, file_name, file_url')
-          .eq('house_id', house.id)
+          .eq('lot_id', house.id)
           .limit(20)
 
         if (linkedDocs) {
@@ -1375,7 +1377,7 @@ function IssueLotModal({
         formData.append('file', file)
         formData.append('siteId', siteId)
         formData.append('houseId', house.id)
-        formData.append('bucket', 'egl-media')
+        formData.append('bucket', 'frm-media')
 
         const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
@@ -1393,8 +1395,8 @@ function IssueLotModal({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            site_id: siteId,
-            house_id: house.id,
+            jobsite_id: siteId,
+            lot_id: house.id,
             name: file.name,
             file_url: uploadData.url,
             file_path: uploadData.path,
@@ -1414,10 +1416,10 @@ function IssueLotModal({
       const allPlans = [...existingPlans, ...uploadedDocs]
 
       // 3. Update the house to mark as issued
-      // Note: issued_to_worker_id requires valid UUID from egl_site_workers
+      // Note: issued_to_worker_id requires valid UUID from frm_site_workers
       // For now, we only store the worker name until real workers are integrated
       const { error: updateError } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .update({
           is_issued: true,
           issued_at: issuedAt,
@@ -1442,14 +1444,14 @@ function IssueLotModal({
       }))
 
       // Send issuance message with plans attached
-      console.log('[Message] Sending issuance message...')
+      logger.info('EAGLE', 'Sending issuance message')
       try {
         const msgResponse = await fetch('/api/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            site_id: siteId,
-            house_id: house.id,
+            jobsite_id: siteId,
+            lot_id: house.id,
             sender_type: 'system',
             sender_name: 'System',
             content: `🔓 **Lot ${house.lot_number} Issued**\n\nAssigned to: ${selectedWorker.name}${selectedWorker.trade ? ` (${selectedWorker.trade})` : ''}\nPlans: ${planNames}\n\nWork can now begin!`,
@@ -1461,7 +1463,7 @@ function IssueLotModal({
 
         if (msgResponse.ok) {
           const msgResult = await msgResponse.json()
-          console.log('[Message] Created successfully:', msgResult.id)
+          logger.info('EAGLE', 'Message created successfully', { messageId: msgResult.id })
         } else {
           const msgError = await msgResponse.json()
           console.error('[Message] API error:', msgResponse.status, msgError)
@@ -1471,8 +1473,8 @@ function IssueLotModal({
       }
 
       // Also keep timeline entry for historical record
-      const { error: timelineError } = await supabase.from('egl_timeline').insert({
-        house_id: house.id,
+      const { error: timelineError } = await supabase.from('frm_timeline').insert({
+        lot_id: house.id,
         event_type: 'issue',
         title: `Lot ${house.lot_number} Issued to ${selectedWorker.name}`,
         description: `Building plans: ${planNames}. Work can now begin.`,
@@ -1496,7 +1498,7 @@ function IssueLotModal({
       expectedEndDate.setDate(expectedEndDate.getDate() + 42) // 6 weeks standard
 
       const scheduleData = {
-        house_id: house.id,
+        lot_id: house.id,
         template_name: 'Standard Wood Frame',
         expected_start_date: startDate.toISOString().split('T')[0],
         expected_end_date: expectedEndDate.toISOString().split('T')[0],
@@ -1505,7 +1507,7 @@ function IssueLotModal({
         assigned_worker_name: selectedWorker.name,
       }
 
-      console.log('[Schedule] Creating via API:', scheduleData)
+      logger.info('EAGLE', 'Creating schedule via API', { scheduleData })
 
       try {
         const scheduleResponse = await fetch('/api/schedules', {
@@ -1516,7 +1518,7 @@ function IssueLotModal({
 
         if (scheduleResponse.ok) {
           const scheduleResult = await scheduleResponse.json()
-          console.log('[Schedule] Created successfully:', scheduleResult)
+          logger.info('EAGLE', 'Schedule created successfully', { scheduleResult })
         } else {
           const errorData = await scheduleResponse.json()
           console.error('[Schedule] API error:', errorData.error)
@@ -1526,14 +1528,14 @@ function IssueLotModal({
       }
 
       // 7. Create calendar event (appears in Schedule tab calendar)
-      console.log('[Event] Creating calendar event...')
+      logger.info('EAGLE', 'Creating calendar event')
       try {
         const eventResponse = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            site_id: siteId,
-            house_id: house.id,
+            jobsite_id: siteId,
+            lot_id: house.id,
             event_type: 'other',
             title: `🔓 Lot ${house.lot_number} Issued`,
             description: `Assigned to ${selectedWorker.name}${selectedWorker.trade ? ` (${selectedWorker.trade})` : ''}. Plans: ${planNames}`,
@@ -1544,7 +1546,7 @@ function IssueLotModal({
 
         if (eventResponse.ok) {
           const eventResult = await eventResponse.json()
-          console.log('[Event] Created successfully:', eventResult.id)
+          logger.info('EAGLE', 'Calendar event created successfully', { eventId: eventResult.id })
         } else {
           const eventError = await eventResponse.json()
           console.error('[Event] API error:', eventError)
@@ -1779,7 +1781,7 @@ function SiteScheduleView({
             type: mapEventType(e.event_type),
             description: e.description,
             metadata: {
-              house_id: e.house_id,
+              lot_id: e.lot_id,
               source: e.source,
               impact_severity: e.impact_severity,
             },
@@ -1920,7 +1922,7 @@ function SiteScheduleView({
             <div className="mt-4 pt-4 border-t border-[#E5E5EA]">
               <p className="text-xs font-semibold text-[#86868B] uppercase mb-2">Related Lots</p>
               <div className="space-y-1">
-                {[...new Set(eventsForSelectedDate.map(e => e.metadata?.house_id as string).filter(Boolean))].map(houseId => {
+                {[...new Set(eventsForSelectedDate.map(e => e.metadata?.lot_id as string).filter(Boolean))].map(houseId => {
                   const house = houses.find(h => h.id === houseId)
                   if (!house) return null
                   return (

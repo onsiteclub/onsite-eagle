@@ -4,34 +4,38 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { MaterialRequest, MaterialRequestStatus, UrgencyLevel, House } from '../types/database'
+import type { FrmMaterialRequest, MaterialRequestStatus, UrgencyLevel } from '@onsite/framing'
 
 // ===========================================
 // TYPES
 // ===========================================
 
 export interface MaterialRequestFilters {
-  siteId?: string
-  siteIds?: string[]  // For operator viewing multiple sites
-  houseId?: string
+  jobsiteId?: string
+  jobsiteIds?: string[]  // For operator viewing multiple jobsites
+  lotId?: string
   status?: MaterialRequestStatus | 'all'
   urgency?: UrgencyLevel | 'all'
   limit?: number
+  // Legacy aliases
+  siteId?: string
+  siteIds?: string[]
+  houseId?: string
 }
 
 export interface CreateMaterialRequestInput {
-  site_id: string
-  house_id?: string | null
-  material_type: string
-  material_name: string
-  quantity: number
+  lot_id: string
+  phase_id: string
+  jobsite_id?: string | null
+  material_type?: string | null
+  material_name?: string | null
+  quantity?: number | null
   unit: string
   urgency_level: UrgencyLevel
   delivery_location?: string | null
   notes?: string | null
-  requested_by_id?: string | null
-  requested_by_name: string
-  requested_by_role?: string
+  requested_by: string
+  requested_by_name?: string | null
 }
 
 export interface UpdateRequestStatusInput {
@@ -64,14 +68,14 @@ export const URGENCY_BASE_SCORES: Record<UrgencyLevel, number> = {
  */
 export function calculateUrgencyScore(
   urgencyLevel: UrgencyLevel,
-  house?: { status?: string; priority_score?: number } | null
+  lot?: { status?: string; priority_score?: number } | null
 ): number {
   const factors = {
     explicit_urgency: URGENCY_BASE_SCORES[urgencyLevel] || 50,
     phase_blocking: 50, // Default - could be enhanced with phase data
-    schedule_deviation: house?.status === 'delayed' ? 80 :
-                        house?.status === 'on_hold' ? 60 : 30,
-    lot_priority: house?.priority_score || 50
+    schedule_deviation: lot?.status === 'delayed' ? 80 :
+                        lot?.status === 'on_hold' ? 60 : 30,
+    lot_priority: lot?.priority_score || 50
   }
 
   return Math.round(
@@ -88,34 +92,37 @@ export function calculateUrgencyScore(
 
 /**
  * Get material requests with filters
- * Used by both Monitor (single lot/site) and Operator (multiple sites queue)
+ * Used by both Monitor (single lot/jobsite) and Operator (multiple jobsites queue)
  */
 export async function getMaterialRequests(
   supabase: SupabaseClient,
   filters: MaterialRequestFilters = {}
-): Promise<{ data: MaterialRequest[] | null; error: Error | null }> {
+): Promise<{ data: FrmMaterialRequest[] | null; error: Error | null }> {
   let query = supabase
-    .from('egl_material_requests')
+    .from('frm_material_requests')
     .select(`
       *,
-      house:egl_houses(id, lot_number, address, status, priority_score),
-      site:egl_sites(id, name)
+      lot:frm_lots(id, lot_number, address, status, priority_score),
+      jobsite:frm_jobsites(id, name)
     `)
     .is('deleted_at', null)
 
-  // Filter by single site
-  if (filters.siteId) {
-    query = query.eq('site_id', filters.siteId)
+  // Filter by single jobsite (support both new and legacy field names)
+  const jobsiteId = filters.jobsiteId || filters.siteId
+  if (jobsiteId) {
+    query = query.eq('jobsite_id', jobsiteId)
   }
 
-  // Filter by multiple sites (for operator)
-  if (filters.siteIds && filters.siteIds.length > 0) {
-    query = query.in('site_id', filters.siteIds)
+  // Filter by multiple jobsites (for operator)
+  const jobsiteIds = filters.jobsiteIds || filters.siteIds
+  if (jobsiteIds && jobsiteIds.length > 0) {
+    query = query.in('jobsite_id', jobsiteIds)
   }
 
-  // Filter by house
-  if (filters.houseId) {
-    query = query.eq('house_id', filters.houseId)
+  // Filter by lot (support both new and legacy field names)
+  const lotId = filters.lotId || filters.houseId
+  if (lotId) {
+    query = query.eq('lot_id', lotId)
   }
 
   // Filter by status
@@ -145,16 +152,16 @@ export async function getMaterialRequests(
 
 /**
  * Get operator's delivery queue
- * Returns pending/acknowledged/in_transit requests for assigned sites
+ * Returns pending/acknowledged/in_transit requests for assigned jobsites
  */
 export async function getOperatorQueue(
   supabase: SupabaseClient,
   operatorId: string
-): Promise<{ data: MaterialRequest[] | null; error: Error | null }> {
-  // First get operator's assigned sites
+): Promise<{ data: FrmMaterialRequest[] | null; error: Error | null }> {
+  // First get operator's assigned jobsites
   const { data: assignments, error: assignError } = await supabase
-    .from('egl_operator_assignments')
-    .select('site_id')
+    .from('frm_operator_assignments')
+    .select('jobsite_id')
     .eq('operator_id', operatorId)
     .eq('is_active', true)
 
@@ -166,11 +173,11 @@ export async function getOperatorQueue(
     return { data: [], error: null }
   }
 
-  const siteIds = assignments.map(a => a.site_id)
+  const jobsiteIds = assignments.map(a => a.jobsite_id)
 
-  // Get active requests for those sites
+  // Get active requests for those jobsites
   return getMaterialRequests(supabase, {
-    siteIds,
+    jobsiteIds,
     status: 'all' // We'll filter in the UI for active statuses
   })
 }
@@ -180,7 +187,7 @@ export async function getOperatorQueue(
  */
 export async function getOperatorQueueStats(
   supabase: SupabaseClient,
-  siteIds: string[]
+  jobsiteIds: string[]
 ): Promise<{
   pending: number
   acknowledged: number
@@ -191,9 +198,9 @@ export async function getOperatorQueueStats(
   const today = new Date().toISOString().split('T')[0]
 
   const { data } = await supabase
-    .from('egl_material_requests')
+    .from('frm_material_requests')
     .select('status, urgency_level, delivered_at')
-    .in('site_id', siteIds)
+    .in('jobsite_id', jobsiteIds)
     .is('deleted_at', null)
 
   const stats = {
@@ -207,13 +214,13 @@ export async function getOperatorQueueStats(
   if (!data) return stats
 
   for (const req of data) {
-    if (req.status === 'pending') stats.pending++
+    if (req.status === 'requested') stats.pending++
     if (req.status === 'acknowledged') stats.acknowledged++
     if (req.status === 'in_transit') stats.in_transit++
     if (req.status === 'delivered' && req.delivered_at?.startsWith(today)) {
       stats.delivered_today++
     }
-    if (req.urgency_level === 'critical' && req.status === 'pending') {
+    if (req.urgency_level === 'critical' && req.status === 'requested') {
       stats.critical++
     }
   }
@@ -231,20 +238,20 @@ export async function getOperatorQueueStats(
 export async function createMaterialRequest(
   supabase: SupabaseClient,
   input: CreateMaterialRequestInput,
-  house?: { status?: string; priority_score?: number } | null
-): Promise<{ data: MaterialRequest | null; error: Error | null }> {
-  const urgencyScore = calculateUrgencyScore(input.urgency_level, house)
+  lot?: { status?: string; priority_score?: number } | null
+): Promise<{ data: FrmMaterialRequest | null; error: Error | null }> {
+  const urgencyScore = calculateUrgencyScore(input.urgency_level, lot)
 
   const { data, error } = await supabase
-    .from('egl_material_requests')
+    .from('frm_material_requests')
     .insert({
       ...input,
       urgency_score: urgencyScore,
       urgency_factors: {
         explicit_urgency: URGENCY_BASE_SCORES[input.urgency_level],
         phase_blocking: 50,
-        schedule_deviation: house?.status === 'delayed' ? 80 : 30,
-        lot_priority: house?.priority_score || 50
+        schedule_deviation: lot?.status === 'delayed' ? 80 : 30,
+        lot_priority: lot?.priority_score || 50
       }
     })
     .select()
@@ -286,7 +293,7 @@ export async function updateRequestStatus(
   }
 
   const { error } = await supabase
-    .from('egl_material_requests')
+    .from('frm_material_requests')
     .update(updateData)
     .eq('id', requestId)
 
@@ -301,7 +308,7 @@ export async function deleteRequest(
   requestId: string
 ): Promise<{ error: Error | null }> {
   const { error } = await supabase
-    .from('egl_material_requests')
+    .from('frm_material_requests')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', requestId)
 

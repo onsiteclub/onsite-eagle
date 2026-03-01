@@ -1,0 +1,40 @@
+{
+  "cli": {
+    "version": ">= 5.2.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dbasazrdbtigrdntaehb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiYXNhenJkYnRpZ3JkbnRhZWhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NzY2ODIsImV4cCI6MjA4NTQ1MjY4Mn0.D41C2Ahwlp1Q-SfaCVPR-2LDDr12ueGMUdQ3M4S7Rj0",
+        "EXPO_PUBLIC_MONITOR_API_URL": "https://monitor.onsiteclub.ca"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dbasazrdbtigrdntaehb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiYXNhenJkYnRpZ3JkbnRhZWhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NzY2ODIsImV4cCI6MjA4NTQ1MjY4Mn0.D41C2Ahwlp1Q-SfaCVPR-2LDDr12ueGMUdQ3M4S7Rj0",
+        "EXPO_PUBLIC_MONITOR_API_URL": "https://monitor.onsiteclub.ca"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dbasazrdbtigrdntaehb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiYXNhenJkYnRpZ3JkbnRhZWhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NzY2ODIsImV4cCI6MjA4NTQ1MjY4Mn0.D41C2Ahwlp1Q-SfaCVPR-2LDDr12ueGMUdQ3M4S7Rj0",
+        "EXPO_PUBLIC_MONITOR_API_URL": "https://monitor.onsiteclub.ca"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -38,7 +38,7 @@ export interface FormFieldSuggestion {
 
 // Lot update suggestion
 export interface LotUpdateSuggestion {
-  status?: 'not_started' | 'in_progress' | 'delayed' | 'completed' | 'on_hold'
+  status?: 'pending' | 'released' | 'in_progress' | 'paused_for_trades' | 'backframe' | 'inspection' | 'completed'
   current_phase?: number
   progress_percentage?: number
   priority_score?: number

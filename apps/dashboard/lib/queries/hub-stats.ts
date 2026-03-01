@@ -17,7 +17,7 @@ export async function getWeeklyStats(supabase: SupabaseClient, userId: string) {
 
     // Photos uploaded this week
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('id', { count: 'exact', head: true })
       .eq('uploaded_by', userId)
       .gte('created_at', weekAgoISO),
@@ -73,13 +73,13 @@ export async function getAppStats(supabase: SupabaseClient, userId: string) {
 
     // Photos total
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('id', { count: 'exact', head: true })
       .eq('uploaded_by', userId),
 
     // Sites via org membership
     supabase
-      .from('egl_sites')
+      .from('frm_jobsites')
       .select('id', { count: 'exact', head: true }),
 
     // Shop orders
@@ -117,7 +117,7 @@ export async function getRecentActivity(supabase: SupabaseClient, userId: string
       .order('entry_at', { ascending: false })
       .limit(3),
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('id, ai_validation_status, created_at')
       .eq('uploaded_by', userId)
       .order('created_at', { ascending: false })

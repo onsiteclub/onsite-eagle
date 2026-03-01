@@ -33,6 +33,11 @@ export default {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#F6F7F9",
       },
+      config: {
+        googleMaps: {
+          apiKey: "AIzaSyBdITLu3Kr5OYPr8ZnhxIGVNFHIGEgvfKY",
+        },
+      },
       permissions: [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -53,6 +58,25 @@ export default {
       "expo-router",
       "expo-sqlite",
       [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission:
+            "OnSite Timekeeper needs your location to automatically track when you arrive at or leave work.",
+          locationAlwaysPermission:
+            "OnSite Timekeeper needs background location access to work properly even when the app is closed.",
+          locationWhenInUsePermission:
+            "OnSite Timekeeper needs your location to show your position on the map.",
+          isAndroidBackgroundLocationEnabled: true,
+          isAndroidForegroundServiceEnabled: true,
+        },
+      ],
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/notification-icon.png",
+        },
+      ],
+      [
         "expo-build-properties",
         {
           android: {
@@ -66,6 +90,14 @@ export default {
     ],
     experiments: {
       typedRoutes: true,
+    },
+    extra: {
+      router: {
+        origin: false,
+      },
+      eas: {
+        projectId: "17ddb1e1-cbcf-43d1-91e8-2f8ee96f036b",
+      },
     },
   },
 };

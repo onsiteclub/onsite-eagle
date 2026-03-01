@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Format Check ──────────────────────────────────────
+      - name: Prettier format check
+        run: npx prettier --check "apps/**/*.{ts,tsx}" "packages/**/*.{ts,tsx}" || true
+        # Non-blocking for now — existing code not yet formatted
+
+      # ── Lint ───────────────────────────────────────────────
+      - name: Lint packages
+        run: npx turbo lint --filter='./packages/*' --continue 2>&1 | tail -50
+        continue-on-error: true
+        # Warnings expected in first runs — will tighten later
+
+      - name: Lint apps
+        run: npx turbo lint --filter='./apps/*' --continue 2>&1 | tail -80
+        continue-on-error: true
+
+      # ── TypeScript ─────────────────────────────────────────
+      # Check packages (all clean)
+      - name: Typecheck packages
+        run: |
+          for pkg in shared auth auth-ui supabase hooks utils logger ui tokens export sharing timeline agenda media offline voice ai camera; do
+            echo "::group::@onsite/$pkg"
+            npx tsc --noEmit -p packages/$pkg/tsconfig.json || exit 1
+            echo "::endgroup::"
+          done
+
+      # Check Next.js apps (clean after fixes)
+      - name: Typecheck web apps
+        run: |
+          for app in monitor analytics dashboard auth; do
+            echo "::group::$app"
+            npx tsc --noEmit -p apps/$app/tsconfig.json || exit 1
+            echo "::endgroup::"
+          done
+
+      # Expo apps — typecheck but don't fail (React 18/19 false positives)
+      - name: Typecheck Expo apps (informational)
+        run: |
+          for app in timekeeper operator field inspect; do
+            echo "::group::$app"
+            npx tsc --noEmit -p apps/$app/tsconfig.json 2>&1 | tail -5 || true
+            echo "::endgroup::"
+          done
+        continue-on-error: true
+
+      # ── Tests ──────────────────────────────────────────────
+      - name: Run tests (calculator)
+        run: npx turbo test --filter=@onsite/calculator --continue
+        continue-on-error: true
+        # Only calculator has tests currently

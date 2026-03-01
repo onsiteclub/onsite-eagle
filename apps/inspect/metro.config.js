@@ -8,19 +8,21 @@ const config = getDefaultConfig(projectRoot);
 
 // 1. Watch ONLY the packages this app actually imports (not the whole monorepo!)
 // Watching monorepoRoot on Windows causes Metro to scan .next/, .turbo/, all apps → hangs.
+// Only packages actually imported by the app (checked via grep @onsite/)
 config.watchFolders = [
   path.resolve(monorepoRoot, 'packages', 'auth'),
   path.resolve(monorepoRoot, 'packages', 'auth-ui'),
   path.resolve(monorepoRoot, 'packages', 'tokens'),
   path.resolve(monorepoRoot, 'packages', 'shared'),
   path.resolve(monorepoRoot, 'packages', 'timeline'),
+  path.resolve(monorepoRoot, 'packages', 'offline'),
+  path.resolve(monorepoRoot, 'packages', 'logger'),
   path.resolve(monorepoRoot, 'packages', 'media'),
   path.resolve(monorepoRoot, 'packages', 'agenda'),
   path.resolve(monorepoRoot, 'packages', 'camera'),
-  path.resolve(monorepoRoot, 'packages', 'offline'),
   path.resolve(monorepoRoot, 'packages', 'sharing'),
   path.resolve(monorepoRoot, 'packages', 'ai'),
-  path.resolve(monorepoRoot, 'packages', 'logger'),
+  path.resolve(monorepoRoot, 'packages', 'framing'),
 ];
 
 // 2. Let Metro know where to resolve packages and in what order

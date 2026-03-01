@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { Building2, Radio, RefreshCw, Send, Loader2, BarChart3, PieChart, TrendingUp, Hash } from 'lucide-react'
+import { logger } from '@onsite/logger'
 
 // Types
 interface Site {
@@ -18,7 +19,7 @@ interface Site {
 interface House {
   id: string
   lot_number: string
-  status: 'not_started' | 'in_progress' | 'delayed' | 'completed' | 'on_hold'
+  status: 'pending' | 'released' | 'in_progress' | 'paused_for_trades' | 'backframe' | 'inspection' | 'completed'
   progress_percentage: number
   coordinates: { x: number; y: number; width: number; height: number } | null
 }
@@ -40,11 +41,13 @@ interface AIResponse {
 
 // Status colors
 const STATUS_COLORS: Record<string, { fill: string; stroke: string; label: string }> = {
-  not_started: { fill: '#E5E5EA', stroke: '#AEAEB2', label: 'Not Started' },
+  pending: { fill: '#E5E5EA', stroke: '#AEAEB2', label: 'Pending' },
+  released: { fill: '#007AFF', stroke: '#0056B3', label: 'Released' },
   in_progress: { fill: '#FF9500', stroke: '#CC7700', label: 'In Progress' },
-  delayed: { fill: '#FF3B30', stroke: '#CC2F26', label: 'Delayed' },
+  paused_for_trades: { fill: '#AF52DE', stroke: '#8E44AD', label: 'Paused for Trades' },
+  backframe: { fill: '#5AC8FA', stroke: '#4AA3CC', label: 'Backframe' },
+  inspection: { fill: '#FF3B30', stroke: '#CC2F26', label: 'Inspection' },
   completed: { fill: '#34C759', stroke: '#2AA147', label: 'Completed' },
-  on_hold: { fill: '#8E8E93', stroke: '#636366', label: 'On Hold' },
 }
 
 // Create Supabase client for realtime (using anon key)
@@ -114,11 +117,11 @@ export default function PublicSiteMapPage() {
         {
           event: '*',
           schema: 'public',
-          table: 'egl_houses',
-          filter: `site_id=eq.${siteId}`
+          table: 'frm_lots',
+          filter: `jobsite_id=eq.${siteId}`
         },
         (payload) => {
-          console.log('Realtime update:', payload)
+          logger.debug('EAGLE', 'Realtime update received', { eventType: payload.eventType })
           setLastUpdate(new Date())
 
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
@@ -182,9 +185,9 @@ export default function PublicSiteMapPage() {
     total: houses.length,
     completed: houses.filter(h => h.status === 'completed').length,
     inProgress: houses.filter(h => h.status === 'in_progress').length,
-    delayed: houses.filter(h => h.status === 'delayed').length,
-    notStarted: houses.filter(h => h.status === 'not_started').length,
-    onHold: houses.filter(h => h.status === 'on_hold').length,
+    delayed: houses.filter(h => h.status === 'paused_for_trades').length,
+    notStarted: houses.filter(h => h.status === 'pending').length,
+    onHold: houses.filter(h => h.status === 'paused_for_trades').length,
   }
 
   // Loading state
@@ -268,7 +271,7 @@ export default function PublicSiteMapPage() {
                     {houses.map(house => {
                       if (!house.coordinates) return null
                       const { x, y, width, height } = house.coordinates
-                      const colors = STATUS_COLORS[house.status] || STATUS_COLORS.not_started
+                      const colors = STATUS_COLORS[house.status] || STATUS_COLORS.pending
 
                       return (
                         <g

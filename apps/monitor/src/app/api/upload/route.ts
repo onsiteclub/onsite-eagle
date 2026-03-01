@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File
     const siteId = formData.get('siteId') as string
     const houseId = formData.get('houseId') as string | null
-    const bucket = formData.get('bucket') as string || 'egl-media'
+    const bucket = formData.get('bucket') as string || 'frm-media'
 
     if (!file || !siteId) {
       return NextResponse.json(

@@ -134,10 +134,10 @@ Worker entra na geofence ──→ GPS event
 | `tmk_entries` | Sessoes de trabalho (via sync) |
 | `tmk_geofences` | Locais de trabalho (via sync) |
 | `tmk_projects` | Projetos |
-| `egl_sites` | Sites (via integracao Lots) |
-| `egl_houses` | Lotes (via integracao Lots) |
-| `egl_documents` | Documentos do lote |
-| `egl_timeline` | Timeline do lote |
+| `frm_jobsites` | Sites (via integracao Lots) |
+| `frm_lots` | Lotes (via integracao Lots) |
+| `frm_documents` | Documentos do lote |
+| `frm_timeline` | Timeline do lote |
 | `core_profiles` | Perfil do worker |
 
 ### Tabelas Supabase (escrita)
@@ -146,14 +146,14 @@ Worker entra na geofence ──→ GPS event
 |--------|-----|
 | `tmk_entries` | Upload de sessoes (sync) |
 | `tmk_geofences` | Upload de locais (sync) |
-| `egl_timeline` | Notas no lote |
+| `frm_timeline` | Notas no lote |
 
 ### Storage
 
 | Bucket | Uso |
 |--------|-----|
 | `core-avatars` | Avatar do usuario |
-| `egl-media` | Fotos de lotes |
+| `frm-media` | Fotos de lotes |
 
 ### SQLite Local (11 tabelas)
 
@@ -195,10 +195,10 @@ Worker seleciona periodo → Agrega sessoes
 ### Conexao com Outros Apps
 
 ```
-Monitor (supervisor) ──[atribui lotes]──→ egl_houses ──→ Timekeeper (tab Lots)
+Monitor (supervisor) ──[atribui lotes]──→ frm_lots ──→ Timekeeper (tab Lots)
 Timekeeper ──[horas por geofence]──→ tmk_entries ──→ Dashboard (chart + export)
 Timekeeper ──[QR share]──→ access_grants ──→ Manager ve horas no Dashboard
-Field (worker) ──[fotos]──→ egl_timeline ──→ Timekeeper (timeline no lote)
+Field (worker) ──[fotos]──→ frm_timeline ──→ Timekeeper (timeline no lote)
 ```
 
 ### 5-Sphere Data Architecture

@@ -95,7 +95,7 @@ export default function LotDetailScreen() {
     try {
       // Load house
       const { data: houseData } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('*')
         .eq('id', id)
         .single();
@@ -105,7 +105,7 @@ export default function LotDetailScreen() {
 
         // Load site
         const { data: siteData } = await supabase
-          .from('egl_sites')
+          .from('frm_jobsites')
           .select('id, name, address')
           .eq('id', houseData.site_id)
           .single();
@@ -115,9 +115,9 @@ export default function LotDetailScreen() {
 
       // Load timeline
       const { data: timelineData } = await supabase
-        .from('egl_timeline')
+        .from('frm_timeline')
         .select('*')
-        .eq('house_id', id)
+        .eq('lot_id', id)
         .order('created_at', { ascending: false })
         .limit(50);
 

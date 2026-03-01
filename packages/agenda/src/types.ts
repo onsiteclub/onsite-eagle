@@ -8,16 +8,16 @@
  * Agenda is READ-ONLY for workers (Timekeeper, Operator).
  * Foreman (Monitor) can create/edit events.
  *
- * Data lives in `egl_external_events` (calendar events) and
- * `egl_schedule_phases` (phase deadlines).
+ * Data lives in `frm_external_events` (calendar events) and
+ * `frm_schedule_phases` (phase deadlines).
  */
 
 // ─── Agenda Event ───────────────────────────────────────────
 
 export interface AgendaEvent {
   id: string;
-  site_id: string;
-  house_id: string | null;
+  jobsite_id: string;
+  lot_id: string | null;
   event_type: AgendaEventType;
   title: string;
   description: string | null;
@@ -84,13 +84,13 @@ export type ImpactSeverity = 'none' | 'minor' | 'medium' | 'major' | 'critical';
 
 // ─── Phase Schedule ─────────────────────────────────────────
 
-/** Derived from egl_schedule_phases — shown as deadlines on the agenda. */
+/** Derived from frm_schedule_phases — shown as deadlines on the agenda. */
 export interface PhaseDeadline {
   id: string;
   schedule_id: string;
   phase_id: string;
   phase_name: string;
-  house_id: string;
+  lot_id: string;
   lot_number: string;
   expected_start_date: string | null;
   expected_end_date: string | null;
@@ -114,8 +114,8 @@ export type AgendaView = 'day' | 'week' | 'month';
 // ─── Fetch Options ──────────────────────────────────────────
 
 export interface AgendaFetchOptions {
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD
   event_types?: AgendaEventType[];

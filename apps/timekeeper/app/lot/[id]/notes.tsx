@@ -101,7 +101,7 @@ export default function NotesScreen() {
   async function loadHouse() {
     try {
       const { data } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('id, lot_number')
         .eq('id', id)
         .single();
@@ -143,9 +143,9 @@ export default function NotesScreen() {
 
       // Create timeline event
       const { error } = await supabase
-        .from('egl_timeline')
+        .from('frm_timeline')
         .insert({
-          house_id: id,
+          lot_id: id,
           event_type: 'note',
           title,
           description: noteContent,

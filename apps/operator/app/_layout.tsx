@@ -9,6 +9,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider, useAuth } from '@onsite/auth';
 import { registerPushToken, configureForegroundHandler } from '../src/lib/pushRegistration';
 import { initQueue, useOfflineSync } from '@onsite/offline';
+import { logger } from '@onsite/logger';
 import { supabase } from '../src/lib/supabase';
 
 // Configure foreground notification display
@@ -40,7 +41,7 @@ function AppContent() {
     netInfo: NetInfo,
     onFlush: (result) => {
       if (result.flushed > 0) {
-        console.log(`[offline] Flushed ${result.flushed} queued items`);
+        logger.info('SYNC', 'Flushed queued items', { flushed: result.flushed });
       }
     },
   });
@@ -48,7 +49,7 @@ function AppContent() {
   // Log connectivity status changes
   useEffect(() => {
     if (queueSize > 0) {
-      console.log(`[offline] ${queueSize} items pending, online: ${isOnline}`);
+      logger.debug('SYNC', 'Offline queue status', { queueSize, isOnline });
     }
   }, [queueSize, isOnline]);
 
@@ -78,7 +79,7 @@ function AppContent() {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, string> | undefined;
       if (data?.type === 'material_request' && data?.request_id) {
-        console.log('[push] Tapped material request notification:', data.request_id);
+        logger.info('MATERIAL', 'Tapped material request notification', { requestId: data.request_id });
       }
     });
     return () => sub.remove();

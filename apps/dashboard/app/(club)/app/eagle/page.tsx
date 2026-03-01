@@ -12,18 +12,18 @@ export default async function EagleAppPage() {
 
   const [{ data: sites }, { data: photos }, { count: issueCount }] = await Promise.all([
     supabase
-      .from('egl_sites')
+      .from('frm_jobsites')
       .select('id, name, total_lots, completed_lots, created_at')
       .order('created_at', { ascending: false })
       .limit(10),
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('id, ai_validation_status, created_at')
       .eq('uploaded_by', user.id)
       .order('created_at', { ascending: false })
       .limit(50),
     supabase
-      .from('egl_issues')
+      .from('frm_house_items')
       .select('*', { count: 'exact', head: true })
       .eq('reported_by', user.id)
       .eq('status', 'open'),

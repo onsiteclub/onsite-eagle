@@ -4,6 +4,7 @@
 // IMPORTANTE: Só salvar se usuário tiver consentimento voice_training
 
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '@onsite/logger';
 
 // Supabase com service role (server-side)
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -47,11 +48,11 @@ export interface VoiceLogRecord {
  */
 export async function canCollectVoice(userId: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
-  console.log('[VoiceLogs] canCollectVoice - supabase client:', !!supabase, 'userId:', userId);
-  console.log('[VoiceLogs] ENV check - SUPABASE_URL:', !!process.env.SUPABASE_URL, 'SERVICE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+  logger.debug('VOICE', 'canCollectVoice check', { hasSupabase: !!supabase, userId });
+  logger.debug('VOICE', 'ENV check', { hasSupabaseUrl: !!process.env.SUPABASE_URL, hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY });
 
   if (!supabase || !userId) {
-    console.log('[VoiceLogs] canCollectVoice returning false - no supabase or no userId');
+    logger.debug('VOICE', 'canCollectVoice returning false - no supabase or no userId');
     return false;
   }
 
@@ -64,7 +65,7 @@ export async function canCollectVoice(userId: string): Promise<boolean> {
       .eq('granted', true)
       .limit(1);
 
-    console.log('[VoiceLogs] core_consents query result:', { data, error: error?.message });
+    logger.debug('VOICE', 'core_consents query result', { data, errorMessage: error?.message });
 
     if (error) {
       console.warn('[VoiceLogs] Error checking consent:', error.message);
@@ -72,7 +73,7 @@ export async function canCollectVoice(userId: string): Promise<boolean> {
     }
 
     const hasConsent = data && data.length > 0;
-    console.log('[VoiceLogs] Final hasConsent:', hasConsent);
+    logger.debug('VOICE', 'Final hasConsent', { hasConsent });
     return hasConsent;
   } catch (err) {
     console.error('[VoiceLogs] Exception checking consent:', err);

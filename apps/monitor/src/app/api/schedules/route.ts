@@ -16,9 +16,9 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from('egl_schedules')
+    .from('frm_schedules')
     .select('*')
-    .eq('house_id', houseId)
+    .eq('lot_id', houseId)
     .single()
 
   if (error && error.code !== 'PGRST116') {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      house_id,
+      lot_id,
       template_name,
       expected_start_date,
       expected_end_date,
@@ -42,18 +42,18 @@ export async function POST(request: NextRequest) {
       assigned_worker_name,
     } = body
 
-    if (!house_id || !expected_start_date || !expected_end_date) {
+    if (!lot_id || !expected_start_date || !expected_end_date) {
       return NextResponse.json(
-        { error: 'Missing required fields: house_id, expected_start_date, expected_end_date' },
+        { error: 'Missing required fields: lot_id, expected_start_date, expected_end_date' },
         { status: 400 }
       )
     }
 
     // Try to insert
     const { data, error } = await supabase
-      .from('egl_schedules')
+      .from('frm_schedules')
       .insert({
-        house_id,
+        lot_id,
         template_name: template_name || 'Standard Wood Frame',
         expected_start_date,
         expected_end_date,
@@ -68,14 +68,14 @@ export async function POST(request: NextRequest) {
       // If duplicate, update instead
       if (error.code === '23505') {
         const { data: updateData, error: updateError } = await supabase
-          .from('egl_schedules')
+          .from('frm_schedules')
           .update({
             actual_start_date,
             status: status || 'in_progress',
             assigned_worker_name,
             updated_at: new Date().toISOString(),
           })
-          .eq('house_id', house_id)
+          .eq('lot_id', lot_id)
           .select()
           .single()
 

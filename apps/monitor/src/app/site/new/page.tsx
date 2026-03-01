@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Building2, MapPin, Calendar, Hash, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@onsite/logger'
 
 export default function NewSitePage() {
   const router = useRouter()
@@ -31,12 +32,12 @@ export default function NewSitePage() {
 
     setLoading(true)
     try {
-      console.log('Creating site with data:', formData)
+      logger.info('EAGLE', 'Creating site', { formData })
 
-      // Use egl_sites table directly (sites is a view)
+      // Use frm_jobsites table directly (sites is a view)
       // If auto-creating lots, set total_lots to 0 initially (will be updated after lots are created)
       const { data, error } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .insert({
           name: formData.name.trim(),
           address: formData.address.trim() || null,
@@ -54,19 +55,19 @@ export default function NewSitePage() {
         throw error
       }
 
-      console.log('Site created:', data)
+      logger.info('EAGLE', 'Site created', { siteId: data.id, name: data.name })
 
       // Auto-create lots if enabled and total_lots is specified
       if (autoCreateLots && totalLots > 0) {
-        console.log(`Creating ${totalLots} lots for site ${data.id}...`)
+        logger.info('EAGLE', 'Creating lots for site', { totalLots, siteId: data.id })
         setProgress({ current: 0, total: totalLots })
 
         const lotsToCreate = []
         for (let i = 1; i <= totalLots; i++) {
           lotsToCreate.push({
-            site_id: data.id,
+            jobsite_id: data.id,
             lot_number: String(i),
-            status: 'not_started',
+            status: 'pending',
             current_phase: 1,
             progress_percentage: 0,
             is_issued: false, // Locked until issued with worker & plans
@@ -81,7 +82,7 @@ export default function NewSitePage() {
           const chunk = lotsToCreate.slice(i, i + chunkSize)
 
           const { data: insertedData, error: insertError } = await supabase
-            .from('egl_houses')
+            .from('frm_lots')
             .insert(chunk)
             .select()
 
@@ -97,16 +98,16 @@ export default function NewSitePage() {
 
           created += insertedCount
           setProgress({ current: created, total: totalLots })
-          console.log(`Created ${created}/${totalLots} lots`)
+          logger.debug('EAGLE', 'Lots creation progress', { created, totalLots })
         }
 
         // Update total_lots count with actual created count
         await supabase
-          .from('egl_sites')
+          .from('frm_jobsites')
           .update({ total_lots: created })
           .eq('id', data.id)
 
-        console.log(`All ${created} lots created successfully`)
+        logger.info('EAGLE', 'All lots created successfully', { created })
       }
 
       router.push(`/site/${data.id}`)

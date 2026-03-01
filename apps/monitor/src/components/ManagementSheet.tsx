@@ -91,9 +91,9 @@ export default function ManagementSheet({ siteId, siteName }: ManagementSheetPro
     setLoading(true)
 
     const { data: houses } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id, lot_number')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
       .order('lot_number')
 
     if (!houses?.length) {
@@ -108,16 +108,16 @@ export default function ManagementSheet({ siteId, siteName }: ManagementSheetPro
 
     // Get schedules for these houses
     const { data: schedules } = await supabase
-      .from('egl_schedules')
-      .select('id, house_id')
-      .in('house_id', houseIds)
+      .from('frm_schedules')
+      .select('id, lot_id')
+      .in('lot_id', houseIds)
 
     const scheduleIds = (schedules || []).map(s => s.id)
-    const scheduleToHouse = new Map((schedules || []).map(s => [s.id, s.house_id]))
+    const scheduleToHouse = new Map((schedules || []).map(s => [s.id, s.lot_id]))
 
     // Get schedule phases with completion dates
     const { data: phases } = await supabase
-      .from('egl_schedule_phases')
+      .from('frm_schedule_phases')
       .select('schedule_id, phase_id, status, actual_end_date, notes')
       .in('schedule_id', scheduleIds)
 

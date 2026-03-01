@@ -188,8 +188,8 @@ export default function ChatTimeline({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            site_id: siteId,
-            house_id: houseId,
+            jobsite_id: siteId,
+            lot_id: houseId,
             sender_type: 'ai',
             sender_name: 'Eagle AI',
             content: messageAnalysis.response,
@@ -222,8 +222,8 @@ export default function ChatTimeline({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              site_id: siteId,
-              house_id: houseId,
+              jobsite_id: siteId,
+              lot_id: houseId,
               sender_type: 'system',
               sender_name: 'Eagle AI',
               content: `📊 Updated lot: ${Object.entries(updatePayload).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ')}`,
@@ -246,8 +246,8 @@ export default function ChatTimeline({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            site_id: siteId,
-            house_id: houseId,
+            jobsite_id: siteId,
+            lot_id: houseId,
             sender_type: 'ai',
             sender_name: 'Eagle AI',
             content: `⚠️ **Issue Detected**: ${issue.title} (${issue.severity})\n${issue.description}`,
@@ -260,13 +260,13 @@ export default function ChatTimeline({
 
       // 4. Create detected events in calendar AND log in chat
       for (const event of messageAnalysis.detected_events || []) {
-        // Save event to egl_external_events table (calendar)
+        // Save event to frm_external_events table (calendar)
         const eventResponse = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            site_id: siteId,
-            house_id: houseId,
+            jobsite_id: siteId,
+            lot_id: houseId,
             event_type: (event as { event_type?: string }).event_type || event.type || 'other',
             title: event.title,
             description: `Detected from chat message`,
@@ -282,8 +282,8 @@ export default function ChatTimeline({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            site_id: siteId,
-            house_id: houseId,
+            jobsite_id: siteId,
+            lot_id: houseId,
             sender_type: 'ai',
             sender_name: 'Eagle AI',
             content: `📅 **Event ${savedToCalendar ? 'Added to Calendar' : 'Noted'}**: ${event.title} - ${event.date} (${event.type})`,
@@ -314,9 +314,9 @@ export default function ChatTimeline({
 
     try {
       const { data: houses, error } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('status, progress_percentage')
-        .eq('site_id', siteId)
+        .eq('jobsite_id', siteId)
 
       if (error) throw error
 
@@ -324,9 +324,9 @@ export default function ChatTimeline({
         total_lots: houses?.length || 0,
         completed: houses?.filter(h => h.status === 'completed').length || 0,
         in_progress: houses?.filter(h => h.status === 'in_progress').length || 0,
-        delayed: houses?.filter(h => h.status === 'delayed').length || 0,
-        not_started: houses?.filter(h => h.status === 'not_started').length || 0,
-        on_hold: houses?.filter(h => h.status === 'on_hold').length || 0,
+        delayed: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
+        not_started: houses?.filter(h => h.status === 'pending').length || 0,
+        on_hold: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
         avg_progress: houses?.length
           ? Math.round(houses.reduce((sum, h) => sum + (h.progress_percentage || 0), 0) / houses.length)
           : 0,
@@ -376,17 +376,17 @@ export default function ChatTimeline({
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'egl_messages',
+          table: 'frm_messages',
           filter: houseId
-            ? `house_id=eq.${houseId}`
-            : `site_id=eq.${siteId}`,
+            ? `lot_id=eq.${houseId}`
+            : `jobsite_id=eq.${siteId}`,
         },
         (payload) => {
           const newMessage = payload.new as Message
           // Only add if matches our filter (site-level or specific house)
-          if (houseId && newMessage.house_id === houseId) {
+          if (houseId && newMessage.lot_id === houseId) {
             setMessages((prev) => [...prev, newMessage])
-          } else if (!houseId && !newMessage.house_id) {
+          } else if (!houseId && !newMessage.lot_id) {
             setMessages((prev) => [...prev, newMessage])
           }
         }
@@ -431,7 +431,7 @@ export default function ChatTimeline({
       formData.append('file', file)
       formData.append('siteId', siteId)
       if (houseId) formData.append('houseId', houseId)
-      formData.append('bucket', 'egl-media')
+      formData.append('bucket', 'frm-media')
 
       try {
         const response = await fetch('/api/upload', {
@@ -531,8 +531,8 @@ export default function ChatTimeline({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              site_id: siteId,
-              house_id: houseId, // ISOLATED: only this lot
+              jobsite_id: siteId,
+              lot_id: houseId, // ISOLATED: only this lot
               sender_type: 'system',
               sender_name: 'Eagle AI',
               content: `📊 AI updated lot: ${Object.entries(updates).map(([k, v]) => `${k}: ${v}`).join(', ')}`,
@@ -556,8 +556,8 @@ export default function ChatTimeline({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              site_id: siteId,
-              house_id: houseId, // ISOLATED: only this lot
+              jobsite_id: siteId,
+              lot_id: houseId, // ISOLATED: only this lot
               sender_type: 'ai',
               sender_name: 'Eagle AI',
               content: `⚠️ Issue detected: **${issue.title}** (${issue.severity})\n${issue.description}`,
@@ -575,8 +575,8 @@ export default function ChatTimeline({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            site_id: siteId,
-            house_id: houseId, // ISOLATED: only this lot
+            jobsite_id: siteId,
+            lot_id: houseId, // ISOLATED: only this lot
             sender_type: 'ai',
             sender_name: 'Eagle AI',
             content: `🔍 **${aiSuggestions.timeline.title}**\n\n${aiSuggestions.timeline.description}`,
@@ -607,8 +607,8 @@ export default function ChatTimeline({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        site_id: siteId,
-        house_id: houseId || null,
+        jobsite_id: siteId,
+        lot_id: houseId || null,
         sender_type: 'supervisor',
         sender_id: currentUserId,
         sender_name: currentUserName,
@@ -663,8 +663,8 @@ export default function ChatTimeline({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          site_id: siteId,
-          house_id: houseId || null,
+          jobsite_id: siteId,
+          lot_id: houseId || null,
           sender_type: 'supervisor',
           sender_id: currentUserId,
           sender_name: currentUserName,
@@ -689,8 +689,8 @@ export default function ChatTimeline({
           body: JSON.stringify({
             message_id: messageData.id,
             message: messageText,
-            site_id: siteId,
-            house_id: houseId || null,
+            jobsite_id: siteId,
+            lot_id: houseId || null,
             sender_type: 'supervisor',
             sender_name: currentUserName,
             source_app: 'monitor',
@@ -767,8 +767,8 @@ export default function ChatTimeline({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          site_id: siteId,
-          house_id: houseId || null,
+          jobsite_id: siteId,
+          lot_id: houseId || null,
           sender_type: 'ai',
           sender_name: 'Eagle AI',
           content: aiResponse.answer,

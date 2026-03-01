@@ -4,7 +4,7 @@
  * Pure functions that accept a Supabase client as parameter.
  * No global state, no React — works in any JS environment.
  *
- * Table: `egl_messages` (chat-style feed)
+ * Table: `frm_messages` (chat-style feed)
  */
 
 import type {
@@ -30,27 +30,27 @@ interface SupabaseQueryBuilder {
 }
 
 /**
- * Fetch timeline messages for a site or specific house.
- * If house_id is provided, returns only that house's messages.
- * If omitted, returns site-level messages (house_id IS NULL).
+ * Fetch timeline messages for a jobsite or specific lot.
+ * If lot_id is provided, returns only that lot's messages.
+ * If omitted, returns jobsite-level messages (lot_id IS NULL).
  */
 export async function fetchMessages(
   supabase: { from: (table: string) => SupabaseQueryBuilder },
   options: TimelineFetchOptions,
 ): Promise<{ data: TimelineMessage[]; error: string | null }> {
-  const { site_id, house_id, limit = 100, offset = 0, before, after } = options;
+  const { jobsite_id, lot_id, limit = 100, offset = 0, before, after } = options;
 
   try {
     let query = supabase
-      .from('egl_messages')
+      .from('frm_messages')
       .select('*')
-      .eq('site_id', site_id)
+      .eq('jobsite_id', jobsite_id)
       .order('created_at', { ascending: true });
 
-    if (house_id) {
-      query = query.eq('house_id', house_id);
+    if (lot_id) {
+      query = query.eq('lot_id', lot_id);
     } else {
-      query = query.is('house_id', null);
+      query = query.is('lot_id', null);
     }
 
     if (before) {
@@ -80,8 +80,8 @@ export async function fetchMessages(
 // ─── Send Message ───────────────────────────────────────────
 
 export interface SendMessageInput {
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   sender_type: SenderType;
   sender_id?: string;
   sender_name: string;
@@ -106,10 +106,10 @@ export async function sendMessage(
     const senderType = input.sender_type === 'operator' ? 'worker' : input.sender_type;
 
     const { data, error } = await supabase
-      .from('egl_messages')
+      .from('frm_messages')
       .insert({
-        site_id: input.site_id,
-        house_id: input.house_id || null,
+        jobsite_id: input.jobsite_id,
+        lot_id: input.lot_id || null,
         sender_type: senderType,
         sender_id: input.sender_id || null,
         sender_name: input.sender_name,
@@ -131,7 +131,7 @@ export async function sendMessage(
 // ─── Subscribe to Realtime ──────────────────────────────────
 
 /**
- * Subscribe to realtime message inserts on a site/house channel.
+ * Subscribe to realtime message inserts on a jobsite/lot channel.
  * Returns an unsubscribe function.
  */
 export function subscribeToMessages(
@@ -143,12 +143,12 @@ export function subscribeToMessages(
   },
   options: TimelineSubscribeOptions,
 ): () => void {
-  const { site_id, house_id, onMessage } = options;
-  const channelName = `timeline-${site_id}-${house_id || 'site'}`;
+  const { jobsite_id, lot_id, onMessage } = options;
+  const channelName = `timeline-${jobsite_id}-${lot_id || 'jobsite'}`;
 
-  const filter = house_id
-    ? `house_id=eq.${house_id}`
-    : `site_id=eq.${site_id}`;
+  const filter = lot_id
+    ? `lot_id=eq.${lot_id}`
+    : `jobsite_id=eq.${jobsite_id}`;
 
   const channel = supabase
     .channel(channelName)
@@ -157,16 +157,16 @@ export function subscribeToMessages(
       {
         event: 'INSERT',
         schema: 'public',
-        table: 'egl_messages',
+        table: 'frm_messages',
         filter,
       },
       (payload: { new: TimelineMessage }) => {
-        if (house_id) {
-          if (payload.new.house_id === house_id) onMessage(payload.new);
+        if (lot_id) {
+          if (payload.new.lot_id === lot_id) onMessage(payload.new);
           return;
         }
 
-        if (!payload.new.house_id) onMessage(payload.new);
+        if (!payload.new.lot_id) onMessage(payload.new);
       },
     )
     .subscribe();
@@ -182,8 +182,8 @@ export function subscribeToMessages(
 export interface MediationRequest {
   message_id?: string;
   message: string;
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   sender_type: SenderType;
   sender_id?: string;
   sender_name: string;
@@ -194,7 +194,7 @@ export interface MediationRequest {
  * Request AI mediation for a message.
  *
  * Call this AFTER sendMessage() to interpret the raw text into a typed event.
- * The API will update the egl_messages row with ai_interpretation.
+ * The API will update the frm_messages row with ai_interpretation.
  *
  * @param apiBaseUrl - Base URL of the Monitor app (e.g., "https://monitor.onsiteclub.ca")
  * @param input - Message data to mediate
@@ -256,14 +256,14 @@ export async function fetchMessageCount(
       select: (columns: string, options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => SupabaseQueryBuilder;
     };
   },
-  site_id: string,
+  jobsite_id: string,
   since?: string,
 ): Promise<{ count: number; error: string | null }> {
   try {
     let query = supabase
-      .from('egl_messages')
+      .from('frm_messages')
       .select('*', { count: 'exact', head: true })
-      .eq('site_id', site_id) as unknown as SupabaseQueryBuilder;
+      .eq('jobsite_id', jobsite_id) as unknown as SupabaseQueryBuilder;
 
     if (since) {
       query = query.gt('created_at', since);

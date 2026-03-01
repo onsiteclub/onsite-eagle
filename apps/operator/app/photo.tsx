@@ -83,21 +83,21 @@ export default function PhotoScreen() {
   async function loadSiteInfo(userId: string) {
     // Get operator's assigned site
     const { data: assignment } = await supabase
-      .from('egl_operator_assignments')
-      .select('site_id, site:egl_sites(name)')
+      .from('frm_operator_assignments')
+      .select('jobsite_id, jobsite:frm_jobsites(name)')
       .eq('operator_id', userId)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (assignment?.site_id) {
-      setSiteId(assignment.site_id);
-      setSiteName((assignment as any).site?.name || null);
+    if (assignment?.jobsite_id) {
+      setSiteId(assignment.jobsite_id);
+      setSiteName((assignment as any).jobsite?.name || null);
 
       // Load houses for lot selection
       const { data: houseData } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('id, lot_number')
-        .eq('site_id', assignment.site_id)
+        .eq('jobsite_id', assignment.jobsite_id)
         .is('deleted_at', null)
         .order('lot_number', { ascending: true });
 
@@ -152,7 +152,7 @@ export default function PhotoScreen() {
       }
 
       const { error: uploadError } = await supabase.storage
-        .from('egl-media')
+        .from('frm-media')
         .upload(storagePath, bytes, { contentType: 'image/jpeg', upsert: false });
 
       if (uploadError) {
@@ -162,15 +162,15 @@ export default function PhotoScreen() {
       }
 
       const { data: urlData } = supabase.storage
-        .from('egl-media')
+        .from('frm-media')
         .getPublicUrl(storagePath);
 
       const publicUrl = urlData.publicUrl;
 
       // 2. Create timeline event for the house (if lot selected)
       if (selectedHouse) {
-        await supabase.from('egl_timeline').insert({
-          house_id: selectedHouse.id,
+        await supabase.from('frm_timeline').insert({
+          lot_id: selectedHouse.id,
           event_type: selectedCategory.id === 'accident' || selectedCategory.id === 'theft'
             ? 'alert'
             : selectedCategory.id === 'progress'

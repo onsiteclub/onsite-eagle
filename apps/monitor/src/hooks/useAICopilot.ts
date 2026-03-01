@@ -105,9 +105,9 @@ export function useAICopilot(options: UseAICopilotOptions): UseCopilotReturn {
           if (!timeline || !houseId) return
 
           const { error: insertError } = await supabase
-            .from('egl_timeline_events')
+            .from('frm_timeline_events')
             .insert({
-              house_id: houseId,
+              lot_id: houseId,
               event_type: timeline.event_type,
               title: timeline.title,
               description: timeline.description,
@@ -127,7 +127,7 @@ export function useAICopilot(options: UseAICopilotOptions): UseCopilotReturn {
           if (!updates || !houseId) return
 
           const { error: updateError } = await supabase
-            .from('egl_houses')
+            .from('frm_lots')
             .update({
               ...(updates.status && { status: updates.status }),
               ...(updates.current_phase && { current_phase: updates.current_phase }),
@@ -156,9 +156,9 @@ export function useAICopilot(options: UseAICopilotOptions): UseCopilotReturn {
 
           for (const issue of issues) {
             const { error: insertError } = await supabase
-              .from('egl_issues')
+              .from('frm_house_items')
               .insert({
-                house_id: houseId,
+                lot_id: houseId,
                 title: issue.title,
                 description: issue.description,
                 severity: issue.severity,

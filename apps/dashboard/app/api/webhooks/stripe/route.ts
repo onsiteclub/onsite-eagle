@@ -1,4 +1,5 @@
 import { stripe } from '@/lib/stripe/server'
+import { logger } from '@onsite/logger'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`)
+        logger.debug('STRIPE', `Unhandled event type: ${event.type}`)
     }
 
     return NextResponse.json({ received: true })

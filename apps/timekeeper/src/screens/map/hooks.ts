@@ -219,7 +219,7 @@ export function useMapScreen() {
   // ============================================
 
   const handleMapReady = useCallback(() => {
-    console.log('🗺️ Map loaded');
+    logger.info('ui', 'Map loaded');
     setMapReady(true);
   }, []);
 

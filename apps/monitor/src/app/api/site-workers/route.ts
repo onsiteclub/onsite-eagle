@@ -16,9 +16,9 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from('egl_site_workers')
+    .from('frm_site_workers')
     .select('*')
-    .eq('site_id', siteId)
+    .eq('jobsite_id', siteId)
     .eq('is_active', true)
     .order('worker_name')
 
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      site_id,
+      jobsite_id,
       worker_name,
       worker_phone,
       worker_email,
@@ -43,17 +43,17 @@ export async function POST(request: NextRequest) {
       company_name,
     } = body
 
-    if (!site_id || !worker_name) {
+    if (!jobsite_id || !worker_name) {
       return NextResponse.json(
-        { error: 'site_id and worker_name are required' },
+        { error: 'jobsite_id and worker_name are required' },
         { status: 400 }
       )
     }
 
     const { data, error } = await supabase
-      .from('egl_site_workers')
+      .from('frm_site_workers')
       .insert({
-        site_id,
+        jobsite_id,
         worker_name,
         worker_phone: worker_phone || null,
         worker_email: worker_email || null,
@@ -97,7 +97,7 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete - set is_active to false
     const { error } = await supabase
-      .from('egl_site_workers')
+      .from('frm_site_workers')
       .update({ is_active: false })
       .eq('id', id)
 

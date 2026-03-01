@@ -43,11 +43,11 @@ export default function DeliverConfirmation() {
   async function loadRequest() {
     try {
       const { data, error } = await supabase
-        .from('egl_material_requests')
+        .from('frm_material_requests')
         .select(`
           *,
-          house:egl_houses(lot_number),
-          site:egl_sites(name)
+          lot:frm_lots(lot_number),
+          jobsite:frm_jobsites(name)
         `)
         .eq('id', id)
         .single();
@@ -59,8 +59,8 @@ export default function DeliverConfirmation() {
 
       setRequest({
         ...data,
-        lot_number: data.house?.lot_number,
-        site_name: data.site?.name,
+        lot_number: data.lot?.lot_number,
+        site_name: data.jobsite?.name,
       });
     } catch (err) {
       console.error('Error:', err);
@@ -99,8 +99,8 @@ export default function DeliverConfirmation() {
       });
 
       // Build storage path
-      const siteFolder = request.site_id || 'unsorted';
-      const houseFolder = request.house_id || 'deliveries';
+      const siteFolder = request.jobsite_id || request.site_id || 'unsorted';
+      const houseFolder = request.lot_id || request.house_id || 'deliveries';
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 7);
       const storagePath = `${siteFolder}/${houseFolder}/${timestamp}_${random}.jpg`;
@@ -114,7 +114,7 @@ export default function DeliverConfirmation() {
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
-        .from('egl-media')
+        .from('frm-media')
         .upload(storagePath, bytes, { contentType: 'image/jpeg', upsert: false });
 
       if (uploadError) {
@@ -125,7 +125,7 @@ export default function DeliverConfirmation() {
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from('egl-media')
+        .from('frm-media')
         .getPublicUrl(storagePath);
 
       setPhotoUrl(urlData.publicUrl);
@@ -149,7 +149,7 @@ export default function DeliverConfirmation() {
 
     try {
       const { error } = await supabase
-        .from('egl_material_requests')
+        .from('frm_material_requests')
         .update({
           status: 'delivered',
           delivered_at: new Date().toISOString(),
@@ -165,10 +165,10 @@ export default function DeliverConfirmation() {
       }
 
       // Create house-level timeline event with photo
-      if (request.house_id) {
+      if (request.lot_id || request.house_id) {
         const photoSuffix = photoUrl ? `\nFoto: ${photoUrl}` : '';
-        await supabase.from('egl_timeline').insert({
-          house_id: request.house_id,
+        await supabase.from('frm_timeline').insert({
+          lot_id: request.lot_id || request.house_id,
           event_type: 'material_delivery',
           title: `Material Delivered: ${request.material_name}`,
           description: `${request.quantity} ${request.unit} delivered by ${operatorName}${deliveryNotes ? `. Notes: ${deliveryNotes}` : ''}${photoSuffix}`,

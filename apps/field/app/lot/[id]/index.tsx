@@ -1,7 +1,7 @@
 /**
  * Lot Detail — House detail with progress, quick actions, activity
  *
- * Queries egl_houses, egl_sites, egl_timeline.
+ * Queries frm_lots, frm_jobsites, frm_timeline.
  * Enterprise v3 light theme.
  */
 
@@ -19,8 +19,8 @@ interface House {
   status: string;
   current_phase: number;
   progress_percentage: number;
-  site_id: string;
-  site: { id: string; name: string } | null;
+  jobsite_id: string;
+  jobsite: { id: string; name: string } | null;
 }
 
 interface TimelineEvent {
@@ -87,11 +87,11 @@ export default function LotDetailScreen() {
   async function loadLotData() {
     try {
       const { data: houseData } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select(`
           id, lot_number, address, status,
-          current_phase, progress_percentage, site_id,
-          site:egl_sites ( id, name )
+          current_phase, progress_percentage, jobsite_id,
+          jobsite:frm_jobsites ( id, name )
         `)
         .eq('id', id)
         .single();
@@ -99,15 +99,15 @@ export default function LotDetailScreen() {
       if (houseData) {
         const normalized = {
           ...houseData,
-          site: Array.isArray(houseData.site) ? houseData.site[0] : houseData.site,
+          jobsite: Array.isArray(houseData.jobsite) ? houseData.jobsite[0] : houseData.jobsite,
         } as House;
         setHouse(normalized);
       }
 
       const { data: timelineData } = await supabase
-        .from('egl_timeline')
+        .from('frm_timeline')
         .select('*')
-        .eq('house_id', id)
+        .eq('lot_id', id)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -158,7 +158,7 @@ export default function LotDetailScreen() {
             </View>
           </View>
 
-          <Text style={styles.siteName}>{house.site?.name || 'Unknown Site'}</Text>
+          <Text style={styles.siteName}>{house.jobsite?.name || 'Unknown Site'}</Text>
           {house.address && <Text style={styles.address}>{house.address}</Text>}
 
           {/* Progress */}

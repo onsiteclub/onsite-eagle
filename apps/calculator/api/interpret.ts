@@ -3,6 +3,7 @@
 // Vercel Serverless Function
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { logger } from '@onsite/logger';
 import { apiLogger } from './lib/api-logger.js';
 import { checkRateLimit } from './lib/rate-limit.js';
 import { saveVoiceLog, detectLanguage, detectInformalTerms, extractEntities } from './lib/voice-logs.js';
@@ -408,7 +409,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     parsed.expression = expr;
 
     const durationMs = Date.now() - startTime;
-    console.log('[Voice] Success:', { expression: parsed.expression, duration_ms: durationMs });
+    logger.debug('VOICE', 'Voice interpretation success', { expression: parsed.expression, duration_ms: durationMs });
 
     // Log de sucesso para app_logs (expression only, no transcription unless consented)
     apiLogger.voice.success(durationMs, {

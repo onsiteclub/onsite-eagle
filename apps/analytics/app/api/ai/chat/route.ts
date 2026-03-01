@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { logger } from '@onsite/logger';
 import { createAdminClient } from '@onsite/supabase/server';
 
 // Lazy initialization to avoid build-time errors on Vercel
@@ -440,11 +441,11 @@ function detectIntent(message: string): {
 // ============================================
 
 export async function POST(request: Request) {
-  console.log('\n=== ARGUS (Teletraan9) ===');
+  logger.info('AI', 'ARGUS (Teletraan9) request received');
 
   try {
     const { message, history, conversationId } = await request.json();
-    console.log('User:', message);
+    logger.debug('AI', 'User message', { message });
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({
@@ -464,7 +465,7 @@ export async function POST(request: Request) {
 
     // Handle commands
     if (command) {
-      console.log('Command detected:', command, args);
+      logger.debug('AI', 'Command detected', { command, args });
 
       switch (command) {
         case '/churn':
@@ -530,7 +531,7 @@ export async function POST(request: Request) {
     else if (intent.wants === 'refcode') {
       const refCode = detectRefCode(message);
       if (refCode) {
-        console.log('Ref # detected:', refCode);
+        logger.debug('AI', 'Ref # detected', { refCode });
         const refLookup = await lookupUserByRefCode(refCode);
 
         if (refLookup?.user) {
@@ -570,7 +571,7 @@ export async function POST(request: Request) {
     }
     // Handle other intents
     else if (intent.wants !== 'none') {
-      console.log('Intent:', intent);
+      logger.debug('AI', 'Intent detected', { intent });
 
       if (intent.topic === 'churn') {
         const data = await getChurnRisk();
@@ -642,7 +643,7 @@ Respond naturally and conversationally. Include insights and recommended actions
       { role: 'user', content: message },
     ];
 
-    console.log('Calling GPT-4o...');
+    logger.debug('AI', 'Calling GPT-4o');
 
     const response = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
@@ -652,7 +653,7 @@ Respond naturally and conversationally. Include insights and recommended actions
     });
 
     const aiMessage = response.choices[0].message.content || 'I could not process that request.';
-    console.log('=== END ===\n');
+    logger.debug('AI', 'ARGUS request completed');
 
     return NextResponse.json({
       message: aiMessage,

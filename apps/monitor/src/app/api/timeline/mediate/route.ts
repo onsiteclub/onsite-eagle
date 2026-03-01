@@ -24,13 +24,13 @@ function getOpenAIClient() {
  * POST /api/timeline/mediate
  *
  * Interprets a raw text message using AI and returns a typed timeline event.
- * Optionally updates the egl_messages row with ai_interpretation.
+ * Optionally updates the frm_messages row with ai_interpretation.
  *
  * Body: {
  *   message_id?: string   — if provided, updates the row after mediation
  *   message: string       — raw text to interpret
- *   site_id: string
- *   house_id?: string
+ *   jobsite_id: string
+ *   lot_id?: string
  *   sender_type: string
  *   sender_id?: string
  *   sender_name: string
@@ -45,31 +45,31 @@ export async function POST(request: NextRequest) {
     const {
       message_id,
       message,
-      site_id,
-      house_id,
+      jobsite_id,
+      lot_id,
       sender_type,
       sender_name,
     } = body;
 
-    if (!message || !site_id) {
+    if (!message || !jobsite_id) {
       return NextResponse.json(
-        { error: 'Missing required fields: message, site_id' },
+        { error: 'Missing required fields: message, jobsite_id' },
         { status: 400 },
       );
     }
 
     // Fetch site context
     const { data: site } = await supabase
-      .from('egl_sites')
+      .from('frm_jobsites')
       .select('name')
-      .eq('id', site_id)
+      .eq('id', jobsite_id)
       .single();
 
     // Fetch active houses for context
     const { data: houses } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('lot_number, status, current_phase')
-      .eq('site_id', site_id)
+      .eq('jobsite_id', jobsite_id)
       .is('deleted_at', null)
       .order('lot_number', { ascending: true })
       .limit(30);
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 
       if (message_id) {
         await supabase
-          .from('egl_messages')
+          .from('frm_messages')
           .update({
             ai_interpretation: {
               ...fallback,
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     // Update the message row with AI interpretation
     if (message_id) {
       await supabase
-        .from('egl_messages')
+        .from('frm_messages')
         .update({
           ai_interpretation: {
             ...result,
@@ -154,27 +154,27 @@ export async function POST(request: NextRequest) {
         .eq('id', message_id);
     }
 
-    // If a material_request was detected, create an egl_material_requests row
+    // If a material_request was detected, create an frm_material_requests row
     // Check material_request object directly — AI may populate it even when
     // event_type is "calendar" or "note" (e.g. message mentions delivery date)
     if (result.material_request && result.material_request.material_name) {
       const mr = result.material_request;
 
-      // Try to resolve house_id from lot number
-      let resolvedHouseId = house_id || null;
-      if (mr.house_id && !resolvedHouseId) {
+      // Try to resolve lot_id from lot number
+      let resolvedHouseId = lot_id || null;
+      if (mr.lot_id && !resolvedHouseId) {
         const { data: house } = await supabase
-          .from('egl_houses')
+          .from('frm_lots')
           .select('id')
-          .eq('site_id', site_id)
-          .eq('lot_number', mr.house_id)
+          .eq('jobsite_id', jobsite_id)
+          .eq('lot_number', mr.lot_id)
           .maybeSingle();
         if (house) resolvedHouseId = house.id;
       }
 
-      const { error: insertError } = await supabase.from('egl_material_requests').insert({
-        site_id,
-        house_id: resolvedHouseId,
+      const { error: insertError } = await supabase.from('frm_material_requests').insert({
+        jobsite_id,
+        lot_id: resolvedHouseId,
         material_type: mr.material_type || 'general',
         material_name: mr.material_name,
         quantity: mr.quantity || 1,
@@ -195,8 +195,8 @@ export async function POST(request: NextRequest) {
     if (result.confidence >= 0.6 && result.event.event_type !== 'note') {
       triggerPushNotification({
         event_type: result.event.event_type,
-        site_id,
-        house_id: house_id || undefined,
+        jobsite_id,
+        lot_id: lot_id || undefined,
         title: result.event.title || result.display_text,
         body: result.event.description || result.display_text,
         sender_id: body.sender_id,
@@ -226,8 +226,8 @@ export async function POST(request: NextRequest) {
  */
 async function triggerPushNotification(payload: {
   event_type: string;
-  site_id: string;
-  house_id?: string;
+  jobsite_id: string;
+  lot_id?: string;
   title: string;
   body: string;
   sender_id?: string;

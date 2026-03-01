@@ -48,7 +48,7 @@ export function createLinkPayload(
   return JSON.stringify(payload);
 }
 
-/** Create a QR payload string for a house assignment action */
+/** Create a QR payload string for a lot assignment action */
 export function createAssignPayload(
   data: Omit<QRAssignPayload, 'app' | 'action'>,
   app: QRApp = 'onsite-eagle',
@@ -80,11 +80,11 @@ export function parseQRPayload(data: string): QRPayload | null {
       return parsed as QRLinkPayload;
     }
 
-    if (parsed.action === 'assign' && typeof parsed.houseId === 'string') {
+    if (parsed.action === 'assign' && typeof parsed.lotId === 'string') {
       return parsed as QRAssignPayload;
     }
 
-    if (parsed.action === 'join_site' && typeof parsed.siteId === 'string') {
+    if (parsed.action === 'join_site' && typeof parsed.jobsiteId === 'string') {
       return parsed as QRJoinSitePayload;
     }
 

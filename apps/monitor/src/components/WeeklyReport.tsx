@@ -35,7 +35,7 @@ interface ReportMetrics {
 interface ReportAlert {
   severity: 'low' | 'medium' | 'high' | 'critical'
   message: string
-  house_id: string | null
+  lot_id: string | null
 }
 
 interface Report {
@@ -74,7 +74,7 @@ export default function WeeklyReport({ siteId, siteName }: WeeklyReportProps) {
       const response = await fetch('/api/reports/weekly', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site_id: siteId }),
+        body: JSON.stringify({ jobsite_id: siteId }),
       })
 
       if (!response.ok) {
@@ -217,8 +217,8 @@ export default function WeeklyReport({ siteId, siteName }: WeeklyReportProps) {
                     />
                     <div>
                       <p className="text-sm text-[#1D1D1F]">{alert.message}</p>
-                      {alert.house_id && (
-                        <span className="text-xs text-[#8E8E93]">House: {alert.house_id}</span>
+                      {alert.lot_id && (
+                        <span className="text-xs text-[#8E8E93]">House: {alert.lot_id}</span>
                       )}
                     </div>
                     <span

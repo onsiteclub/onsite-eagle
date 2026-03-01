@@ -4,6 +4,10 @@
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@onsite/supabase": "*"
   },
@@ -11,7 +15,10 @@
     "react": ">=18.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@types/react": "^18.0.0",
-    "typescript": "^5.0.0"
+    "eslint": "^9.0.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0"
   }
 }

@@ -17,14 +17,14 @@ export async function GET(request: NextRequest) {
   }
 
   let query = supabase
-    .from('egl_external_events')
+    .from('frm_external_events')
     .select('*')
     .order('event_date', { ascending: true })
 
   if (houseId) {
-    query = query.eq('house_id', houseId)
+    query = query.eq('lot_id', houseId)
   } else if (siteId) {
-    query = query.eq('site_id', siteId)
+    query = query.eq('jobsite_id', siteId)
   }
 
   const { data, error } = await query
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { site_id, house_id, event_type, title, description, event_date, source } = body
+    const { jobsite_id, lot_id, event_type, title, description, event_date, source } = body
 
     if (!title || !event_date) {
       return NextResponse.json(
@@ -50,9 +50,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!site_id && !house_id) {
+    if (!jobsite_id && !lot_id) {
       return NextResponse.json(
-        { error: 'Either site_id or house_id is required' },
+        { error: 'Either jobsite_id or lot_id is required' },
         { status: 400 }
       )
     }
@@ -84,10 +84,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('egl_external_events')
+      .from('frm_external_events')
       .insert({
-        site_id: site_id || null,
-        house_id: house_id || null,
+        jobsite_id: jobsite_id || null,
+        lot_id: lot_id || null,
         event_type: validEventType,
         title,
         description: description || null,

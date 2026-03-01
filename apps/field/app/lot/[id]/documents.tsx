@@ -1,7 +1,7 @@
 /**
  * Documents — Lot documents grouped by category
  *
- * Queries egl_houses, egl_timeline.
+ * Queries frm_lots, frm_timeline.
  * Enterprise v3 light theme.
  */
 
@@ -62,7 +62,7 @@ export default function DocumentsScreen() {
   async function loadDocuments() {
     try {
       const { data: houseData } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('id, lot_number')
         .eq('id', id)
         .single();
@@ -70,9 +70,9 @@ export default function DocumentsScreen() {
       if (houseData) setHouse(houseData);
 
       const { data: docsData } = await supabase
-        .from('egl_timeline')
+        .from('frm_timeline')
         .select('*')
-        .eq('house_id', id)
+        .eq('lot_id', id)
         .or('event_type.eq.document,source_link.not.is.null')
         .order('created_at', { ascending: false });
 

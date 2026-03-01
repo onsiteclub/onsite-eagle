@@ -56,7 +56,7 @@ export default function DocumentsTab({ siteId, onBulkUpload }: DocumentsTabProps
 
   const loadDocs = useCallback(async () => {
     setLoading(true)
-    const result = await fetchDocuments(supabase as never, { site_id: siteId })
+    const result = await fetchDocuments(supabase as never, { jobsite_id: siteId })
     setDocs(result.data || [])
     setLoading(false)
   }, [siteId])
@@ -91,19 +91,19 @@ export default function DocumentsTab({ siteId, onBulkUpload }: DocumentsTabProps
       const filePath = `${siteId}/documents/${fileName}`
 
       const { error: uploadError } = await supabase.storage
-        .from('egl-media')
+        .from('frm-media')
         .upload(filePath, file)
 
       if (uploadError) throw uploadError
 
       const { data: urlData } = supabase.storage
-        .from('egl-media')
+        .from('frm-media')
         .getPublicUrl(filePath)
 
       await supabase
-        .from('egl_documents')
+        .from('frm_documents')
         .insert({
-          site_id: siteId,
+          jobsite_id: siteId,
           name: file.name,
           file_url: urlData.publicUrl,
           file_path: filePath,

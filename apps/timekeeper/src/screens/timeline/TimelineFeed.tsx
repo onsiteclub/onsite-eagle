@@ -28,8 +28,8 @@ async function resolveWorkerContext() {
     .maybeSingle();
 
   const { data: link } = await supabase
-    .from('egl_site_workers')
-    .select('site_id')
+    .from('frm_site_workers')
+    .select('jobsite_id')
     .eq('worker_id', user.id)
     .eq('is_active', true)
     .limit(1)
@@ -38,7 +38,7 @@ async function resolveWorkerContext() {
   return {
     userId: user.id,
     senderName: profile?.full_name || user.email || 'Worker',
-    siteId: link?.site_id || null,
+    siteId: link?.jobsite_id || null,
   };
 }
 
@@ -125,7 +125,7 @@ export function TimelineFeed() {
       // Offline fallback: queue message for later sync
       if (result.error) {
         await enqueue({
-          table: 'egl_messages',
+          table: 'frm_messages',
           operation: 'INSERT',
           data: {
             site_id: siteId,

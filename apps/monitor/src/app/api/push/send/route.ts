@@ -15,8 +15,8 @@ const EXPO_PUSH_API = 'https://exp.host/--/api/v2/push/send';
  *
  * Body: {
  *   event_type: string    — timeline event type
- *   site_id: string       — site where event occurred
- *   house_id?: string     — optional house context
+ *   jobsite_id: string       — site where event occurred
+ *   lot_id?: string     — optional house context
  *   title: string         — notification title
  *   body: string          — notification body text
  *   data?: object         — extra data for the notification (e.g., request_id)
@@ -26,11 +26,11 @@ const EXPO_PUSH_API = 'https://exp.host/--/api/v2/push/send';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { event_type, site_id, title, body: notifBody, data, sender_id } = body;
+    const { event_type, jobsite_id, title, body: notifBody, data, sender_id } = body;
 
-    if (!event_type || !site_id || !title || !notifBody) {
+    if (!event_type || !jobsite_id || !title || !notifBody) {
       return NextResponse.json(
-        { error: 'Missing required fields: event_type, site_id, title, body' },
+        { error: 'Missing required fields: event_type, jobsite_id, title, body' },
         { status: 400 },
       );
     }
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch push tokens for users at this site
-    const tokens = await getTargetTokens(site_id, targets, sender_id);
+    const tokens = await getTargetTokens(jobsite_id, targets, sender_id);
 
     if (tokens.length === 0) {
       return NextResponse.json({ success: true, sent: 0, reason: 'no_tokens' });
@@ -146,9 +146,9 @@ async function getTargetTokens(
   if (appNames.includes('operator')) {
     // Get operators assigned to this site
     const { data: assignments } = await supabase
-      .from('egl_operator_assignments')
+      .from('frm_operator_assignments')
       .select('operator_id')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
       .eq('is_active', true);
 
     if (assignments?.length) {
@@ -180,7 +180,7 @@ async function getTargetTokens(
     // Get the site creator/org admins — for now, get all active admins
     // who have a push token registered for 'monitor' app
     const { data: site } = await supabase
-      .from('egl_sites')
+      .from('frm_jobsites')
       .select('organization_id')
       .eq('id', siteId)
       .single();
@@ -223,7 +223,7 @@ async function getTargetTokens(
   if (appNames.includes('timekeeper')) {
     // Get workers at this site via org membership or geofence assignment
     const { data: site } = await supabase
-      .from('egl_sites')
+      .from('frm_jobsites')
       .select('organization_id')
       .eq('id', siteId)
       .single();

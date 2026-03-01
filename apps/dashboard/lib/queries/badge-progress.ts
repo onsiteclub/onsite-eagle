@@ -25,7 +25,7 @@ export async function getNextBadges(
       .eq('user_id', userId)
       .is('deleted_at', null),
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('id', { count: 'exact', head: true })
       .eq('uploaded_by', userId),
     supabase

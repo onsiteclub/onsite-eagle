@@ -3,8 +3,6 @@
  * Used across Eagle apps for consistent event display
  */
 
-import type { EventType as DBEventType, HouseStatus as DBHouseStatus, IssueSeverity as DBIssueSeverity } from '../types/database'
-
 export const EVENT_CONFIG = {
   photo: {
     icon: 'Camera',
@@ -114,6 +112,32 @@ export const STATUS_CONFIG = {
     label: 'On Hold',
     labelPt: 'Em Espera',
   },
+  // New framing statuses
+  pending: {
+    color: '#8E8E93',
+    label: 'Pending',
+    labelPt: 'Pendente',
+  },
+  released: {
+    color: '#007AFF',
+    label: 'Released',
+    labelPt: 'Liberado',
+  },
+  paused_for_trades: {
+    color: '#FF9500',
+    label: 'Paused for Trades',
+    labelPt: 'Pausa p/ Trades',
+  },
+  backframe: {
+    color: '#5856D6',
+    label: 'Backframe',
+    labelPt: 'Backframe',
+  },
+  inspection: {
+    color: '#AF52DE',
+    label: 'Inspection',
+    labelPt: 'Inspeção',
+  },
 } as const
 
 // Use types from database.ts to avoid conflicts
@@ -153,20 +177,20 @@ export type SeverityConfig = typeof SEVERITY_CONFIG[SeverityConfigKey]
 /**
  * Helper to get event config by type
  */
-export function getEventConfig(type: DBEventType) {
-  return EVENT_CONFIG[type]
+export function getEventConfig(type: string) {
+  return EVENT_CONFIG[type as EventConfigKey]
 }
 
 /**
  * Helper to get status config by status
  */
-export function getStatusConfig(status: DBHouseStatus) {
-  return STATUS_CONFIG[status]
+export function getStatusConfig(status: string) {
+  return STATUS_CONFIG[status as StatusConfigKey]
 }
 
 /**
  * Helper to get severity config by severity level
  */
-export function getSeverityConfig(severity: DBIssueSeverity) {
-  return SEVERITY_CONFIG[severity]
+export function getSeverityConfig(severity: string) {
+  return SEVERITY_CONFIG[severity as SeverityConfigKey]
 }

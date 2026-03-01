@@ -53,8 +53,8 @@ export default async function ArchitecturePage() {
     supabase.from('core_profiles').select('*', { count: 'exact', head: true }),
     supabase.from('tmk_entries').select('*', { count: 'exact', head: true }),
     supabase.from('ccl_calculations').select('*', { count: 'exact', head: true }),
-    supabase.from('egl_photos').select('*', { count: 'exact', head: true }),
-    supabase.from('egl_sites').select('*', { count: 'exact', head: true }),
+    supabase.from('frm_photos').select('*', { count: 'exact', head: true }),
+    supabase.from('frm_jobsites').select('*', { count: 'exact', head: true }),
     supabase.from('shp_orders').select('*', { count: 'exact', head: true }),
   ])
 
@@ -62,8 +62,8 @@ export default async function ArchitecturePage() {
     { app: 'Core', table: 'core_profiles', records: totalProfiles ?? 0 },
     { app: 'Timekeeper', table: 'app_timekeeper_entries', records: totalEntries ?? 0 },
     { app: 'Calculator', table: 'app_calculator_calculations', records: totalCalculations ?? 0 },
-    { app: 'Eagle', table: 'egl_photos', records: totalPhotos ?? 0 },
-    { app: 'Eagle', table: 'egl_sites', records: totalSites ?? 0 },
+    { app: 'Eagle', table: 'frm_photos', records: totalPhotos ?? 0 },
+    { app: 'Eagle', table: 'frm_jobsites', records: totalSites ?? 0 },
     { app: 'Shop', table: 'shp_orders', records: totalOrders ?? 0 },
   ]
 

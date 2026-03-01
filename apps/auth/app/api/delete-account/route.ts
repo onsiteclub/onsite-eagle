@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@onsite/supabase/server';
+import { logger } from '@onsite/logger';
 
 /**
  * POST /api/delete-account
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[DeleteAccount] User ${userId} (${user.email}) deleted successfully`);
+    logger.info('AUTH', 'User account deleted successfully', { userId, email: user.email });
 
     return NextResponse.json({ success: true });
   } catch (error) {

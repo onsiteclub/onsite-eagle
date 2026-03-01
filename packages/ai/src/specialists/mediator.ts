@@ -96,7 +96,7 @@ RESPONSE FORMAT:
     "quantity": number | null,
     "unit": "string" | null,
     "urgency": "low|medium|high|critical",
-    "house_id": "lot number mentioned" | null
+    "lot_id": "lot number mentioned" | null
   },
   "alert": null | {
     "title": "string",
@@ -162,7 +162,7 @@ export interface ParsedMediationResult {
     quantity?: number | null;
     unit?: string | null;
     urgency: 'low' | 'medium' | 'high' | 'critical';
-    house_id?: string | null;
+    lot_id?: string | null;
   } | null;
   alert: {
     title: string;

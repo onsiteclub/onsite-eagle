@@ -25,23 +25,23 @@ function getSupabaseClient() {
 async function getContext(supabase: ReturnType<typeof getSupabaseClient>, siteId: string, houseId?: string) {
   // Get site info
   const { data: site } = await supabase
-    .from('egl_sites')
+    .from('frm_jobsites')
     .select('*')
     .eq('id', siteId)
     .single()
 
   // Get all houses in site
   const { data: houses } = await supabase
-    .from('egl_houses')
+    .from('frm_lots')
     .select('*')
-    .eq('site_id', siteId)
+    .eq('jobsite_id', siteId)
     .order('lot_number')
 
   // Get specific house if provided
   let house = null
   if (houseId) {
     const { data } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('*')
       .eq('id', houseId)
       .single()
@@ -50,16 +50,16 @@ async function getContext(supabase: ReturnType<typeof getSupabaseClient>, siteId
 
   // Get recent messages (last 20)
   let messagesQuery = supabase
-    .from('egl_messages')
+    .from('frm_messages')
     .select('sender_type, sender_name, content, created_at')
-    .eq('site_id', siteId)
+    .eq('jobsite_id', siteId)
     .order('created_at', { ascending: false })
     .limit(20)
 
   if (houseId) {
-    messagesQuery = messagesQuery.eq('house_id', houseId)
+    messagesQuery = messagesQuery.eq('lot_id', houseId)
   } else {
-    messagesQuery = messagesQuery.is('house_id', null)
+    messagesQuery = messagesQuery.is('lot_id', null)
   }
 
   const { data: messages } = await messagesQuery
@@ -69,9 +69,9 @@ async function getContext(supabase: ReturnType<typeof getSupabaseClient>, siteId
     total: houses?.length || 0,
     completed: houses?.filter(h => h.status === 'completed').length || 0,
     inProgress: houses?.filter(h => h.status === 'in_progress').length || 0,
-    delayed: houses?.filter(h => h.status === 'delayed').length || 0,
-    notStarted: houses?.filter(h => h.status === 'not_started').length || 0,
-    onHold: houses?.filter(h => h.status === 'on_hold').length || 0,
+    delayed: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
+    notStarted: houses?.filter(h => h.status === 'pending').length || 0,
+    onHold: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
   }
 
   // Progress percentage

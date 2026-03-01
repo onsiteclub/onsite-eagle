@@ -3,7 +3,7 @@
 /**
  * GanttView — Visual schedule: houses as rows, phases as bars.
  *
- * Reads from egl_schedules + egl_schedule_phases to display
+ * Reads from frm_schedules + frm_schedule_phases to display
  * a Gantt-style chart of construction progress.
  */
 
@@ -30,7 +30,7 @@ interface SchedulePhase {
 
 interface HouseSchedule {
   id: string
-  house_id: string
+  lot_id: string
   lot_number: string
   house_status: string
   status: string
@@ -119,14 +119,14 @@ export default function GanttView({ siteId, siteName }: GanttViewProps) {
 
     // Load schedules with house info
     const { data: schedulesData } = await supabase
-      .from('egl_schedules')
+      .from('frm_schedules')
       .select(`
-        id, house_id, status,
+        id, lot_id, status,
         expected_start_date, expected_end_date,
         actual_start_date, actual_end_date,
         deviation_days, assigned_worker_name
       `)
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
 
     if (!schedulesData?.length) {
       setSchedules([])
@@ -135,9 +135,9 @@ export default function GanttView({ siteId, siteName }: GanttViewProps) {
     }
 
     // Load houses for lot numbers
-    const houseIds = schedulesData.map((s: { house_id: string }) => s.house_id)
+    const houseIds = schedulesData.map((s: { lot_id: string }) => s.lot_id)
     const { data: housesData } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('id, lot_number, status')
       .in('id', houseIds)
 
@@ -148,7 +148,7 @@ export default function GanttView({ siteId, siteName }: GanttViewProps) {
     // Load schedule phases
     const scheduleIds = schedulesData.map((s: { id: string }) => s.id)
     const { data: phasesData } = await supabase
-      .from('egl_schedule_phases')
+      .from('frm_schedule_phases')
       .select('id, schedule_id, phase_id, expected_start_date, expected_end_date, actual_start_date, actual_end_date, status')
       .in('schedule_id', scheduleIds)
 
@@ -161,12 +161,12 @@ export default function GanttView({ siteId, siteName }: GanttViewProps) {
 
     const result: HouseSchedule[] = schedulesData
       .map((s: {
-        id: string; house_id: string; status: string;
+        id: string; lot_id: string; status: string;
         expected_start_date: string | null; expected_end_date: string | null;
         actual_start_date: string | null; actual_end_date: string | null;
         deviation_days: number | null; assigned_worker_name: string | null
       }) => {
-        const house = houseMap.get(s.house_id) as { lot_number: string; status: string } | undefined
+        const house = houseMap.get(s.lot_id) as { lot_number: string; status: string } | undefined
         return {
           ...s,
           lot_number: house?.lot_number || '?',

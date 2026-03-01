@@ -5,6 +5,7 @@ import { useCallback, useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useCalculator, useOnlineStatus, useVoiceRecorder, useCalculatorHistory } from '../hooks';
 import { logger } from '../lib/logger';
+import { logger as pkgLogger } from '@onsite/logger';
 import { getLocalConsentStatus } from '../lib/consent';
 import { HistoryModal } from './HistoryModal';
 import VoiceConsentModal from './VoiceConsentModal';
@@ -78,7 +79,7 @@ export default function Calculator({
     const trainingStatus = getLocalConsentStatus('voice_training');
     setHasVoiceTrainingConsent(trainingStatus === true);
     setVoiceConsentChecked(true);
-    console.log('[Calculator] Microphone consent status:', status, 'Voice training:', trainingStatus);
+    pkgLogger.debug('VOICE', 'Microphone consent status', { status, trainingStatus });
   }, [voiceConsentChecked]);
 
   const {
@@ -322,7 +323,7 @@ export default function Calculator({
     // Carrega o resultado na calculadora
     loadResult(result);
 
-    console.log('[Calculator] Loaded result from history:', entry.expression);
+    pkgLogger.debug('DB', 'Loaded result from history', { expression: entry.expression });
   };
 
   return (

@@ -92,7 +92,7 @@ export default function BulkDocumentUpload({ siteId, houses, onClose, onComplete
 
     // Create batch record
     const batchData: Record<string, unknown> = {
-      site_id: siteId,
+      jobsite_id: siteId,
       status: 'processing',
       total_files: items.length,
       uploaded_by_name: profileName
@@ -104,7 +104,7 @@ export default function BulkDocumentUpload({ siteId, houses, onClose, onComplete
     }
 
     const { data: batch, error: batchError } = await supabase
-      .from('egl_document_batches')
+      .from('frm_document_batches')
       .insert(batchData)
       .select()
       .single()
@@ -136,19 +136,19 @@ export default function BulkDocumentUpload({ siteId, houses, onClose, onComplete
         const filePath = `${siteId}/documents/${fileName}`
 
         const { error: uploadError } = await supabase.storage
-          .from('egl-media')
+          .from('frm-media')
           .upload(filePath, item.file)
 
         if (uploadError) throw uploadError
 
         // Get public URL
         const { data: urlData } = supabase.storage
-          .from('egl-media')
+          .from('frm-media')
           .getPublicUrl(filePath)
 
         // Create document record - build object dynamically to avoid undefined values
         const docData: Record<string, unknown> = {
-          site_id: siteId,
+          jobsite_id: siteId,
           name: item.file.name,
           file_url: urlData.publicUrl,
           file_path: filePath,
@@ -165,7 +165,7 @@ export default function BulkDocumentUpload({ siteId, houses, onClose, onComplete
         }
 
         const { data: doc, error: docError } = await supabase
-          .from('egl_documents')
+          .from('frm_documents')
           .insert(docData)
           .select()
           .single()
@@ -182,7 +182,7 @@ export default function BulkDocumentUpload({ siteId, houses, onClose, onComplete
           if (houseId) {
             const linkData: Record<string, unknown> = {
               document_id: doc.id,
-              house_id: houseId,
+              lot_id: houseId,
               link_type: 'auto_parsed'
             }
 
@@ -191,7 +191,7 @@ export default function BulkDocumentUpload({ siteId, houses, onClose, onComplete
             }
 
             const { error: linkError } = await supabase
-              .from('egl_document_links')
+              .from('frm_document_links')
               .insert(linkData)
 
             if (!linkError) {
@@ -224,7 +224,7 @@ export default function BulkDocumentUpload({ siteId, houses, onClose, onComplete
 
     // Update batch with final counts
     await supabase
-      .from('egl_document_batches')
+      .from('frm_document_batches')
       .update({
         status: 'completed',
         processed_files: items.length,

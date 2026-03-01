@@ -57,9 +57,9 @@ export default function AgendaScreen() {
 
   async function loadSiteAndEvents() {
     try {
-      // Get user's first site via org membership -> egl_sites
+      // Get user's first jobsite via org membership -> frm_jobsites
       const { data: sites } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .select('id')
         .limit(1);
 

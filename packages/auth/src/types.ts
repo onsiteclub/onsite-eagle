@@ -2,9 +2,20 @@
  * Authentication and User Types
  *
  * Roles aligned with core_org_memberships.role in DB.
+ *
+ * Changes (framing migration):
+ *   - Removed 'inspector' (merged into 'supervisor')
+ *   - Added 'crew_lead', 'operator', 'builder'
  */
 
-export type UserRole = 'worker' | 'inspector' | 'supervisor' | 'admin' | 'owner'
+export type UserRole =
+  | 'worker'
+  | 'crew_lead'
+  | 'supervisor'
+  | 'operator'
+  | 'builder'
+  | 'admin'
+  | 'owner'
 
 export interface User {
   id: string
@@ -79,9 +90,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permissions> = {
     canManageUsers: false,
     canExportData: false,
   },
-  inspector: {
+  crew_lead: {
     canAssignWorkers: false,
-    canApprovePhotos: true,
+    canApprovePhotos: false,
     canEditPhases: false,
     canViewAllSites: false,
     canManageUsers: false,
@@ -90,8 +101,24 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permissions> = {
   supervisor: {
     canAssignWorkers: true,
     canApprovePhotos: true,
+    canEditPhases: true,
+    canViewAllSites: true,
+    canManageUsers: false,
+    canExportData: true,
+  },
+  operator: {
+    canAssignWorkers: false,
+    canApprovePhotos: false,
     canEditPhases: false,
     canViewAllSites: false,
+    canManageUsers: false,
+    canExportData: false,
+  },
+  builder: {
+    canAssignWorkers: false,
+    canApprovePhotos: false,
+    canEditPhases: false,
+    canViewAllSites: true,
     canManageUsers: false,
     canExportData: false,
   },

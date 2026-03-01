@@ -25,7 +25,7 @@ export interface PhotoInput {
 
 /** Context required for photo upload */
 export interface PhotoContext {
-  houseId: string;
+  lotId: string;
   phaseId: string;
   /** Current user ID (auth.uid). Required for uploaded_by and timeline. */
   uploadedBy: string;
@@ -33,8 +33,8 @@ export interface PhotoContext {
   organizationId?: string;
   /** Categorize the photo. Defaults to 'progress' */
   photoType?: PhotoType;
-  /** Site ID for storage path organization */
-  siteId?: string;
+  /** Jobsite ID for storage path organization */
+  jobsiteId?: string;
 }
 
 /** Device + environment info for Prumo training metadata */
@@ -56,7 +56,7 @@ export interface GPSData {
 
 /** Result of a successful photo upload */
 export interface PhotoUploadResult {
-  /** UUID of the egl_photos record */
+  /** UUID of the frm_photos record */
   photoId: string;
   /** Public URL of the uploaded photo */
   publicUrl: string;
@@ -68,11 +68,11 @@ export interface PhotoUploadResult {
 
 /** Configuration for the upload pipeline */
 export interface UploadConfig {
-  /** Storage bucket name. Defaults to 'egl-media' */
+  /** Storage bucket name. Defaults to 'frm-media' */
   bucket?: string;
-  /** Table for photo records. Defaults to 'egl_photos' */
+  /** Table for photo records. Defaults to 'frm_photos' */
   photosTable?: string;
-  /** Table for timeline events. Defaults to 'egl_timeline' */
+  /** Table for timeline events. Defaults to 'frm_timeline' */
   timelineTable?: string;
   /** Skip timeline event creation. Defaults to false */
   skipTimeline?: boolean;

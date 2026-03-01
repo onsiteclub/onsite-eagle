@@ -111,8 +111,9 @@ export default function CreateMaterialRequestModal({
       const { data: newRequest, error: insertError } = await createMaterialRequest(
         supabase,
         {
-          site_id: siteId,
-          house_id: houseId || null,
+          jobsite_id: siteId,
+          lot_id: houseId || '',
+          phase_id: '',
           material_type: materialType,
           material_name: materialName.trim(),
           quantity: parseFloat(quantity),
@@ -120,10 +121,9 @@ export default function CreateMaterialRequestModal({
           urgency_level: urgencyLevel,
           delivery_location: deliveryLocation.trim() || null,
           notes: notes.trim() || null,
-          requested_by_id: user?.id || null,
+          requested_by: user?.id || '',
           requested_by_name: userName,
-          requested_by_role: 'supervisor'
-        }
+        } as any
       )
 
       if (insertError) {
@@ -136,9 +136,9 @@ export default function CreateMaterialRequestModal({
       const urgencyLabel = URGENCY_OPTIONS.find(u => u.value === urgencyLevel)?.label || urgencyLevel
       const urgencyEmoji = urgencyLevel === 'critical' ? '🚨' : urgencyLevel === 'high' ? '⚠️' : urgencyLevel === 'medium' ? '📦' : '📋'
 
-      const { error: messageError } = await supabase.from('egl_messages').insert({
-        site_id: siteId,
-        house_id: houseId || null,
+      const { error: messageError } = await supabase.from('frm_messages').insert({
+        jobsite_id: siteId,
+        lot_id: houseId || null,
         sender_type: 'system',
         sender_name: 'Material Request',
         content: `${urgencyEmoji} **Material Requested:** ${materialName}\n\n**Quantity:** ${quantity} ${unit}\n**Urgency:** ${urgencyLabel}${deliveryLocation.trim() ? `\n**Drop Location:** ${deliveryLocation.trim()}` : ''}${notes.trim() ? `\n**Notes:** ${notes.trim()}` : ''}`,
@@ -158,8 +158,8 @@ export default function CreateMaterialRequestModal({
 
       // Also create a timeline event for historical record
       if (houseId) {
-        const { error: timelineError } = await supabase.from('egl_timeline').insert({
-          house_id: houseId,
+        const { error: timelineError } = await supabase.from('frm_timeline').insert({
+          lot_id: houseId,
           event_type: 'material',
           title: `Material Requested: ${materialName}`,
           description: `${quantity} ${unit} - ${urgencyLabel} urgency`,

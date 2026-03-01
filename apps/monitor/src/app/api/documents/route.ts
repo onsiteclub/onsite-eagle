@@ -10,8 +10,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 // Unified document type for response
 interface UnifiedDocument {
   id: string
-  house_id: string | null
-  site_id: string | null
+  lot_id: string | null
+  jobsite_id: string | null
   name: string
   file_url: string
   file_type: string
@@ -34,18 +34,18 @@ export async function GET(request: NextRequest) {
 
   const allFiles: UnifiedDocument[] = []
 
-  // 1. Fetch from egl_documents table (directly linked via house_id)
+  // 1. Fetch from frm_documents table (directly linked via lot_id)
   try {
     let docsQuery = supabase
-      .from('egl_documents')
+      .from('frm_documents')
       .select('*')
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
 
     if (houseId) {
-      docsQuery = docsQuery.eq('house_id', houseId)
+      docsQuery = docsQuery.eq('lot_id', houseId)
     } else if (siteId) {
-      docsQuery = docsQuery.eq('site_id', siteId)
+      docsQuery = docsQuery.eq('jobsite_id', siteId)
     }
 
     const { data: docs } = await docsQuery
@@ -54,8 +54,8 @@ export async function GET(request: NextRequest) {
       for (const doc of docs) {
         allFiles.push({
           id: doc.id,
-          house_id: doc.house_id,
-          site_id: doc.site_id,
+          lot_id: doc.lot_id,
+          jobsite_id: doc.jobsite_id,
           name: doc.name,
           file_url: doc.file_url,
           file_type: doc.file_type || 'unknown',
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     }
   } catch (e) {
     // Table might not exist yet, continue
-    logger.info('EAGLE', 'egl_documents table not available', { error: String(e) })
+    logger.info('EAGLE', 'frm_documents table not available', { error: String(e) })
   }
 
   // 1b. Fetch LINKED documents (from bulk upload system)
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       const { data: linkedDocs } = await supabase
         .from('v_house_documents')
         .select('*')
-        .eq('house_id', houseId)
+        .eq('lot_id', houseId)
         .order('uploaded_at', { ascending: false })
 
       if (linkedDocs) {
@@ -87,8 +87,8 @@ export async function GET(request: NextRequest) {
           if (!existingIds.has(doc.document_id)) {
             allFiles.push({
               id: doc.document_id,
-              house_id: houseId,
-              site_id: null,
+              lot_id: houseId,
+              jobsite_id: null,
               name: doc.file_name,
               file_url: doc.file_url,
               file_type: doc.file_type || 'unknown',
@@ -106,18 +106,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 2. Fetch attachments from egl_messages (timeline uploads)
+  // 2. Fetch attachments from frm_messages (timeline uploads)
   try {
     let messagesQuery = supabase
-      .from('egl_messages')
-      .select('id, house_id, site_id, attachments, created_at, sender_name')
+      .from('frm_messages')
+      .select('id, lot_id, jobsite_id, attachments, created_at, sender_name')
       .not('attachments', 'eq', '[]')
       .order('created_at', { ascending: false })
 
     if (houseId) {
-      messagesQuery = messagesQuery.eq('house_id', houseId)
+      messagesQuery = messagesQuery.eq('lot_id', houseId)
     } else if (siteId) {
-      messagesQuery = messagesQuery.eq('site_id', siteId)
+      messagesQuery = messagesQuery.eq('jobsite_id', siteId)
     }
 
     const { data: messages } = await messagesQuery
@@ -142,8 +142,8 @@ export async function GET(request: NextRequest) {
 
             allFiles.push({
               id: `msg_${msg.id}_${i}`,
-              house_id: msg.house_id,
-              site_id: msg.site_id,
+              lot_id: msg.lot_id,
+              jobsite_id: msg.jobsite_id,
               name: att.name || `File ${i + 1}`,
               file_url: att.url,
               file_type: isImage ? 'image' : isPdf ? 'pdf' : ext,
@@ -171,8 +171,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      site_id,
-      house_id,
+      jobsite_id,
+      lot_id,
       name,
       file_url,
       file_path,
@@ -189,9 +189,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!site_id && !house_id) {
+    if (!jobsite_id && !lot_id) {
       return NextResponse.json(
-        { error: 'Either site_id or house_id is required' },
+        { error: 'Either jobsite_id or lot_id is required' },
         { status: 400 }
       )
     }
@@ -209,10 +209,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('egl_documents')
+      .from('frm_documents')
       .insert({
-        site_id: site_id || null,
-        house_id: house_id || null,
+        jobsite_id: jobsite_id || null,
+        lot_id: lot_id || null,
         name,
         file_url,
         file_path: file_path || null,
@@ -251,14 +251,14 @@ export async function DELETE(request: NextRequest) {
 
     // Get the document first to delete from storage too
     const { data: doc } = await supabase
-      .from('egl_documents')
+      .from('frm_documents')
       .select('file_path')
       .eq('id', id)
       .single()
 
     // Delete from database
     const { error } = await supabase
-      .from('egl_documents')
+      .from('frm_documents')
       .delete()
       .eq('id', id)
 
@@ -269,7 +269,7 @@ export async function DELETE(request: NextRequest) {
 
     // Also delete from storage if we have the path
     if (doc?.file_path) {
-      await supabase.storage.from('egl-documents').remove([doc.file_path])
+      await supabase.storage.from('frm-documents').remove([doc.file_path])
     }
 
     return NextResponse.json({ success: true })

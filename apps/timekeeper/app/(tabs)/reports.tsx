@@ -25,6 +25,7 @@ import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 
+import { logger } from '../../src/lib/logger';
 import { Card } from '../../src/components/ui/Button';
 import { colors, withOpacity, shadows } from '../../src/constants/colors';
 import type { ComputedSession } from '../../src/lib/database';
@@ -427,7 +428,7 @@ export default function ReportsScreen() {
 
   // Handle date range selection (Airbnb style)
   const handleDateRangeSelect = async (date: Date) => {
-    console.log('[Reports] handleDateRangeSelect called:', {
+    logger.debug('ui', 'handleDateRangeSelect called', {
       date: date.toISOString(),
       dateRangeMode,
       rangeStartDate: rangeStartDate?.toISOString(),
@@ -435,19 +436,19 @@ export default function ReportsScreen() {
     });
 
     if (!dateRangeMode) {
-      console.log('[Reports] Not in date range mode, returning');
+      logger.debug('ui', 'Not in date range mode, returning');
       return;
     }
 
     if (!rangeStartDate || (rangeStartDate && rangeEndDate)) {
       // First selection or reset
-      console.log('[Reports] Setting start date:', date.toDateString());
+      logger.debug('ui', 'Setting start date', { date: date.toDateString() });
       setRangeStartDate(date);
       setRangeEndDate(null);
       setRangeSessions([]);
     } else {
       // Second selection
-      console.log('[Reports] Setting end date:', date.toDateString());
+      logger.debug('ui', 'Setting end date', { date: date.toDateString() });
       let startDate = rangeStartDate;
       let endDate = date;
 
@@ -467,17 +468,17 @@ export default function ReportsScreen() {
       endTime.setHours(23, 59, 59, 999);
 
       try {
-        console.log('[Reports] Fetching sessions from', startTime.toISOString(), 'to', endTime.toISOString());
+        logger.debug('record', 'Fetching sessions for date range', { from: startTime.toISOString(), to: endTime.toISOString() });
         const sessions = await getSessionsByPeriod(startTime.toISOString(), endTime.toISOString());
-        console.log('[Reports] Got sessions:', sessions?.length || 0);
+        logger.debug('record', 'Got sessions', { count: sessions?.length || 0 });
         const completedSessions = sessions.filter((s: ComputedSession) => s.exit_at);
-        console.log('[Reports] Completed sessions:', completedSessions.length);
+        logger.debug('record', 'Completed sessions', { count: completedSessions.length });
         setRangeSessions(completedSessions);
 
         // Open export modal after selecting range
         setTimeout(() => setShowExportModal(true), 300);
       } catch (err) {
-        console.log('[Reports] Error fetching sessions:', err);
+        logger.debug('record', 'Error fetching sessions', { error: String(err) });
       }
     }
   };
@@ -651,7 +652,7 @@ export default function ReportsScreen() {
             style={reportStyles.exportRangeBtn}
             activeOpacity={0.7}
             onPress={() => {
-              console.log('[Reports] Select Dates button pressed');
+              logger.debug('ui', 'Select Dates button pressed');
               setDateRangeMode(true);
             }}
           >
@@ -772,7 +773,7 @@ export default function ReportsScreen() {
                         rangePosition === 'single' && reportStyles.monthDayRangeSingle,
                       ]}
                       onPress={() => {
-                        console.log('[Reports] Day pressed:', dayKey, 'dateRangeMode:', dateRangeMode);
+                        logger.debug('ui', 'Day pressed', { dayKey, dateRangeMode });
                         if (dateRangeMode) {
                           handleDateRangeSelect(date);
                         } else {

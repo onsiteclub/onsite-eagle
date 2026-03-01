@@ -31,7 +31,15 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-camera", { "cameraPermission": "Permitir acesso a camera para escanear QR codes" }]
+      ["expo-camera", { "cameraPermission": "Permitir acesso a camera para escanear QR codes" }],
+      ["expo-build-properties", {
+        "android": {
+          "kotlinVersion": "1.9.25",
+          "compileSdkVersion": 35,
+          "targetSdkVersion": 34,
+          "minSdkVersion": 24
+        }
+      }]
     ],
     "experiments": {
       "typedRoutes": true

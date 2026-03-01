@@ -9,18 +9,15 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="index" />
-      <Stack.Screen name="site-new" />
       <Stack.Screen name="site/[id]" />
-      <Stack.Screen
-        name="lot/[lotId]"
-        options={{
-          headerShown: true,
-          title: 'Lot Detail',
-          headerStyle: { backgroundColor: '#FFFFFF' },
-          headerTintColor: '#101828',
-          headerTitleStyle: { fontWeight: '600' },
-        }}
-      />
+      <Stack.Screen name="lot/[lotId]" />
+      <Stack.Screen name="agenda" />
+      <Stack.Screen name="team" />
+      <Stack.Screen name="site-timeline" />
+      <Stack.Screen name="documents" />
+      <Stack.Screen name="gate-check/[lotId]" />
+      <Stack.Screen name="gate-check/checklist" />
+      <Stack.Screen name="gate-check/summary" />
       <Stack.Screen
         name="camera"
         options={{

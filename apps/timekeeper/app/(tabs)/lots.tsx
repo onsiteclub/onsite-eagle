@@ -59,7 +59,7 @@ export default function LotsScreen() {
     try {
       // Load houses assigned to this worker via house_assignments
       const { data, error } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select(`
           id,
           lot_number,
@@ -67,8 +67,8 @@ export default function LotsScreen() {
           status,
           current_phase,
           progress_percentage,
-          site_id,
-          sites!inner (
+          jobsite_id,
+          jobsites!inner (
             id,
             name
           )
@@ -85,8 +85,8 @@ export default function LotsScreen() {
           status: house.status,
           current_phase: house.current_phase,
           progress_percentage: house.progress_percentage,
-          site_id: house.site_id,
-          site_name: house.sites?.name || 'Unknown Site',
+          site_id: house.jobsite_id,
+          site_name: house.jobsites?.name || 'Unknown Site',
         }));
         setLots(transformedLots);
       }

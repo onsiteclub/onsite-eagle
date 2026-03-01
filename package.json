@@ -22,11 +22,14 @@
     "dev:architecture": "turbo dev --filter=@onsite/architecture",
     "clean": "turbo clean && rm -rf node_modules",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css,md}\" \"packages/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"apps/**/*.{ts,tsx,js,jsx,json,css,md}\" \"packages/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "devDependencies": {
     "metro-cache-key": "^0.81.0",
     "metro-transform-worker": "0.81.0",
+    "prettier": "^3.4.0",
     "turbo": "^2.3.0"
   },
   "packageManager": "npm@10.0.0",

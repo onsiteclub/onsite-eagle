@@ -14,7 +14,7 @@ export async function GET(
     const { id } = await params
 
     const { data, error } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('*')
       .eq('id', id)
       .single()
@@ -77,7 +77,7 @@ export async function PATCH(
     updates.updated_at = new Date().toISOString()
 
     const { data, error } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .update(updates)
       .eq('id', id)
       .select()

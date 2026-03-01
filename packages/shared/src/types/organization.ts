@@ -50,7 +50,7 @@ export interface OrgMembership {
   updated_at: string
 }
 
-export type OrgRole = 'owner' | 'admin' | 'supervisor' | 'inspector' | 'worker'
+export type OrgRole = 'owner' | 'admin' | 'supervisor' | 'crew_lead' | 'worker' | 'operator' | 'builder'
 export type MembershipStatus = 'active' | 'invited' | 'suspended'
 
 // ==========================================
@@ -120,18 +120,29 @@ export const ORG_ROLE_PERMISSIONS: Record<OrgRole, string[]> = {
     'report.view', 'report.create',
     'member.view',
   ],
-  inspector: [
+  crew_lead: [
     'org.view',
     'site.view',
     'house.view',
-    'photo.view', 'photo.validate',
-    'report.view',
+    'photo.view', 'photo.upload',
+    'material.request',
   ],
   worker: [
     'org.view',
     'site.view',
     'house.view',
     'photo.view', 'photo.upload',
+  ],
+  operator: [
+    'org.view',
+    'site.view',
+    'material.deliver', 'material.view',
+  ],
+  builder: [
+    'org.view',
+    'site.view',
+    'house.view',
+    'report.view',
   ],
 }
 

@@ -13,18 +13,18 @@ export default async function OperatorAppPage() {
   // Fetch delivery-related timeline events and photos
   const [deliveryResult, photosResult, incidentResult] = await Promise.all([
     supabase
-      .from('egl_timeline')
+      .from('frm_timeline')
       .select('id, event_type, title, created_at', { count: 'exact' })
       .eq('created_by', user.id)
       .in('event_type', ['delivery', 'material_delivery', 'status_change'])
       .order('created_at', { ascending: false })
       .limit(10),
     supabase
-      .from('egl_photos')
+      .from('frm_photos')
       .select('id', { count: 'exact', head: true })
       .eq('uploaded_by', user.id),
     supabase
-      .from('egl_issues')
+      .from('frm_house_items')
       .select('id', { count: 'exact', head: true })
       .eq('reported_by', user.id),
   ])

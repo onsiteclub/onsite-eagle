@@ -35,7 +35,7 @@ export default function SiteSettingsPage() {
   async function loadSite() {
     try {
       const { data, error } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .select('*')
         .eq('id', siteId)
         .single()
@@ -243,25 +243,25 @@ function DangerTab({ site }: { site: Site }) {
     try {
       // First delete all related data
       const { data: houses } = await supabase
-        .from('egl_houses')
+        .from('frm_lots')
         .select('id')
-        .eq('site_id', site.id)
+        .eq('jobsite_id', site.id)
 
       if (houses && houses.length > 0) {
         const houseIds = houses.map(h => h.id)
-        await supabase.from('egl_timeline').delete().in('house_id', houseIds)
-        await supabase.from('egl_photos').delete().in('house_id', houseIds)
-        await supabase.from('egl_issues').delete().in('house_id', houseIds)
-        await supabase.from('egl_progress').delete().in('house_id', houseIds)
-        await supabase.from('egl_houses').delete().eq('site_id', site.id)
+        await supabase.from('frm_timeline').delete().in('lot_id', houseIds)
+        await supabase.from('frm_photos').delete().in('lot_id', houseIds)
+        await supabase.from('frm_house_items').delete().in('lot_id', houseIds)
+        await supabase.from('frm_progress').delete().in('lot_id', houseIds)
+        await supabase.from('frm_lots').delete().eq('jobsite_id', site.id)
       }
 
       // Delete scans
-      await supabase.from('egl_scans').delete().eq('site_id', site.id)
+      await supabase.from('frm_scans').delete().eq('jobsite_id', site.id)
 
       // Finally delete the site
       const { error } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .delete()
         .eq('id', site.id)
 
@@ -378,7 +378,7 @@ function EditSiteModal({
     setSaving(true)
     try {
       const { error } = await supabase
-        .from('egl_sites')
+        .from('frm_jobsites')
         .update({
           name: formData.name.trim(),
           address: formData.address.trim() || null,

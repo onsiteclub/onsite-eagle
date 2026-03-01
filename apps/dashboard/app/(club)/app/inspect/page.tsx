@@ -13,21 +13,21 @@ export default async function InspectAppPage() {
   // Fetch inspection-related progress data
   const [approvedResult, pendingResult, rejectedResult, recentResult] = await Promise.all([
     supabase
-      .from('egl_progress')
+      .from('frm_progress')
       .select('id', { count: 'exact', head: true })
       .eq('approved_by', user.id)
       .eq('status', 'approved'),
     supabase
-      .from('egl_progress')
+      .from('frm_progress')
       .select('id', { count: 'exact', head: true })
       .in('status', ['in_progress', 'ai_review']),
     supabase
-      .from('egl_progress')
+      .from('frm_progress')
       .select('id', { count: 'exact', head: true })
       .eq('approved_by', user.id)
       .eq('status', 'rejected'),
     supabase
-      .from('egl_progress')
+      .from('frm_progress')
       .select('id, house_id, status, updated_at, notes')
       .or(`approved_by.eq.${user.id},status.in.(in_progress,ai_review)`)
       .order('updated_at', { ascending: false })

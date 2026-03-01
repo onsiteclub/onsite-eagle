@@ -89,30 +89,30 @@ app/
 
 | Tabela | Uso |
 |--------|-----|
-| `egl_material_requests` | Lista de pedidos de materiais (realtime subscription) |
-| `egl_sites` | Info do canteiro vinculado |
-| `egl_houses` | Lotes do canteiro (para foto avulsa) |
+| `frm_material_requests` | Lista de pedidos de materiais (realtime subscription) |
+| `frm_jobsites` | Info do canteiro vinculado |
+| `frm_lots` | Lotes do canteiro (para foto avulsa) |
 | `core_profiles` | Perfil do operador |
 
 ### Tabelas Supabase (escrita)
 
 | Tabela | Uso |
 |--------|-----|
-| `egl_material_requests` | Atualizar status (acknowledged → in_transit → delivered) |
-| `egl_timeline` | Postar eventos (entregas, fotos, reports) |
+| `frm_material_requests` | Atualizar status (acknowledged → in_transit → delivered) |
+| `frm_timeline` | Postar eventos (entregas, fotos, reports) |
 | `core_devices` | Registrar push token |
 
 ### Storage
 
 | Bucket | Path | Uso |
 |--------|------|-----|
-| `egl-media` | `{siteId}/{houseId}/{timestamp}_{random}.jpg` | Fotos de entregas e campo |
+| `frm-media` | `{siteId}/{houseId}/{timestamp}_{random}.jpg` | Fotos de entregas e campo |
 
 ### Conexao com Outros Apps
 
 ```
-Monitor (supervisor) ──[cria pedido]──→ egl_material_requests ──[realtime]──→ Operator
-Operator ──[confirma entrega + foto]──→ egl_timeline ──[aparece em]──→ Monitor + Field
+Monitor (supervisor) ──[cria pedido]──→ frm_material_requests ──[realtime]──→ Operator
+Operator ──[confirma entrega + foto]──→ frm_timeline ──[aparece em]──→ Monitor + Field
 ```
 
 ## 6. Decisoes de Arquitetura

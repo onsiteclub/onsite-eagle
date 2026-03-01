@@ -1,81 +1,148 @@
 /**
- * Lot Detail — Individual lot view with phases, photos, timeline, issues.
+ * Lot Detail — Timeline-centric workspace for a single lot.
  *
- * Equivalent to Monitor's `/site/[id]/lot/[lotId]` page.
+ * Layout: LotHeader (~8%) + LotTimeline (~72%) + ActionBar (~20%)
+ * All data is scoped to this house_id.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  RefreshControl,
-  Image,
-  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { format } from 'date-fns';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@onsite/auth';
+import { sendMessage, requestMediation } from '@onsite/timeline';
+import type { TimelineEventType } from '@onsite/timeline';
 import { supabase } from '../../../src/lib/supabase';
-import StatusBadge from '../../../src/components/StatusBadge';
-import PhaseProgress from '../../../src/components/PhaseProgress';
-import PhotoGallery from '../../../src/components/PhotoGallery';
-import type { House, HouseStatus } from '@onsite/shared';
+import LotHeader from '../../../src/components/LotHeader';
+import LotTimeline from '../../../src/components/LotTimeline';
+import ActionBar from '../../../src/components/ActionBar';
+import EventTypePicker from '../../../src/components/EventTypePicker';
+import type { House } from '@onsite/shared';
 
 const ACCENT = '#0F766E';
-
-interface LotPhoto {
-  id: string;
-  photo_url: string;
-  thumbnail_url: string | null;
-  phase_id: string | null;
-  ai_validation_status: string | null;
-  ai_validation_notes: string | null;
-  created_at: string;
-}
+const MONITOR_API_URL = process.env.EXPO_PUBLIC_MONITOR_API_URL || 'https://monitor.onsiteclub.ca';
 
 export default function LotDetailScreen() {
   const { lotId } = useLocalSearchParams<{ lotId: string }>();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
   const [house, setHouse] = useState<House | null>(null);
-  const [photos, setPhotos] = useState<LotPhoto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [eventPickerVisible, setEventPickerVisible] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchHouse = useCallback(async () => {
     if (!lotId) return;
     try {
-      const [houseRes, photosRes] = await Promise.all([
-        supabase.from('egl_houses').select('*').eq('id', lotId).single(),
-        supabase
-          .from('egl_photos')
-          .select('*')
-          .eq('house_id', lotId)
-          .order('created_at', { ascending: false }),
-      ]);
+      const { data, error } = await supabase
+        .from('frm_lots')
+        .select('*')
+        .eq('id', lotId)
+        .single();
 
-      if (houseRes.error) throw houseRes.error;
-      setHouse(houseRes.data as House);
-      setPhotos((photosRes.data as LotPhoto[]) || []);
+      if (error) throw error;
+      setHouse(data as House);
     } catch (err) {
       console.error('[lot] Fetch error:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [lotId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchHouse();
+  }, [fetchHouse]);
+
+  // Send a text message to the lot timeline
+  async function handleSendMessage(text: string) {
+    if (!house || sending) return;
+    setSending(true);
+    try {
+      const { error } = await sendMessage(supabase as never, {
+        site_id: house.jobsite_id,
+        house_id: house.id,
+        sender_type: 'supervisor',
+        sender_id: user?.id,
+        sender_name: user?.email || 'Inspector',
+        content: text,
+        phase_at_creation: house.current_phase || 1,
+        source_app: 'inspect',
+      });
+
+      if (error) {
+        console.error('[lot] Send error:', error);
+        return;
+      }
+
+      // AI mediation (fire-and-forget)
+      requestMediation(MONITOR_API_URL, {
+        message: text,
+        site_id: house.jobsite_id,
+        house_id: house.id,
+        sender_type: 'supervisor',
+        sender_id: user?.id,
+        sender_name: user?.email || 'Inspector',
+        source_app: 'inspect',
+      }).catch(() => {
+        // Non-fatal: message stays as 'note'
+      });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Navigate to camera
+  function handleCameraPress() {
+    if (!house) return;
+    router.push({
+      pathname: '/(app)/camera',
+      params: {
+        houseId: house.id,
+        siteId: house.jobsite_id,
+        currentPhase: String(house.current_phase || 1),
+      },
+    });
+  }
+
+  // Open event type picker
+  function handleEventPress() {
+    setEventPickerVisible(true);
+  }
+
+  // Send a typed event from the picker
+  async function handleEventSelect(eventType: TimelineEventType, label: string) {
+    setEventPickerVisible(false);
+    if (!house) return;
+
+    setSending(true);
+    try {
+      await sendMessage(supabase as never, {
+        site_id: house.jobsite_id,
+        house_id: house.id,
+        sender_type: 'supervisor',
+        sender_id: user?.id,
+        sender_name: user?.email || 'Inspector',
+        content: `[${label}]`,
+        phase_at_creation: house.current_phase || 1,
+        source_app: 'inspect',
+      });
+    } catch (err) {
+      console.error('[lot] Event send error:', err);
+    } finally {
+      setSending(false);
+    }
+  }
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={ACCENT} />
       </View>
     );
@@ -83,80 +150,39 @@ export default function LotDetailScreen() {
 
   if (!house) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <Text style={styles.errorText}>Lot not found</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchData();
-            }}
-            tintColor={ACCENT}
-            colors={[ACCENT]}
-          />
-        }
-      >
-        {/* Header Info */}
-        <View style={styles.infoCard}>
-          <View style={styles.infoHeader}>
-            <Text style={styles.lotTitle}>Lot {house.lot_number}</Text>
-            <StatusBadge status={(house.status as HouseStatus) || 'not_started'} size="md" />
-          </View>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header ~8% */}
+      <LotHeader house={house} onBackPress={() => router.back()} />
 
-          {house.address && (
-            <Text style={styles.address}>{house.address}</Text>
-          )}
+      {/* Timeline ~72% */}
+      <LotTimeline
+        siteId={house.jobsite_id}
+        houseId={house.id}
+        currentPhase={house.current_phase || 1}
+        currentUserId={user?.id}
+      />
 
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{Math.round(house.progress_percentage || 0)}%</Text>
-              <Text style={styles.statLabel}>Progress</Text>
-            </View>
-            {house.current_phase != null && (
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>{house.current_phase}</Text>
-                <Text style={styles.statLabel}>Phase</Text>
-              </View>
-            )}
-          </View>
+      {/* Action Bar ~20% */}
+      <ActionBar
+        onSendMessage={handleSendMessage}
+        onCameraPress={handleCameraPress}
+        onEventPress={handleEventPress}
+        sending={sending}
+      />
 
-          {/* Progress bar */}
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${house.progress_percentage || 0}%` }]} />
-          </View>
-        </View>
-
-        {/* Phases */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Phases</Text>
-          <PhaseProgress houseId={house.id} />
-        </View>
-
-        {/* Photos */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Photos ({photos.length})</Text>
-            <TouchableOpacity
-              style={styles.cameraBtn}
-              onPress={() => router.push({
-                pathname: '/(app)/camera',
-                params: { houseId: house.id, siteId: house.site_id },
-              })}
-            >
-              <Text style={styles.cameraBtnText}>Take Photo</Text>
-            </TouchableOpacity>
-          </View>
-          <PhotoGallery photos={photos} screenWidth={width} />
-        </View>
-      </ScrollView>
+      {/* Event Type Picker Modal */}
+      <EventTypePicker
+        visible={eventPickerVisible}
+        onClose={() => setEventPickerVisible(false)}
+        onSelect={handleEventSelect}
+      />
     </View>
   );
 }
@@ -175,85 +201,5 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
     color: '#DC2626',
-  },
-  infoCard: {
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  lotTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#101828',
-  },
-  address: {
-    fontSize: 14,
-    color: '#667085',
-    marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 24,
-    marginBottom: 12,
-  },
-  stat: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: ACCENT,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: ACCENT,
-    borderRadius: 4,
-  },
-  section: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#101828',
-    marginBottom: 12,
-  },
-  cameraBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: ACCENT,
-    marginBottom: 12,
-  },
-  cameraBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
 });

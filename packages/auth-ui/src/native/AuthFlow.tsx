@@ -13,7 +13,7 @@
  *   <AuthFlow appName="Timekeeper" onSignIn={mySignIn} onSignUp={mySignUp} />
  */
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { LoginScreen } from './LoginScreen';
 import { SignupScreen } from './SignupScreen';
@@ -56,14 +56,15 @@ export function AuthFlow({
   const [screen, setScreen] = useState<AuthScreenMode>(initialScreen);
 
   // Try to get auth context for smart auto-wiring
-  const authContext = useMemo(() => {
-    if (!useAuthHook) return null;
+  // Must be at top level — hooks cannot be called inside useMemo/useEffect
+  let authContext: ReturnType<NonNullable<typeof useAuthHook>> | null = null;
+  if (useAuthHook) {
     try {
-      return useAuthHook();
+      authContext = useAuthHook();
     } catch {
-      return null;
+      authContext = null;
     }
-  }, []);
+  }
 
   // Resolve handlers: explicit > context > undefined
   const handleSignIn = onSignIn ?? (authContext

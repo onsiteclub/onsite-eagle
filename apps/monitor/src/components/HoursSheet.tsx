@@ -2,7 +2,7 @@
 
 /**
  * Hours Sheet — Worker hours per day, integrated with Timekeeper.
- * Data from tmk_entries + tmk_geofences (linked to site via site_id).
+ * Data from tmk_entries + tmk_geofences (linked to site via jobsite_id).
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -71,7 +71,7 @@ export default function HoursSheet({ siteId, siteName }: HoursSheetProps) {
     const { data: geofences } = await supabase
       .from('tmk_geofences')
       .select('id')
-      .eq('site_id', siteId)
+      .eq('jobsite_id', siteId)
 
     if (!geofences?.length) {
       setWorkers([])

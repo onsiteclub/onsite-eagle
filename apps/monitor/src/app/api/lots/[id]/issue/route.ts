@@ -25,8 +25,8 @@ export async function POST(
 
     // 1. Get the lot info
     const { data: lot, error: lotError } = await supabase
-      .from('egl_houses')
-      .select('*, site:egl_sites(id, name)')
+      .from('frm_lots')
+      .select('*, jobsite:frm_jobsites(id, name)')
       .eq('id', lotId)
       .single()
 
@@ -36,9 +36,9 @@ export async function POST(
 
     // 2. Check if plans exist for this lot
     const { data: plans } = await supabase
-      .from('egl_documents')
+      .from('frm_documents')
       .select('id, name, file_url, file_type')
-      .eq('house_id', lotId)
+      .eq('lot_id', lotId)
       .eq('category', 'plan')
 
     if (!plans || plans.length === 0) {
@@ -50,13 +50,13 @@ export async function POST(
 
     // 3. Update the lot as issued
     const { error: updateError } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .update({
         is_issued: true,
         issued_at: new Date().toISOString(),
         issued_to_worker_id: worker_id,
         issued_to_worker_name: worker_name,
-        status: lot.status === 'not_started' ? 'in_progress' : lot.status,
+        status: lot.status === 'pending' ? 'in_progress' : lot.status,
       })
       .eq('id', lotId)
 
@@ -74,9 +74,9 @@ export async function POST(
 
     const plansList = plans.map(p => `• ${p.name}`).join('\n')
 
-    await supabase.from('egl_messages').insert({
-      site_id: lot.site_id,
-      house_id: lotId,
+    await supabase.from('frm_messages').insert({
+      jobsite_id: lot.jobsite_id,
+      lot_id: lotId,
       sender_type: 'system',
       sender_name: 'Eagle System',
       content: `📐 **Lot Issued to ${worker_name}**\n\nOfficial plans for this lot:\n${plansList}\n\n_These plans are now available to the assigned worker._`,
@@ -86,9 +86,9 @@ export async function POST(
     })
 
     // 5. Log the issuance event
-    await supabase.from('egl_messages').insert({
-      site_id: lot.site_id,
-      house_id: lotId,
+    await supabase.from('frm_messages').insert({
+      jobsite_id: lot.jobsite_id,
+      lot_id: lotId,
       sender_type: 'system',
       sender_name: 'Eagle System',
       content: `🔓 **Lot ${lot.lot_number} Issued**\n\nAssigned to: **${worker_name}**\nIssued by: ${issued_by_name || 'Supervisor'}\nDate: ${new Date().toLocaleDateString('en-CA')}\n\n_Timeline is now active. Worker can access this lot._`,
@@ -98,9 +98,9 @@ export async function POST(
     })
 
     // 6. Create a calendar event for the issuance
-    await supabase.from('egl_external_events').insert({
-      site_id: lot.site_id,
-      house_id: lotId,
+    await supabase.from('frm_external_events').insert({
+      jobsite_id: lot.jobsite_id,
+      lot_id: lotId,
       event_type: 'other',
       title: `Lot ${lot.lot_number} issued to ${worker_name}`,
       description: `Lot formally assigned and work can begin`,
@@ -137,7 +137,7 @@ export async function DELETE(
 
     // 1. Get lot info
     const { data: lot, error: lotError } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('*')
       .eq('id', lotId)
       .single()
@@ -150,7 +150,7 @@ export async function DELETE(
 
     // 2. Clear issuance
     const { error: updateError } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .update({
         is_issued: false,
         issued_at: null,
@@ -165,9 +165,9 @@ export async function DELETE(
 
     // 3. Log the change
     if (previousWorker) {
-      await supabase.from('egl_messages').insert({
-        site_id: lot.site_id,
-        house_id: lotId,
+      await supabase.from('frm_messages').insert({
+        jobsite_id: lot.jobsite_id,
+        lot_id: lotId,
         sender_type: 'system',
         sender_name: 'Eagle System',
         content: `🔒 **Worker Assignment Removed**\n\nPrevious worker: ${previousWorker}\nLot is now unassigned.`,

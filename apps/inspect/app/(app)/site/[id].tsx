@@ -1,8 +1,8 @@
 /**
- * Site Detail — Main site view with 8 sub-views.
+ * Site Detail — Grid of lots for the selected site.
  *
- * Uses internal state for tab navigation (not Expo Router Tabs).
- * Equivalent to Monitor's `/site/[id]` page.
+ * Inspector taps a lot → navigates to Lot Detail (timeline workspace).
+ * No tabs — all detailed work happens at the lot level.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -16,15 +16,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../src/lib/supabase';
-import TabBar, { type ViewType } from '../../../src/components/TabBar';
 import LotsView from '../../../src/components/LotsView';
-import ScheduleView from '../../../src/components/ScheduleView';
-import TimelineView from '../../../src/components/TimelineView';
-import TeamView from '../../../src/components/TeamView';
-import DocumentsView from '../../../src/components/DocumentsView';
-import PaymentsView from '../../../src/components/PaymentsView';
-import ReportsView from '../../../src/components/ReportsView';
-import EmptyState from '../../../src/components/EmptyState';
 import type { Site, House } from '@onsite/shared';
 
 const ACCENT = '#0F766E';
@@ -37,17 +29,16 @@ export default function SiteDetailScreen() {
   const [site, setSite] = useState<Site | null>(null);
   const [houses, setHouses] = useState<House[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<ViewType>('lots');
 
   const fetchSiteData = useCallback(async () => {
     if (!id) return;
     try {
       const [siteRes, housesRes] = await Promise.all([
-        supabase.from('egl_sites').select('*').eq('id', id).single(),
+        supabase.from('frm_jobsites').select('*').eq('id', id).single(),
         supabase
-          .from('egl_houses')
+          .from('frm_lots')
           .select('*')
-          .eq('site_id', id)
+          .eq('jobsite_id', id)
           .order('lot_number', { ascending: true }),
       ]);
 
@@ -64,38 +55,6 @@ export default function SiteDetailScreen() {
   useEffect(() => {
     fetchSiteData();
   }, [fetchSiteData]);
-
-  function renderActiveView() {
-    if (!id) return null;
-
-    switch (activeView) {
-      case 'lots':
-        return (
-          <LotsView
-            siteId={id}
-            houses={houses}
-            onRefresh={fetchSiteData}
-            onLotPress={(lotId) => router.push(`/(app)/lot/${lotId}`)}
-          />
-        );
-      case 'schedule':
-        return <ScheduleView siteId={id} houses={houses} />;
-      case 'gantt':
-        return <EmptyState title="Gantt View" subtitle="Gantt chart will show phase timelines across all lots." />;
-      case 'chat':
-        return <TimelineView siteId={id} />;
-      case 'team':
-        return <TeamView siteId={id} />;
-      case 'documents':
-        return <DocumentsView siteId={id} />;
-      case 'payments':
-        return <PaymentsView siteId={id} houses={houses} />;
-      case 'reports':
-        return <ReportsView siteId={id} />;
-      default:
-        return null;
-    }
-  }
 
   if (loading) {
     return (
@@ -123,12 +82,16 @@ export default function SiteDetailScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Tab Bar */}
-      <TabBar activeView={activeView} onChangeView={setActiveView} />
-
-      {/* Active View */}
+      {/* Lots Grid */}
       <View style={styles.content}>
-        {renderActiveView()}
+        {id && (
+          <LotsView
+            siteId={id}
+            houses={houses}
+            onRefresh={fetchSiteData}
+            onLotPress={(lotId) => router.push(`/(app)/lot/${lotId}`)}
+          />
+        )}
       </View>
     </View>
   );

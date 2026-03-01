@@ -91,23 +91,23 @@ function getSupabaseClient() {
 async function getContext(supabase: ReturnType<typeof getSupabaseClient>, siteId: string, houseId?: string) {
   // Get site info
   const { data: site } = await supabase
-    .from('egl_sites')
+    .from('frm_jobsites')
     .select('*')
     .eq('id', siteId)
     .single()
 
   // Get all houses in site
   const { data: houses } = await supabase
-    .from('egl_houses')
+    .from('frm_lots')
     .select('*')
-    .eq('site_id', siteId)
+    .eq('jobsite_id', siteId)
     .order('lot_number')
 
   // Get specific house if provided
   let house = null
   if (houseId) {
     const { data } = await supabase
-      .from('egl_houses')
+      .from('frm_lots')
       .select('*')
       .eq('id', houseId)
       .single()
@@ -118,9 +118,9 @@ async function getContext(supabase: ReturnType<typeof getSupabaseClient>, siteId
   let recentEvents: { event_type: string; title: string; created_at: string }[] = []
   if (houseId) {
     const { data } = await supabase
-      .from('egl_timeline_events')
+      .from('frm_timeline_events')
       .select('event_type, title, created_at')
-      .eq('house_id', houseId)
+      .eq('lot_id', houseId)
       .order('created_at', { ascending: false })
       .limit(10)
     recentEvents = data || []
@@ -131,8 +131,8 @@ async function getContext(supabase: ReturnType<typeof getSupabaseClient>, siteId
     total: houses?.length || 0,
     completed: houses?.filter(h => h.status === 'completed').length || 0,
     inProgress: houses?.filter(h => h.status === 'in_progress').length || 0,
-    delayed: houses?.filter(h => h.status === 'delayed').length || 0,
-    notStarted: houses?.filter(h => h.status === 'not_started').length || 0,
+    delayed: houses?.filter(h => h.status === 'paused_for_trades').length || 0,
+    notStarted: houses?.filter(h => h.status === 'pending').length || 0,
   }
 
   return { site, house, houses, stats, recentEvents }
@@ -283,7 +283,7 @@ Extract all relevant information and return JSON:
     "description": "summary of document content"
   },
   "suggested_updates": {
-    "status": "completed|in_progress|delayed|null",
+    "status": "completed|in_progress|paused_for_trades|null",
     "notes": "any notes to add to lot"
   },
   "confidence": 0-1
@@ -308,7 +308,7 @@ Extract as much useful information as possible. If uncertain about a field, omit
     } : undefined,
     form_fields: result.extracted_fields as Record<string, string | number | boolean | null>,
     lot_updates: result.suggested_updates?.status ? {
-      status: result.suggested_updates.status as 'completed' | 'in_progress' | 'delayed',
+      status: result.suggested_updates.status as 'completed' | 'in_progress' | 'paused_for_trades',
     } : undefined,
   }
 

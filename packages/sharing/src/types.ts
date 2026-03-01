@@ -50,8 +50,8 @@ export interface QRLinkPayload {
 export interface QRAssignPayload {
   app: QRApp;
   action: 'assign';
-  houseId: string;
-  siteId: string;
+  lotId: string;
+  jobsiteId: string;
   lotNumber: string;
   assignedBy: string;
   assignedAt: string;
@@ -63,9 +63,9 @@ export interface QRAssignPayload {
 export interface QRJoinSitePayload {
   app: QRApp;
   action: 'join_site';
-  siteId: string;
-  siteName: string;
-  role: 'operator' | 'worker' | 'inspector';
+  jobsiteId: string;
+  jobsiteName: string;
+  role: 'operator' | 'worker' | 'crew_lead';
   invitedBy: string;
   invitedByName: string;
 }
@@ -91,8 +91,8 @@ export interface RedeemResult {
 export interface JoinSiteResult {
   success: boolean;
   message: string;
-  siteId?: string;
-  siteName?: string;
+  jobsiteId?: string;
+  jobsiteName?: string;
   assignmentId?: string;
 }
 
