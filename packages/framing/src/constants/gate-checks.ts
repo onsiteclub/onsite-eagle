@@ -26,10 +26,10 @@ export const TRANSITION_SHORT_LABELS: Record<GateCheckTransition, string> = {
 
 /** Expected item counts per transition (for validation) */
 export const TRANSITION_ITEM_COUNTS: Record<GateCheckTransition, number> = {
-  framing_to_roofing: 16,
-  roofing_to_trades: 5,
-  trades_to_backframe: 7,
-  backframe_to_final: 20,
+  framing_to_roofing: 10,
+  roofing_to_trades: 13,
+  trades_to_backframe: 0,
+  backframe_to_final: 14,
 }
 
 /** Get the next transition after the given one (undefined if last) */
