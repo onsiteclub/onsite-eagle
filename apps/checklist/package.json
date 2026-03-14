@@ -12,9 +12,11 @@
     "@onsite/auth": "*",
     "@onsite/auth-ui": "*",
     "@onsite/framing": "*",
+    "@onsite/export": "*",
     "@onsite/supabase": "*",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.93.3",
+    "jspdf": "^3.0.0",
     "next": "16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

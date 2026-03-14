@@ -6,6 +6,8 @@ const nextConfig = {
     '@onsite/auth',
     '@onsite/auth-ui',
     '@onsite/framing',
+    '@onsite/export',
+    '@onsite/tokens',
   ],
   images: {
     remotePatterns: [
