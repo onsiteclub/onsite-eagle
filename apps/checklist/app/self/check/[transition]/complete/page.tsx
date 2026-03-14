@@ -4,6 +4,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { generateChecklistPDF, type ReportInfo } from '@/lib/pdf-report'
 
+interface StoredResults {
+  info: { name: string; company: string; jobsite: string; lotNumber: string }
+  transition: string
+  transitionLabel: string
+  items: ReportInfo['items']
+  completedAt: string
+  passed: boolean
+}
+
 export default function SelfCheckCompletePage() {
   const router = useRouter()
   const [report, setReport] = useState<ReportInfo | null>(null)
@@ -15,7 +24,20 @@ export default function SelfCheckCompletePage() {
       router.push('/self')
       return
     }
-    setReport(JSON.parse(stored))
+    const data = JSON.parse(stored) as StoredResults
+    // Flatten info into ReportInfo shape
+    setReport({
+      name: data.info.name,
+      company: data.info.company,
+      jobsite: data.info.jobsite,
+      lotNumber: data.info.lotNumber,
+      transition: data.transition,
+      transitionLabel: data.transitionLabel,
+      startedAt: data.completedAt,
+      completedAt: data.completedAt,
+      passed: data.passed,
+      items: data.items,
+    })
   }, [router])
 
   if (!report) {
@@ -96,7 +118,7 @@ export default function SelfCheckCompletePage() {
           </h1>
           <p className="text-sm text-[#667085] mt-1">{report.transitionLabel}</p>
           <p className="text-xs text-[#9CA3AF] mt-1">
-            {report.info.jobsite} — {report.info.lotNumber}
+            {report.jobsite} — {report.lotNumber}
           </p>
         </div>
 
@@ -120,8 +142,8 @@ export default function SelfCheckCompletePage() {
 
           {/* Inspector info */}
           <div className="mt-4 pt-3 border-t border-[#F3F4F6] text-xs text-[#667085] space-y-1">
-            <p>Inspector: <span className="text-[#101828]">{report.info.name}</span></p>
-            {report.info.company && <p>Company: <span className="text-[#101828]">{report.info.company}</span></p>}
+            <p>Inspector: <span className="text-[#101828]">{report.name}</span></p>
+            {report.company && <p>Company: <span className="text-[#101828]">{report.company}</span></p>}
             <p>Date: <span className="text-[#101828]">{new Date(report.completedAt).toLocaleString()}</span></p>
           </div>
         </div>
