@@ -31,7 +31,15 @@ function AuthFlowWrapper({ supabase }: { supabase: ReturnType<typeof createClien
 
   return (
     <AuthFlow
-      appName="Gate Check"
+      appName="Club"
+      logo={
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/onsite-club-logo.png"
+          alt="OnSite Club"
+          className="h-14"
+        />
+      }
       showSignup={false}
       showForgotPassword={true}
       user={user}
