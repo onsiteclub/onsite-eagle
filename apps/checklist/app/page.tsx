@@ -1,7 +1,5 @@
-import LoginPage from './LoginPage'
-
-export const dynamic = 'force-dynamic'
+import { redirect } from 'next/navigation'
 
 export default function Page() {
-  return <LoginPage />
+  redirect('/self')
 }
