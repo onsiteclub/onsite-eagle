@@ -83,7 +83,10 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
   // Items section
   y = addSectionTitle(doc, 'Checklist Items', y, { accentColor: BRAND_COLORS.accent })
 
-  for (const item of report.items) {
+  for (let idx = 0; idx < report.items.length; idx++) {
+    const item = report.items[idx]
+    const itemNumber = idx + 1
+
     // Estimate height needed: label + photos row + notes
     const photoRowHeight = item.photos.length > 0 ? 28 : 0
     const notesHeight = item.result === 'fail' && item.notes ? 8 : 0
@@ -100,21 +103,28 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
       item.result === 'pass' ? 'PASS' :
       item.result === 'fail' ? 'FAIL' : 'N/A'
 
-    // Result badge
+    // Item number
+    doc.setTextColor(...BRAND_COLORS.textSecondary)
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`${itemNumber}.`, margin, y + 1)
+
+    // Result badge (shifted right to make room for number)
+    const badgeX = margin + 8
     doc.setFillColor(...resultColor)
-    doc.roundedRect(margin, y - 3, 14, 6, 1, 1, 'F')
+    doc.roundedRect(badgeX, y - 3, 14, 6, 1, 1, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(6)
     doc.setFont('helvetica', 'bold')
-    doc.text(resultText, margin + 7, y + 1, { align: 'center' })
+    doc.text(resultText, badgeX + 7, y + 1, { align: 'center' })
 
     // Label
     doc.setTextColor(...BRAND_COLORS.text)
     doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
 
-    const labelX = margin + 17
-    const maxLabelWidth = contentWidth - 17 - (item.isBlocking ? 22 : 0)
+    const labelX = margin + 25
+    const maxLabelWidth = contentWidth - 25 - (item.isBlocking ? 22 : 0)
     const lines = doc.splitTextToSize(item.label, maxLabelWidth)
     doc.text(lines, labelX, y + 1)
 
@@ -168,7 +178,7 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
       doc.setTextColor(...BRAND_COLORS.textSecondary)
       doc.setFontSize(7)
       doc.setFont('helvetica', 'italic')
-      const noteLines = doc.splitTextToSize(`Notes: ${item.notes}`, contentWidth - 17)
+      const noteLines = doc.splitTextToSize(`Notes: ${item.notes}`, contentWidth - 25)
       doc.text(noteLines, labelX, y)
       y += noteLines.length * 3.5 + 2
     }
