@@ -83,94 +83,119 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
   // Items section
   y = addSectionTitle(doc, 'Checklist Items', y, { accentColor: BRAND_COLORS.accent })
 
+  const cardPadding = 4 // mm padding inside card
+  const cardGap = 3 // mm between cards
+
   for (let idx = 0; idx < report.items.length; idx++) {
     const item = report.items[idx]
     const itemNumber = idx + 1
 
-    // Estimate height needed: label + photos row + notes
-    const photoRowHeight = item.photos.length > 0 ? 28 : 0
-    const notesHeight = item.result === 'fail' && item.notes ? 8 : 0
-    const neededHeight = 14 + photoRowHeight + notesHeight
-    y = checkBreak(y, neededHeight)
+    // Pre-calculate card content height
+    const innerX = margin + cardPadding
+    const innerWidth = contentWidth - cardPadding * 2
+    const labelMaxW = innerWidth - 22 - (item.isBlocking ? 22 : 0)
+    const labelLines = doc.splitTextToSize(item.label, labelMaxW)
+    const headerHeight = Math.max(labelLines.length * 4, 6) + 4
+    const photoRowHeight = item.photos.length > 0 ? 30 : 0
+    const notesHeight = item.result === 'fail' && item.notes ? 10 : 0
+    const totalCardHeight = cardPadding * 2 + headerHeight + photoRowHeight + notesHeight
 
-    // Item row
+    y = checkBreak(y, totalCardHeight)
+
+    // Card colors based on result
     const resultColor =
       item.result === 'pass' ? [5, 150, 105] as [number, number, number] :
       item.result === 'fail' ? [220, 38, 38] as [number, number, number] :
       [156, 163, 175] as [number, number, number]
 
+    const cardBorderColor =
+      item.result === 'pass' ? [209, 250, 229] as [number, number, number] :
+      item.result === 'fail' ? [254, 226, 226] as [number, number, number] :
+      [229, 231, 235] as [number, number, number]
+
+    const cardBgColor =
+      item.result === 'pass' ? [252, 255, 253] as [number, number, number] :
+      item.result === 'fail' ? [255, 253, 253] as [number, number, number] :
+      [250, 250, 251] as [number, number, number]
+
     const resultText =
       item.result === 'pass' ? 'PASS' :
       item.result === 'fail' ? 'FAIL' : 'N/A'
 
-    // Item number
+    // Draw card background
+    doc.setFillColor(...cardBgColor)
+    doc.setDrawColor(...cardBorderColor)
+    doc.setLineWidth(0.3)
+    doc.roundedRect(margin, y, contentWidth, totalCardHeight, 2, 2, 'FD')
+
+    // Left accent bar (2mm wide colored strip)
+    doc.setFillColor(...resultColor)
+    doc.roundedRect(margin, y, 2, totalCardHeight, 2, 0, 'F')
+    // Fill the right side of the accent bar that the roundedRect curves
+    doc.rect(margin + 1, y, 1, totalCardHeight, 'F')
+
+    let cy = y + cardPadding // cursor inside card
+
+    // Item number + result badge row
     doc.setTextColor(...BRAND_COLORS.textSecondary)
     doc.setFontSize(7)
     doc.setFont('helvetica', 'bold')
-    doc.text(`${itemNumber}.`, margin, y + 1)
+    doc.text(`${itemNumber}.`, innerX + 1, cy + 3.5)
 
-    // Result badge (shifted right to make room for number)
-    const badgeX = margin + 8
+    // Result badge
+    const badgeX = innerX + 9
     doc.setFillColor(...resultColor)
-    doc.roundedRect(badgeX, y - 3, 14, 6, 1, 1, 'F')
+    doc.roundedRect(badgeX, cy, 14, 6, 1, 1, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(6)
     doc.setFont('helvetica', 'bold')
-    doc.text(resultText, badgeX + 7, y + 1, { align: 'center' })
+    doc.text(resultText, badgeX + 7, cy + 4, { align: 'center' })
 
     // Label
+    const labelX = innerX + 26
     doc.setTextColor(...BRAND_COLORS.text)
     doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
-
-    const labelX = margin + 25
-    const maxLabelWidth = contentWidth - 25 - (item.isBlocking ? 22 : 0)
-    const lines = doc.splitTextToSize(item.label, maxLabelWidth)
-    doc.text(lines, labelX, y + 1)
+    doc.text(labelLines, labelX, cy + 3.5)
 
     // Blocking badge
     if (item.isBlocking) {
-      const blockX = margin + contentWidth - 20
+      const blockX = margin + contentWidth - cardPadding - 20
       doc.setFillColor(254, 242, 242)
-      doc.roundedRect(blockX, y - 3, 20, 6, 1, 1, 'F')
+      doc.roundedRect(blockX, cy, 20, 6, 1, 1, 'F')
       doc.setTextColor(220, 38, 38)
       doc.setFontSize(5)
-      doc.text('BLOCKING', blockX + 10, y + 1, { align: 'center' })
+      doc.setFont('helvetica', 'bold')
+      doc.text('BLOCKING', blockX + 10, cy + 4, { align: 'center' })
     }
 
-    y += lines.length * 4 + 4
-
-    // Photo count indicator
-    if (item.photos.length > 0) {
-      doc.setTextColor(...BRAND_COLORS.textSecondary)
-      doc.setFontSize(6)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`${item.photos.length} photo${item.photos.length > 1 ? 's' : ''}`, labelX, y)
-      y += 4
-    }
+    cy += headerHeight
 
     // Photos in a row (inline thumbnails)
     if (item.photos.length > 0) {
-      y = checkBreak(y, 25)
-      const photoSize = 22 // mm per photo
+      const photoSize = 22
       const photoGap = 2
+      // Photo count
+      doc.setTextColor(...BRAND_COLORS.textSecondary)
+      doc.setFontSize(6)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${item.photos.length} photo${item.photos.length > 1 ? 's' : ''}`, labelX, cy + 2)
+      cy += 4
 
       for (let i = 0; i < item.photos.length; i++) {
         const photoX = labelX + i * (photoSize + photoGap)
-        // Check if photo fits on current line
-        if (photoX + photoSize > margin + contentWidth) break
+        if (photoX + photoSize > margin + contentWidth - cardPadding) break
         try {
-          doc.addImage(item.photos[i], 'JPEG', photoX, y, photoSize, photoSize)
+          doc.addImage(item.photos[i], 'JPEG', photoX, cy, photoSize, photoSize)
         } catch {
-          // Draw placeholder if image fails
           doc.setDrawColor(200, 200, 200)
-          doc.rect(photoX, y, photoSize, photoSize)
+          doc.rect(photoX, cy, photoSize, photoSize)
           doc.setFontSize(5)
           doc.setTextColor(150, 150, 150)
-          doc.text('err', photoX + photoSize / 2, y + photoSize / 2, { align: 'center' })
+          doc.text('err', photoX + photoSize / 2, cy + photoSize / 2, { align: 'center' })
         }
       }
-      y += photoSize + 3
+      cy += photoSize + 4
     }
 
     // Notes for failed items
@@ -178,12 +203,11 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
       doc.setTextColor(...BRAND_COLORS.textSecondary)
       doc.setFontSize(7)
       doc.setFont('helvetica', 'italic')
-      const noteLines = doc.splitTextToSize(`Notes: ${item.notes}`, contentWidth - 25)
-      doc.text(noteLines, labelX, y)
-      y += noteLines.length * 3.5 + 2
+      const noteLines = doc.splitTextToSize(`Notes: ${item.notes}`, innerWidth - 26)
+      doc.text(noteLines, labelX, cy + 2)
     }
 
-    y += 2
+    y += totalCardHeight + cardGap
   }
 
   // Footer
