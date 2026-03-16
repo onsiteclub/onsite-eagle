@@ -21,7 +21,7 @@ export interface ReportItem {
   isBlocking: boolean
   result: 'pass' | 'fail' | 'na' | 'pending'
   notes: string
-  photo: string | null // base64 data URL
+  photos: string[] // base64 data URLs (up to 5)
 }
 
 export interface ReportInfo {
@@ -45,6 +45,7 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
   const passCount = report.items.filter((i) => i.result === 'pass').length
   const failCount = report.items.filter((i) => i.result === 'fail').length
   const naCount = report.items.filter((i) => i.result === 'na').length
+  const totalPhotos = report.items.reduce((sum, i) => sum + i.photos.length, 0)
 
   // Header
   let y = addBrandHeader(doc, {
@@ -67,6 +68,8 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
   doc.text(`Inspector: ${report.name}${report.company ? ` (${report.company})` : ''}`, margin, y)
   y += 5
   doc.text(`Date: ${new Date(report.completedAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, margin, y)
+  y += 5
+  doc.text(`Photos attached: ${totalPhotos}`, margin, y)
   y += 10
 
   // Stats
@@ -81,8 +84,10 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
   y = addSectionTitle(doc, 'Checklist Items', y, { accentColor: BRAND_COLORS.accent })
 
   for (const item of report.items) {
-    // Estimate height needed
-    const neededHeight = item.result === 'fail' && (item.notes || item.photo) ? 50 : 14
+    // Estimate height needed: label + photos row + notes
+    const photoRowHeight = item.photos.length > 0 ? 28 : 0
+    const notesHeight = item.result === 'fail' && item.notes ? 8 : 0
+    const neededHeight = 14 + photoRowHeight + notesHeight
     y = checkBreak(y, neededHeight)
 
     // Item row
@@ -125,26 +130,47 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
 
     y += lines.length * 4 + 4
 
-    // Notes + photo for failed items
-    if (item.result === 'fail' && (item.notes || item.photo)) {
-      if (item.notes) {
-        doc.setTextColor(...BRAND_COLORS.textSecondary)
-        doc.setFontSize(7)
-        doc.setFont('helvetica', 'italic')
-        const noteLines = doc.splitTextToSize(`Notes: ${item.notes}`, contentWidth - 17)
-        doc.text(noteLines, labelX, y)
-        y += noteLines.length * 3.5 + 2
-      }
+    // Photo count indicator
+    if (item.photos.length > 0) {
+      doc.setTextColor(...BRAND_COLORS.textSecondary)
+      doc.setFontSize(6)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${item.photos.length} photo${item.photos.length > 1 ? 's' : ''}`, labelX, y)
+      y += 4
+    }
 
-      if (item.photo) {
+    // Photos in a row (inline thumbnails)
+    if (item.photos.length > 0) {
+      y = checkBreak(y, 25)
+      const photoSize = 22 // mm per photo
+      const photoGap = 2
+
+      for (let i = 0; i < item.photos.length; i++) {
+        const photoX = labelX + i * (photoSize + photoGap)
+        // Check if photo fits on current line
+        if (photoX + photoSize > margin + contentWidth) break
         try {
-          y = checkBreak(y, 35)
-          doc.addImage(item.photo, 'JPEG', labelX, y, 30, 30)
-          y += 33
+          doc.addImage(item.photos[i], 'JPEG', photoX, y, photoSize, photoSize)
         } catch {
-          // Skip if image can't be added
+          // Draw placeholder if image fails
+          doc.setDrawColor(200, 200, 200)
+          doc.rect(photoX, y, photoSize, photoSize)
+          doc.setFontSize(5)
+          doc.setTextColor(150, 150, 150)
+          doc.text('err', photoX + photoSize / 2, y + photoSize / 2, { align: 'center' })
         }
       }
+      y += photoSize + 3
+    }
+
+    // Notes for failed items
+    if (item.result === 'fail' && item.notes) {
+      doc.setTextColor(...BRAND_COLORS.textSecondary)
+      doc.setFontSize(7)
+      doc.setFont('helvetica', 'italic')
+      const noteLines = doc.splitTextToSize(`Notes: ${item.notes}`, contentWidth - 17)
+      doc.text(noteLines, labelX, y)
+      y += noteLines.length * 3.5 + 2
     }
 
     y += 2

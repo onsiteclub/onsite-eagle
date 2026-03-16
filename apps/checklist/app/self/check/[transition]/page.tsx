@@ -16,7 +16,7 @@ type ItemResult = 'pending' | 'pass' | 'fail' | 'na'
 interface ItemState {
   result: ItemResult
   notes: string
-  photo: string | null // base64
+  photos: string[] // base64 array (up to 5)
 }
 
 interface SelfCheckInfo {
@@ -58,7 +58,7 @@ export default function SelfChecklistPage() {
     // Init state for each item
     const initial: Record<string, ItemState> = {}
     templates.forEach((t) => {
-      initial[t.code] = { result: 'pending', notes: '', photo: null }
+      initial[t.code] = { result: 'pending', notes: '', photos: [] }
     })
     setState(initial)
   }, [transition, router])
@@ -80,10 +80,10 @@ export default function SelfChecklistPage() {
     }))
   }
 
-  function updatePhoto(code: string, base64: string | null) {
+  function updatePhotos(code: string, photos: string[]) {
     setState((prev) => ({
       ...prev,
-      [code]: { ...prev[code], photo: base64 },
+      [code]: { ...prev[code], photos },
     }))
   }
 
@@ -93,7 +93,6 @@ export default function SelfChecklistPage() {
   )
 
   function handleSubmit() {
-    // Store results in sessionStorage for the complete page
     sessionStorage.setItem('selfCheckResults', JSON.stringify({
       info,
       transition,
@@ -147,6 +146,15 @@ export default function SelfChecklistPage() {
         </div>
       </div>
 
+      {/* Info banner */}
+      <div className="px-4 pt-3">
+        <div className="max-w-[480px] mx-auto">
+          <div className="bg-blue-50 border border-blue-200 rounded-[10px] px-3 py-2 text-[11px] text-blue-800">
+            You can attach up to 5 photos per item. Photos are optional but recommended.
+          </div>
+        </div>
+      </div>
+
       {/* Items */}
       <div className="flex-1 px-4 py-4">
         <div className="max-w-[480px] mx-auto space-y-3">
@@ -154,7 +162,8 @@ export default function SelfChecklistPage() {
             const s = state[item.code]
             if (!s) return null
             const isChecked = s.result !== 'pending'
-            const showExpanded = s.result === 'fail'
+            const showNotes = s.result === 'fail'
+            const needsPhotos = s.result !== 'pending' && s.result !== 'na'
 
             return (
               <div
@@ -171,7 +180,7 @@ export default function SelfChecklistPage() {
                   <div className="flex items-start gap-3">
                     <span className={`
                       w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5
-                      ${isChecked ? 'bg-brand-500 text-white' : 'bg-gray-100 text-[#667085]'}
+                      ${isChecked ? 'bg-[#0F766E] text-white' : 'bg-gray-100 text-[#667085]'}
                     `}>
                       {index + 1}
                     </span>
@@ -226,29 +235,25 @@ export default function SelfChecklistPage() {
                   </div>
                 </div>
 
-                {/* Expanded: Photo + Notes on fail */}
-                {showExpanded && (
+                {/* Photo + Notes section — visible for pass and fail (not N/A) */}
+                {needsPhotos && (
                   <div className="px-4 pb-4 ml-9 space-y-3 border-t border-[#F3F4F6] pt-3">
-                    <div className="flex items-center gap-2">
-                      <PhotoCaptureLocal
-                        itemCode={item.code}
-                        existingBase64={s.photo}
-                        onPhotoCaptured={(b64) => updatePhoto(item.code, b64)}
-                        onPhotoRemoved={() => updatePhoto(item.code, null)}
-                      />
-                      {!s.photo && (
-                        <span className="text-[10px] text-[#DC2626]">
-                          Photo recommended for failed items
-                        </span>
-                      )}
-                    </div>
-                    <textarea
-                      placeholder="Notes (optional)..."
-                      value={s.notes}
-                      onChange={(e) => updateNotes(item.code, e.target.value)}
-                      rows={2}
-                      className="w-full text-sm text-[#101828] placeholder:text-[#9CA3AF] border border-[#E5E7EB] rounded-[10px] px-3 py-2 resize-none"
+                    <PhotoCaptureLocal
+                      itemCode={item.code}
+                      photos={s.photos}
+                      maxPhotos={item.maxPhotos}
+                      onPhotosChanged={(p) => updatePhotos(item.code, p)}
                     />
+
+                    {showNotes && (
+                      <textarea
+                        placeholder="Notes (describe the issue)..."
+                        value={s.notes}
+                        onChange={(e) => updateNotes(item.code, e.target.value)}
+                        rows={2}
+                        className="w-full text-sm text-[#101828] placeholder:text-[#9CA3AF] border border-[#E5E7EB] rounded-[10px] px-3 py-2 resize-none"
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -270,7 +275,9 @@ export default function SelfChecklistPage() {
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
             `}
           >
-            Generate Report
+            {allChecked
+              ? 'Generate Report'
+              : `Check all items (${totalCount - checkedCount} remaining)`}
           </button>
         </div>
       </div>

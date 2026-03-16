@@ -51,6 +51,7 @@ export default function SelfCheckCompletePage() {
   const passCount = report.items.filter((i) => i.result === 'pass').length
   const failCount = report.items.filter((i) => i.result === 'fail').length
   const naCount = report.items.filter((i) => i.result === 'na').length
+  const totalPhotos = report.items.reduce((sum, i) => sum + (i.photos?.length ?? 0), 0)
   const failedItems = report.items.filter((i) => i.result === 'fail')
 
   async function handleDownloadPDF() {
@@ -89,7 +90,7 @@ export default function SelfCheckCompletePage() {
       )
       await navigator.share({
         title: `${report!.transitionLabel} — ${report!.lotNumber}`,
-        text: `Gate check ${report!.passed ? 'PASSED' : 'FAILED'}: ${passCount} pass, ${failCount} fail, ${naCount} n/a`,
+        text: `Gate check ${report!.passed ? 'PASSED' : 'FAILED'}: ${passCount} pass, ${failCount} fail, ${naCount} n/a, ${totalPhotos} photos`,
         files: [file],
       })
     } catch (err) {
@@ -125,7 +126,7 @@ export default function SelfCheckCompletePage() {
         {/* Summary */}
         <div className="bg-white rounded-[14px] border border-[#E5E7EB] p-5 mb-4">
           <h2 className="text-sm font-semibold text-[#101828] mb-3">Summary</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             <div className="text-center p-3 bg-[#ECFDF5] rounded-[10px]">
               <div className="text-lg font-bold text-[#059669]">{passCount}</div>
               <div className="text-xs text-[#667085]">Pass</div>
@@ -137,6 +138,10 @@ export default function SelfCheckCompletePage() {
             <div className="text-center p-3 bg-[#F3F4F6] rounded-[10px]">
               <div className="text-lg font-bold text-[#6B7280]">{naCount}</div>
               <div className="text-xs text-[#667085]">N/A</div>
+            </div>
+            <div className="text-center p-3 bg-blue-50 rounded-[10px]">
+              <div className="text-lg font-bold text-blue-700">{totalPhotos}</div>
+              <div className="text-xs text-[#667085]">Photos</div>
             </div>
           </div>
 
