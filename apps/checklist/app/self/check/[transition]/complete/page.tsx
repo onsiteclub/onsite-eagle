@@ -53,6 +53,7 @@ export default function SelfCheckCompletePage() {
   const naCount = report.items.filter((i) => i.result === 'na').length
   const totalPhotos = report.items.reduce((sum, i) => sum + (i.photos?.length ?? 0), 0)
   const failedItems = report.items.filter((i) => i.result === 'fail')
+  const hasNoPhotos = totalPhotos === 0
 
   async function handleDownloadPDF() {
     setGenerating(true)
@@ -180,6 +181,17 @@ export default function SelfCheckCompletePage() {
           </div>
         )}
 
+        {/* No photos warning */}
+        {hasNoPhotos && (
+          <div className="bg-amber-50 border border-amber-200 rounded-[14px] p-4 mb-4">
+            <p className="text-sm font-semibold text-amber-800">No photos attached</p>
+            <p className="text-xs text-amber-700 mt-1">
+              This report has no photos. Reports without photos cannot be shared.
+              Go back and attach cleanup photos (inside and outside the unit) to enable sharing.
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="space-y-3">
           <button
@@ -195,10 +207,15 @@ export default function SelfCheckCompletePage() {
 
           <button
             onClick={handleShare}
-            disabled={generating}
-            className="w-full h-12 rounded-[10px] font-semibold text-base border border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5 transition-colors"
+            disabled={generating || hasNoPhotos}
+            className={`
+              w-full h-12 rounded-[10px] font-semibold text-base border transition-colors
+              ${hasNoPhotos
+                ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                : 'border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5'}
+            `}
           >
-            Share Report
+            {hasNoPhotos ? 'Share unavailable (no photos)' : 'Share Report'}
           </button>
 
           <button

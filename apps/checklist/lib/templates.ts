@@ -8,7 +8,9 @@ export interface TemplateItem {
   label: string
   sortOrder: number
   isBlocking: boolean
-  maxPhotos: number // maximum photos allowed (up to 5)
+  maxPhotos: number // maximum photos allowed (up to 6)
+  minPhotos?: number // minimum photos required (cleanup items)
+  photoGuidance?: string // guidance string for photo requirements
 }
 
 export type ChecklistTransition =
@@ -36,7 +38,7 @@ export const CHECKLIST_TEMPLATES: Record<ChecklistTransition, TemplateItem[]> = 
     { code: 'mech_walls_ground', label: 'Mechanical walls nailed to the ground next to the studs, even the shower walls', sortOrder: 10, isBlocking: true, maxPhotos: 5 },
     { code: 'steel_beams', label: 'Steel beams supported on the foundation with 8" space for the steel posts', sortOrder: 11, isBlocking: true, maxPhotos: 5 },
     { code: 'porch_beam', label: 'Porch beam and/or flat roofing installed, levelled and braced', sortOrder: 12, isBlocking: false, maxPhotos: 5 },
-    { code: 'house_clean', label: 'Unit is free of debris or leftovers (attach pics)', sortOrder: 13, isBlocking: false, maxPhotos: 5 },
+    { code: 'house_clean', label: 'Unit is free of debris or leftovers (attach pics)', sortOrder: 13, isBlocking: false, maxPhotos: 6, minPhotos: 6, photoGuidance: '6 photos required: front yard, backyard, garage, basement, main floor, upper floor' },
   ],
   roofing_to_trades: [
     { code: 'temp_bracing', label: 'All temporary bracing, blocks and scaffolding removed', sortOrder: 1, isBlocking: true, maxPhotos: 5 },
@@ -52,6 +54,7 @@ export const CHECKLIST_TEMPLATES: Record<ChecklistTransition, TemplateItem[]> = 
     { code: 'truss_bracing', label: 'All the truss bracing installed', sortOrder: 11, isBlocking: true, maxPhotos: 5 },
     { code: 'gypsum_garage', label: 'Gypsum board installed @ garage', sortOrder: 12, isBlocking: false, maxPhotos: 5 },
     { code: 'vents', label: 'Vents cut off', sortOrder: 13, isBlocking: false, maxPhotos: 5 },
+    { code: 'house_clean', label: 'Unit is free of debris or leftovers', sortOrder: 14, isBlocking: false, maxPhotos: 6, minPhotos: 6, photoGuidance: '6 photos required: front yard, backyard, garage, basement, main floor, upper floor' },
   ],
   backframe_to_final: [
     { code: 'attic_hatch', label: 'Attic hatch is installed', sortOrder: 1, isBlocking: false, maxPhotos: 5 },
@@ -67,6 +70,6 @@ export const CHECKLIST_TEMPLATES: Record<ChecklistTransition, TemplateItem[]> = 
     { code: 'garage_jambs', label: 'Garage jambs installed and levelled', sortOrder: 11, isBlocking: false, maxPhotos: 5 },
     { code: 'porch_ceiling', label: 'Porch dropped ceiling or strapped', sortOrder: 12, isBlocking: false, maxPhotos: 5 },
     { code: 'porch_posts', label: 'Porch PT posts installed', sortOrder: 13, isBlocking: false, maxPhotos: 5 },
-    { code: 'house_clean', label: 'Unit is free of debris or leftovers', sortOrder: 14, isBlocking: false, maxPhotos: 5 },
+    { code: 'house_clean', label: 'Unit is free of debris or leftovers', sortOrder: 14, isBlocking: false, maxPhotos: 6, minPhotos: 6, photoGuidance: '6 photos required: front yard, backyard, garage, basement, main floor, upper floor' },
   ],
 }

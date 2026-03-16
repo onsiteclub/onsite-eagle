@@ -92,6 +92,16 @@ export default function SelfChecklistPage() {
     (item) => item.isBlocking && state[item.code]?.result === 'fail'
   )
 
+  // Check cleanup photo requirements
+  const cleanupPhotosMissing = items.some((item) => {
+    if (!item.minPhotos) return false
+    const s = state[item.code]
+    if (!s || s.result === 'na' || s.result === 'pending') return false
+    return s.photos.length < item.minPhotos
+  })
+
+  const canSubmit = allChecked && !cleanupPhotosMissing
+
   function handleSubmit() {
     sessionStorage.setItem('selfCheckResults', JSON.stringify({
       info,
@@ -238,6 +248,19 @@ export default function SelfChecklistPage() {
                 {/* Photo + Notes section — visible for pass and fail (not N/A) */}
                 {needsPhotos && (
                   <div className="px-4 pb-4 ml-9 space-y-3 border-t border-[#F3F4F6] pt-3">
+                    {/* Photo guidance for cleanup items */}
+                    {item.photoGuidance && (
+                      <div className={`rounded-[8px] px-3 py-2 text-[11px] ${
+                        item.minPhotos && s.photos.length < item.minPhotos
+                          ? 'bg-amber-50 border border-amber-200 text-amber-800'
+                          : 'bg-green-50 border border-green-200 text-green-800'
+                      }`}>
+                        {item.minPhotos && s.photos.length < item.minPhotos
+                          ? `${item.photoGuidance} (${s.photos.length}/${item.minPhotos} attached)`
+                          : `All ${item.minPhotos} cleanup photos attached`}
+                      </div>
+                    )}
+
                     <PhotoCaptureLocal
                       itemCode={item.code}
                       photos={s.photos}
@@ -267,17 +290,19 @@ export default function SelfChecklistPage() {
         <div className="max-w-[480px] mx-auto">
           <button
             onClick={handleSubmit}
-            disabled={!allChecked}
+            disabled={!canSubmit}
             className={`
               w-full h-12 rounded-[10px] font-semibold text-base transition-colors
-              ${allChecked
+              ${canSubmit
                 ? 'bg-[#0F766E] text-white hover:bg-[#0d6b63]'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
             `}
           >
-            {allChecked
-              ? 'Generate Report'
-              : `Check all items (${totalCount - checkedCount} remaining)`}
+            {!allChecked
+              ? `Check all items (${totalCount - checkedCount} remaining)`
+              : cleanupPhotosMissing
+                ? 'Cleanup photos required (see last item)'
+                : 'Generate Report'}
           </button>
         </div>
       </div>
