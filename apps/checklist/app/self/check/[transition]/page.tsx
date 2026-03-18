@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   CHECKLIST_TEMPLATES,
@@ -29,6 +29,8 @@ interface SelfCheckInfo {
   startedAt: string
 }
 
+const DRAFT_KEY = 'selfCheckDraft'
+
 export default function SelfChecklistPage() {
   const params = useParams()
   const router = useRouter()
@@ -40,7 +42,22 @@ export default function SelfChecklistPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Load templates and session info — only once
+  // Persist state to sessionStorage on every change (survives mobile camera tab kill)
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const persistState = useCallback((newState: Record<string, ItemState>) => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        transition,
+        state: newState,
+        savedAt: Date.now(),
+      }))
+    } catch {
+      // sessionStorage full (base64 photos) — silently ignore
+    }
+  }, [transition])
+
+  // Load templates and session info — restore draft if available
   const initialized = useRef(false)
   useEffect(() => {
     if (initialized.current) return
@@ -62,7 +79,25 @@ export default function SelfChecklistPage() {
     setInfo(parsed)
     setItems(templates)
 
-    // Init state for each item
+    // Try to restore draft (survives mobile camera kill)
+    const draft = sessionStorage.getItem(DRAFT_KEY)
+    if (draft) {
+      try {
+        const parsed = JSON.parse(draft)
+        if (parsed.transition === transition && parsed.state) {
+          // Validate all template codes exist in draft
+          const allCodesPresent = templates.every((t) => parsed.state[t.code])
+          if (allCodesPresent) {
+            setState(parsed.state)
+            return
+          }
+        }
+      } catch {
+        // corrupt draft — ignore
+      }
+    }
+
+    // Fresh start — init state for each item
     const initial: Record<string, ItemState> = {}
     templates.forEach((t) => {
       initial[t.code] = { result: 'pending', notes: '', photos: [], showNotes: false }
@@ -75,24 +110,27 @@ export default function SelfChecklistPage() {
   const totalCount = items.length
 
   function updateResult(code: string, result: ItemResult) {
-    setState((prev) => ({
-      ...prev,
-      [code]: { ...prev[code], result },
-    }))
+    setState((prev) => {
+      const next = { ...prev, [code]: { ...prev[code], result } }
+      persistState(next)
+      return next
+    })
   }
 
   function updateNotes(code: string, notes: string) {
-    setState((prev) => ({
-      ...prev,
-      [code]: { ...prev[code], notes },
-    }))
+    setState((prev) => {
+      const next = { ...prev, [code]: { ...prev[code], notes } }
+      persistState(next)
+      return next
+    })
   }
 
   function updatePhotos(code: string, photos: string[]) {
-    setState((prev) => ({
-      ...prev,
-      [code]: { ...prev[code], photos },
-    }))
+    setState((prev) => {
+      const next = { ...prev, [code]: { ...prev[code], photos } }
+      persistState(next)
+      return next
+    })
   }
 
   const allChecked = checkedCount === totalCount && totalCount > 0
@@ -143,6 +181,7 @@ export default function SelfChecklistPage() {
 
       // Also store in sessionStorage for PDF fallback on complete page
       sessionStorage.setItem('selfCheckResults', JSON.stringify(payload))
+      sessionStorage.removeItem(DRAFT_KEY)
 
       router.push(`/self/check/${transition}/complete?token=${token}&ref=${encodeURIComponent(reference)}`)
     } catch (err) {
@@ -151,6 +190,7 @@ export default function SelfChecklistPage() {
 
       // Fallback: save to sessionStorage and navigate without token
       sessionStorage.setItem('selfCheckResults', JSON.stringify(payload))
+      sessionStorage.removeItem(DRAFT_KEY)
       router.push(`/self/check/${transition}/complete`)
     } finally {
       setSubmitting(false)
@@ -296,10 +336,11 @@ export default function SelfChecklistPage() {
                   {/* + Add Note button (mobile-friendly, full width) */}
                   {isChecked && !notesVisible && (
                     <button
-                      onClick={() => setState((prev) => ({
-                        ...prev,
-                        [item.code]: { ...prev[item.code], showNotes: true },
-                      }))}
+                      onClick={() => setState((prev) => {
+                        const next = { ...prev, [item.code]: { ...prev[item.code], showNotes: true } }
+                        persistState(next)
+                        return next
+                      })}
                       className="mt-2 ml-9 w-[calc(100%-2.25rem)] h-9 rounded-[14px] text-xs font-semibold text-[#C58B1B] border border-dashed border-[#C58B1B]/40 hover:bg-[#C58B1B]/5 transition-colors"
                     >
                       + Add Note
