@@ -154,32 +154,44 @@ export default function SelfChecklistPage() {
 
   if (!info || items.length === 0) {
     return (
-      <div className="min-h-screen bg-[#F6F7F9] flex items-center justify-center">
-        <div className="text-[#667085]">Loading...</div>
+      <div className="min-h-screen bg-[#F5F5F4] flex items-center justify-center">
+        <div className="text-[#888884]">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] flex flex-col">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-[#E5E7EB] px-4 py-3">
+    <div className="min-h-screen bg-[#F5F5F4] flex flex-col">
+      {/* Dark Header */}
+      <div className="sticky top-0 z-20 bg-[#1A1A1A] px-4 py-3">
+        <div className="max-w-[480px] mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-[10px] bg-[#C58B1B] flex items-center justify-center">
+              <span className="text-white font-bold text-sm">GC</span>
+            </div>
+            <span className="font-semibold text-white text-[15px]">Gate Check</span>
+          </div>
+          <span className="text-xs text-[#B0AFA9]">
+            {checkedCount}/{totalCount}
+          </span>
+        </div>
+      </div>
+
+      {/* Sub-header */}
+      <div className="sticky top-[57px] z-10 bg-[#F5F5F4] border-b border-[#D1D0CE] px-4 py-3">
         <div className="max-w-[480px] mx-auto">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-1">
             <button
               onClick={() => router.push('/self')}
-              className="text-sm text-[#667085] hover:text-[#101828]"
+              className="text-[13px] text-[#C58B1B] hover:text-[#A67516]"
             >
               &larr; Back
             </button>
-            <span className="text-xs text-[#667085]">
-              {checkedCount}/{totalCount} checked
-            </span>
           </div>
-          <h1 className="text-base font-bold text-[#101828]">
+          <h1 className="text-base font-bold text-[#1A1A1A]">
             {TRANSITION_LABELS[transition]}
           </h1>
-          <p className="text-xs text-[#667085]">
+          <p className="text-xs text-[#888884]">
             {info.jobsite} — {info.lotNumber}
           </p>
           <div className="mt-2">
@@ -191,7 +203,7 @@ export default function SelfChecklistPage() {
       {/* Info banner */}
       <div className="px-4 pt-3">
         <div className="max-w-[480px] mx-auto">
-          <div className="bg-blue-50 border border-blue-200 rounded-[10px] px-3 py-2 text-[11px] text-blue-800">
+          <div className="bg-[#FFF3D6] border border-[#F2D28B] rounded-[14px] px-3 py-2 text-[11px] text-[#8F6513]">
             You can attach up to 5 photos per item. Photos are optional but recommended.
           </div>
         </div>
@@ -212,30 +224,30 @@ export default function SelfChecklistPage() {
                 key={item.code}
                 className={`
                   bg-white rounded-[14px] border transition-colors
-                  ${s.result === 'pass' ? 'border-[#059669]/30' : ''}
+                  ${s.result === 'pass' ? 'border-[#16A34A]/30' : ''}
                   ${s.result === 'fail' ? 'border-[#DC2626]/30' : ''}
-                  ${s.result === 'na' ? 'border-[#9CA3AF]/30' : ''}
-                  ${s.result === 'pending' ? 'border-[#E5E7EB]' : ''}
+                  ${s.result === 'na' ? 'border-[#B0AFA9]/30' : ''}
+                  ${s.result === 'pending' ? 'border-[#D1D0CE]' : ''}
                 `}
               >
                 <div className="p-4">
                   <div className="flex items-start gap-3">
                     <span className={`
                       w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5
-                      ${isChecked ? 'bg-[#0F766E] text-white' : 'bg-gray-100 text-[#667085]'}
+                      ${isChecked ? 'bg-[#C58B1B] text-white' : 'bg-[#F5F5F4] text-[#888884]'}
                     `}>
                       {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm text-[#101828] leading-snug">{item.label}</p>
+                        <p className="text-[15px] text-[#1A1A1A] leading-snug">{item.label}</p>
                         {item.isBlocking && (
-                          <span className="text-[10px] font-semibold text-[#DC2626] bg-red-50 px-1.5 py-0.5 rounded flex-shrink-0">
+                          <span className="text-[10px] font-semibold text-[#DC2626] bg-[rgba(220,38,38,0.12)] px-1.5 py-0.5 rounded flex-shrink-0">
                             BLOCKING
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-[#9CA3AF] mt-0.5 font-mono">{item.code}</p>
+                      <p className="text-[10px] text-[#B0AFA9] mt-0.5 font-mono">{item.code}</p>
                     </div>
                   </div>
 
@@ -244,10 +256,10 @@ export default function SelfChecklistPage() {
                     <button
                       onClick={() => updateResult(item.code, 'pass')}
                       className={`
-                        flex-1 h-10 rounded-[10px] text-xs font-semibold transition-all border
+                        flex-1 h-[52px] rounded-[14px] text-xs font-semibold transition-all border
                         ${s.result === 'pass'
-                          ? 'bg-[#ECFDF5] border-[#059669] text-[#059669]'
-                          : 'bg-gray-50 border-gray-200 text-[#667085] hover:border-[#059669]'}
+                          ? 'bg-[#D1FAE5] border-[#16A34A] text-[#16A34A]'
+                          : 'bg-[#F5F5F4] border-[#D1D0CE] text-[#888884] hover:border-[#16A34A]'}
                       `}
                     >
                       &#10003; Pass
@@ -255,10 +267,10 @@ export default function SelfChecklistPage() {
                     <button
                       onClick={() => updateResult(item.code, 'fail')}
                       className={`
-                        flex-1 h-10 rounded-[10px] text-xs font-semibold transition-all border
+                        flex-1 h-[52px] rounded-[14px] text-xs font-semibold transition-all border
                         ${s.result === 'fail'
-                          ? 'bg-[#FEF2F2] border-[#DC2626] text-[#DC2626]'
-                          : 'bg-gray-50 border-gray-200 text-[#667085] hover:border-[#DC2626]'}
+                          ? 'bg-[rgba(220,38,38,0.12)] border-[#DC2626] text-[#DC2626]'
+                          : 'bg-[#F5F5F4] border-[#D1D0CE] text-[#888884] hover:border-[#DC2626]'}
                       `}
                     >
                       &#10005; Fail
@@ -266,10 +278,10 @@ export default function SelfChecklistPage() {
                     <button
                       onClick={() => updateResult(item.code, 'na')}
                       className={`
-                        flex-1 h-10 rounded-[10px] text-xs font-semibold transition-all border
+                        flex-1 h-[52px] rounded-[14px] text-xs font-semibold transition-all border
                         ${s.result === 'na'
-                          ? 'bg-[#F3F4F6] border-[#9CA3AF] text-[#6B7280]'
-                          : 'bg-gray-50 border-gray-200 text-[#667085] hover:border-[#9CA3AF]'}
+                          ? 'bg-[#E5E5E3] border-[#B0AFA9] text-[#888884]'
+                          : 'bg-[#F5F5F4] border-[#D1D0CE] text-[#888884] hover:border-[#B0AFA9]'}
                       `}
                     >
                       N/A
@@ -283,7 +295,7 @@ export default function SelfChecklistPage() {
                         ...prev,
                         [item.code]: { ...prev[item.code], showNotes: true },
                       }))}
-                      className="mt-2 ml-9 w-[calc(100%-2.25rem)] h-9 rounded-[10px] text-xs font-semibold text-[#0F766E] border border-dashed border-[#0F766E]/40 hover:bg-[#0F766E]/5 transition-colors"
+                      className="mt-2 ml-9 w-[calc(100%-2.25rem)] h-9 rounded-[14px] text-xs font-semibold text-[#C58B1B] border border-dashed border-[#C58B1B]/40 hover:bg-[#C58B1B]/5 transition-colors"
                     >
                       + Add Note
                     </button>
@@ -292,13 +304,13 @@ export default function SelfChecklistPage() {
 
                 {/* Photo + Notes section */}
                 {(needsPhotos || notesVisible) && (
-                  <div className="px-4 pb-4 ml-9 space-y-3 border-t border-[#F3F4F6] pt-3">
+                  <div className="px-4 pb-4 ml-9 space-y-3 border-t border-[#E5E5E3] pt-3">
                     {/* Photo guidance for cleanup items */}
                     {needsPhotos && item.photoGuidance && (
-                      <div className={`rounded-[8px] px-3 py-2 text-[11px] ${
+                      <div className={`rounded-[14px] px-3 py-2 text-[11px] ${
                         item.minPhotos && s.photos.length < item.minPhotos
-                          ? 'bg-amber-50 border border-amber-200 text-amber-800'
-                          : 'bg-green-50 border border-green-200 text-green-800'
+                          ? 'bg-[#FFF3D6] border border-[#F2D28B] text-[#8F6513]'
+                          : 'bg-[#D1FAE5] border border-[#16A34A]/30 text-[#16A34A]'
                       }`}>
                         {item.minPhotos && s.photos.length < item.minPhotos
                           ? `${item.photoGuidance} (${s.photos.length}/${item.minPhotos} attached)`
@@ -321,7 +333,7 @@ export default function SelfChecklistPage() {
                         value={s.notes}
                         onChange={(e) => updateNotes(item.code, e.target.value)}
                         rows={2}
-                        className="w-full text-sm text-[#101828] placeholder:text-[#9CA3AF] border border-[#E5E7EB] rounded-[10px] px-3 py-2 resize-none"
+                        className="w-full text-[15px] text-[#1A1A1A] placeholder:text-[#B0AFA9] border border-[#D1D0CE] rounded-[14px] px-3 py-2 resize-none focus:border-[#C58B1B] focus:outline-none"
                       />
                     )}
                   </div>
@@ -333,10 +345,10 @@ export default function SelfChecklistPage() {
       </div>
 
       {/* Sticky Submit */}
-      <div className="sticky bottom-0 bg-white border-t border-[#E5E7EB] p-4">
+      <div className="sticky bottom-0 bg-white border-t border-[#D1D0CE] p-4">
         <div className="max-w-[480px] mx-auto">
           {submitError && (
-            <div className="mb-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-[8px] px-3 py-2">
+            <div className="mb-2 text-xs text-[#8F6513] bg-[#FFF3D6] border border-[#F2D28B] rounded-[14px] px-3 py-2">
               {submitError}
             </div>
           )}
@@ -344,10 +356,10 @@ export default function SelfChecklistPage() {
             onClick={handleSubmit}
             disabled={!canSubmit || submitting}
             className={`
-              w-full h-12 rounded-[10px] font-semibold text-base transition-colors
+              w-full h-[52px] rounded-[14px] font-semibold text-[15px] transition-colors
               ${canSubmit && !submitting
-                ? 'bg-[#0F766E] text-white hover:bg-[#0d6b63]'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                ? 'bg-[#C58B1B] text-white hover:bg-[#A67516]'
+                : 'bg-[#F5F5F4] text-[#B0AFA9] cursor-not-allowed'}
             `}
           >
             {submitting

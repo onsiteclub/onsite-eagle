@@ -40,8 +40,8 @@ export default function LotSearchClient({ jobsites }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-[#101828]">Select Lot</h1>
-        <p className="text-sm text-[#667085] mt-1">Choose a lot to start a gate check</p>
+        <h1 className="text-xl font-bold text-[#1A1A1A]">Select Lot</h1>
+        <p className="text-[15px] text-[#888884] mt-1">Choose a lot to start a gate check</p>
       </div>
 
       {/* Jobsite Selector */}
@@ -49,7 +49,7 @@ export default function LotSearchClient({ jobsites }: Props) {
         <select
           value={selectedJobsite}
           onChange={(e) => setSelectedJobsite(e.target.value)}
-          className="w-full h-11 px-3 rounded-[10px] border border-[#E5E7EB] bg-white text-[#101828] text-sm"
+          className="w-full h-[52px] px-3 rounded-[14px] border border-[#D1D0CE] bg-white text-[#1A1A1A] text-[15px] focus:border-[#C58B1B] focus:outline-none"
         >
           {jobsites.map(js => (
             <option key={js.id} value={js.id}>{js.name} — {js.city}</option>
@@ -63,14 +63,14 @@ export default function LotSearchClient({ jobsites }: Props) {
         placeholder="Search by lot number or address..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full h-11 px-3 rounded-[10px] border border-[#E5E7EB] bg-white text-[#101828] text-sm placeholder:text-[#9CA3AF]"
+        className="w-full h-[52px] px-3 rounded-[14px] border border-[#D1D0CE] bg-white text-[#1A1A1A] text-[15px] placeholder:text-[#B0AFA9] focus:border-[#C58B1B] focus:outline-none"
       />
 
       {/* Results */}
       {loading ? (
-        <div className="py-8 text-center text-[#667085] text-sm">Loading lots...</div>
+        <div className="py-8 text-center text-[#888884] text-[15px]">Loading lots...</div>
       ) : filtered.length === 0 ? (
-        <div className="py-8 text-center text-[#667085] text-sm">No lots found</div>
+        <div className="py-8 text-center text-[#888884] text-[15px]">No lots found</div>
       ) : (
         <div className="space-y-2">
           {filtered.map(lot => {
@@ -79,13 +79,13 @@ export default function LotSearchClient({ jobsites }: Props) {
               <button
                 key={lot.id}
                 onClick={() => router.push(`/app/lot/${lot.id}`)}
-                className="w-full text-left bg-white rounded-[14px] border border-[#E5E7EB] p-4 hover:border-brand-500 transition-colors"
+                className="w-full text-left bg-white rounded-[14px] border border-[#D1D0CE] p-4 hover:border-brand-500 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-semibold text-[#101828]">Lot {lot.lot_number}</span>
+                    <span className="font-semibold text-[#1A1A1A]">Lot {lot.lot_number}</span>
                     {lot.address && (
-                      <span className="text-xs text-[#667085] ml-2">{lot.address}</span>
+                      <span className="text-xs text-[#888884] ml-2">{lot.address}</span>
                     )}
                   </div>
                   <span
@@ -96,7 +96,7 @@ export default function LotSearchClient({ jobsites }: Props) {
                   </span>
                 </div>
                 {lot.current_phase && (
-                  <p className="text-xs text-[#667085] mt-1">
+                  <p className="text-xs text-[#888884] mt-1">
                     Phase: {lot.current_phase.replace(/_/g, ' ')}
                   </p>
                 )}

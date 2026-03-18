@@ -23,11 +23,11 @@ export default async function ReportPage({ params }: Props) {
   // Check expiration
   if (report.expires_at && new Date(report.expires_at) < new Date()) {
     return (
-      <div className="min-h-screen bg-[#F6F7F9] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[#F5F5F4] flex items-center justify-center px-4">
         <div className="text-center">
-          <div className="text-4xl mb-4 text-[#9CA3AF]">&#128274;</div>
-          <h1 className="text-lg font-bold text-[#101828] mb-2">Report Expired</h1>
-          <p className="text-sm text-[#667085]">This report link has expired and is no longer available.</p>
+          <div className="text-4xl mb-4 text-[#B0AFA9]">&#128274;</div>
+          <h1 className="text-lg font-bold text-[#1A1A1A] mb-2">Report Expired</h1>
+          <p className="text-[15px] text-[#888884]">This report link has expired and is no longer available.</p>
         </div>
       </div>
     )

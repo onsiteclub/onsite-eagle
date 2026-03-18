@@ -31,12 +31,12 @@ export default async function LotDetailPage({ params }: Props) {
   return (
     <div className="space-y-4">
       {/* Back */}
-      <Link href="/app" className="text-sm text-brand-500 hover:underline">&larr; Back to lots</Link>
+      <Link href="/app" className="text-[13px] text-[#C58B1B] hover:underline">&larr; Back to lots</Link>
 
       {/* Lot Info */}
-      <div className="bg-white rounded-[14px] border border-[#E5E7EB] p-4">
+      <div className="bg-white rounded-[14px] border border-[#D1D0CE] p-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-[#101828]">Lot {lot.lot_number}</h1>
+          <h1 className="text-lg font-bold text-[#1A1A1A]">Lot {lot.lot_number}</h1>
           <span
             className="text-xs font-medium px-2 py-0.5 rounded-full"
             style={{ backgroundColor: statusCfg.color + '20', color: statusCfg.color }}
@@ -44,17 +44,17 @@ export default async function LotDetailPage({ params }: Props) {
             {statusCfg.label}
           </span>
         </div>
-        {lot.address && <p className="text-sm text-[#667085] mt-1">{lot.address}</p>}
+        {lot.address && <p className="text-[15px] text-[#888884] mt-1">{lot.address}</p>}
         {lot.current_phase && (
-          <p className="text-xs text-[#667085] mt-2">
-            Current phase: <span className="font-medium text-[#101828]">{lot.current_phase.replace(/_/g, ' ')}</span>
+          <p className="text-xs text-[#888884] mt-2">
+            Current phase: <span className="font-medium text-[#1A1A1A]">{lot.current_phase.replace(/_/g, ' ')}</span>
           </p>
         )}
       </div>
 
       {/* Gate Checks */}
       <div>
-        <h2 className="text-sm font-semibold text-[#101828] mb-2">Gate Checks</h2>
+        <h2 className="text-[15px] font-semibold text-[#1A1A1A] mb-2">Gate Checks</h2>
         <div className="space-y-2">
           {gateChecks.map(({ transition, gateCheck }) => (
             <TransitionCard

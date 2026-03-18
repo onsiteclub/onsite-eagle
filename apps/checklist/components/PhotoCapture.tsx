@@ -70,13 +70,13 @@ export default function PhotoCapture({
 
   if (displayUrl) {
     return (
-      <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-[#E5E7EB]">
+      <div className="relative w-20 h-20 rounded-[10px] overflow-hidden border border-[#D1D0CE]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={displayUrl} alt="Photo" className="w-full h-full object-cover" />
         {!disabled && (
           <button
             onClick={handleRemove}
-            className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center text-white text-xs"
+            className="absolute top-0.5 right-0.5 w-5 h-5 bg-[rgba(26,26,26,0.6)] rounded-full flex items-center justify-center text-white text-xs"
           >
             &times;
           </button>
@@ -87,18 +87,18 @@ export default function PhotoCapture({
 
   return (
     <label className={`
-      w-20 h-20 rounded-lg border-2 border-dashed border-[#E5E7EB]
+      w-20 h-20 rounded-[10px] border-2 border-dashed border-[#D1D0CE]
       flex flex-col items-center justify-center cursor-pointer
       hover:border-brand-500 transition-colors
       ${uploading ? 'opacity-50 pointer-events-none' : ''}
       ${disabled ? 'opacity-30 pointer-events-none' : ''}
     `}>
       {uploading ? (
-        <span className="text-[10px] text-[#667085]">Uploading...</span>
+        <span className="text-[10px] text-[#888884]">Uploading...</span>
       ) : (
         <>
-          <span className="text-lg text-[#9CA3AF]">+</span>
-          <span className="text-[10px] text-[#9CA3AF]">Photo</span>
+          <span className="text-lg text-[#B0AFA9]">+</span>
+          <span className="text-[10px] text-[#B0AFA9]">Photo</span>
         </>
       )}
       {error && <span className="text-[9px] text-[#DC2626]">{error}</span>}

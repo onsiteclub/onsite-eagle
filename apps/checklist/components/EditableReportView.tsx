@@ -157,19 +157,29 @@ export default function EditableReportView({ report: initialReport }: EditableRe
   const history: HistoryEntry[] = Array.isArray(report.edit_history) ? report.edit_history : []
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] flex flex-col items-center px-4 py-6">
-      <div className="w-full max-w-[520px]">
+    <div className="min-h-screen bg-[#F5F5F4] flex flex-col items-center">
+      {/* Dark Header */}
+      <div className="w-full bg-[#1A1A1A] px-4 py-3 mb-6">
+        <div className="max-w-[520px] mx-auto flex items-center gap-2">
+          <div className="w-8 h-8 rounded-[10px] bg-[#C58B1B] flex items-center justify-center">
+            <span className="text-white font-bold text-sm">GC</span>
+          </div>
+          <span className="font-semibold text-white text-[15px]">Gate Check</span>
+        </div>
+      </div>
+
+      <div className="w-full max-w-[520px] px-4">
         {/* Reference + Last Updated */}
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-mono text-[#667085]">{report.reference}</span>
+          <span className="text-xs font-mono text-[#888884]">{report.reference}</span>
           {report.updated_by && (
-            <span className="text-xs text-[#9CA3AF]">
+            <span className="text-xs text-[#B0AFA9]">
               Updated by {report.updated_by}
             </span>
           )}
         </div>
         {report.updated_at && (
-          <p className="text-[10px] text-[#9CA3AF] mb-4 text-right">
+          <p className="text-[10px] text-[#B0AFA9] mb-4 text-right">
             {new Date(report.updated_at).toLocaleString('en-CA', {
               year: 'numeric', month: 'short', day: 'numeric',
               hour: '2-digit', minute: '2-digit',
@@ -180,47 +190,47 @@ export default function EditableReportView({ report: initialReport }: EditableRe
         {/* Result Banner */}
         <div className={`
           rounded-[14px] p-6 text-center mb-6
-          ${report.passed ? 'bg-[#ECFDF5] border border-[#059669]/30' : 'bg-[#FEF2F2] border border-[#DC2626]/30'}
+          ${report.passed ? 'bg-[#D1FAE5] border border-[#16A34A]/30' : 'bg-[rgba(220,38,38,0.12)] border border-[#DC2626]/30'}
         `}>
-          <div className={`text-4xl mb-2 ${report.passed ? 'text-[#059669]' : 'text-[#DC2626]'}`}>
+          <div className={`text-4xl mb-2 ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
             {report.passed ? '\u2713' : '\u2717'}
           </div>
-          <h1 className={`text-2xl font-bold ${report.passed ? 'text-[#059669]' : 'text-[#DC2626]'}`}>
+          <h1 className={`text-2xl font-bold ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
             {report.passed ? 'PASSED' : 'FAILED'}
           </h1>
-          <p className="text-sm font-medium text-[#101828] mt-2">{report.transition_label}</p>
-          <p className="text-xs text-[#667085] mt-1">
+          <p className="text-[15px] font-medium text-[#1A1A1A] mt-2">{report.transition_label}</p>
+          <p className="text-xs text-[#888884] mt-1">
             {report.jobsite} &mdash; {report.lot_number}
           </p>
         </div>
 
         {/* Summary */}
-        <div className="bg-white rounded-[14px] border border-[#E5E7EB] p-5 mb-4">
+        <div className="bg-white rounded-[14px] border border-[#D1D0CE] p-5 mb-4">
           <div className="grid grid-cols-4 gap-2 mb-4">
-            <div className="text-center p-3 bg-[#ECFDF5] rounded-[10px]">
-              <div className="text-lg font-bold text-[#059669]">{passCount}</div>
-              <div className="text-xs text-[#667085]">Pass</div>
+            <div className="text-center p-3 bg-[#D1FAE5] rounded-[14px]">
+              <div className="text-lg font-bold text-[#16A34A]">{passCount}</div>
+              <div className="text-xs text-[#888884]">Pass</div>
             </div>
-            <div className="text-center p-3 bg-[#FEF2F2] rounded-[10px]">
+            <div className="text-center p-3 bg-[rgba(220,38,38,0.12)] rounded-[14px]">
               <div className="text-lg font-bold text-[#DC2626]">{failCount}</div>
-              <div className="text-xs text-[#667085]">Fail</div>
+              <div className="text-xs text-[#888884]">Fail</div>
             </div>
-            <div className="text-center p-3 bg-[#F3F4F6] rounded-[10px]">
-              <div className="text-lg font-bold text-[#6B7280]">{naCount}</div>
-              <div className="text-xs text-[#667085]">N/A</div>
+            <div className="text-center p-3 bg-[#E5E5E3] rounded-[14px]">
+              <div className="text-lg font-bold text-[#888884]">{naCount}</div>
+              <div className="text-xs text-[#888884]">N/A</div>
             </div>
-            <div className="text-center p-3 bg-blue-50 rounded-[10px]">
-              <div className="text-lg font-bold text-blue-700">{totalPhotos}</div>
-              <div className="text-xs text-[#667085]">Photos</div>
+            <div className="text-center p-3 bg-[#FFF3D6] rounded-[14px]">
+              <div className="text-lg font-bold text-[#C58B1B]">{totalPhotos}</div>
+              <div className="text-xs text-[#888884]">Photos</div>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#667085] space-y-1">
-            <p>Inspector: <span className="text-[#101828]">{report.inspector_name}</span></p>
+          <div className="pt-3 border-t border-[#E5E5E3] text-xs text-[#888884] space-y-1">
+            <p>Inspector: <span className="text-[#1A1A1A]">{report.inspector_name}</span></p>
             {report.inspector_company && (
-              <p>Company: <span className="text-[#101828]">{report.inspector_company}</span></p>
+              <p>Company: <span className="text-[#1A1A1A]">{report.inspector_company}</span></p>
             )}
-            <p>Date: <span className="text-[#101828]">
+            <p>Date: <span className="text-[#1A1A1A]">
               {new Date(report.completed_at).toLocaleString('en-CA', {
                 year: 'numeric', month: 'short', day: 'numeric',
                 hour: '2-digit', minute: '2-digit',
@@ -231,21 +241,21 @@ export default function EditableReportView({ report: initialReport }: EditableRe
 
         {/* Edit History */}
         {history.length > 0 && (
-          <div className="bg-white rounded-[14px] border border-[#E5E7EB] mb-4 overflow-hidden">
+          <div className="bg-white rounded-[14px] border border-[#D1D0CE] mb-4 overflow-hidden">
             <button
               onClick={() => setShowHistory((v) => !v)}
-              className="w-full flex items-center justify-between px-5 py-3 text-xs font-semibold text-[#667085] hover:bg-[#F6F7F9] transition-colors"
+              className="w-full flex items-center justify-between px-5 py-3 text-xs font-semibold text-[#888884] hover:bg-[#F5F5F4] transition-colors"
             >
               <span>Edit History ({history.length} {history.length === 1 ? 'update' : 'updates'})</span>
-              <span className="text-[#9CA3AF]">{showHistory ? '\u25B2' : '\u25BC'}</span>
+              <span className="text-[#B0AFA9]">{showHistory ? '\u25B2' : '\u25BC'}</span>
             </button>
             {showHistory && (
-              <div className="px-5 pb-4 space-y-4 border-t border-[#F3F4F6]">
+              <div className="px-5 pb-4 space-y-4 border-t border-[#E5E5E3]">
                 {[...history].reverse().map((entry, hi) => (
                   <div key={hi} className="pt-3">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-semibold text-[#101828]">{entry.name}</span>
-                      <span className="text-[10px] text-[#9CA3AF]">
+                      <span className="text-xs font-semibold text-[#1A1A1A]">{entry.name}</span>
+                      <span className="text-[10px] text-[#B0AFA9]">
                         {new Date(entry.at).toLocaleString('en-CA', {
                           month: 'short', day: 'numeric',
                           hour: '2-digit', minute: '2-digit',
@@ -254,12 +264,12 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                     </div>
                     <div className="space-y-1">
                       {entry.changes.map((c, ci) => (
-                        <div key={ci} className="text-[11px] text-[#667085] flex items-start gap-1.5">
-                          <span className="text-[#9CA3AF] flex-shrink-0">&bull;</span>
+                        <div key={ci} className="text-[11px] text-[#888884] flex items-start gap-1.5">
+                          <span className="text-[#B0AFA9] flex-shrink-0">&bull;</span>
                           <span>
                             {c.field === 'result' ? (
                               <>
-                                <span className="font-mono text-[#101828]">{c.item_code}</span>
+                                <span className="font-mono text-[#1A1A1A]">{c.item_code}</span>
                                 {' '}
                                 <span className={resultColorClass(c.from)}>{c.from.toUpperCase()}</span>
                                 {' \u2192 '}
@@ -267,14 +277,14 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                               </>
                             ) : c.field === 'notes' ? (
                               <>
-                                <span className="font-mono text-[#101828]">{c.item_code}</span>
+                                <span className="font-mono text-[#1A1A1A]">{c.item_code}</span>
                                 {' note: "'}
                                 <span className="italic">{c.to || '(cleared)'}</span>
                                 {'"'}
                               </>
                             ) : (
                               <>
-                                <span className="font-mono text-[#101828]">{c.item_code}</span>
+                                <span className="font-mono text-[#1A1A1A]">{c.item_code}</span>
                                 {' '}{c.to}
                               </>
                             )}
@@ -294,7 +304,7 @@ export default function EditableReportView({ report: initialReport }: EditableRe
           {!editing ? (
             <button
               onClick={startEditing}
-              className="flex-1 h-10 rounded-[10px] text-sm font-semibold border border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5 transition-colors"
+              className="flex-1 h-[52px] rounded-[14px] text-[15px] font-semibold border border-[#D1D0CE] text-[#888884] bg-white hover:bg-[#F5F5F4] transition-colors"
             >
               Edit Checklist
             </button>
@@ -302,15 +312,15 @@ export default function EditableReportView({ report: initialReport }: EditableRe
             <>
               <button
                 onClick={cancelEditing}
-                className="flex-1 h-10 rounded-[10px] text-sm font-semibold border border-[#E5E7EB] text-[#667085] hover:bg-gray-50 transition-colors"
+                className="flex-1 h-[52px] rounded-[14px] text-[15px] font-semibold border border-[#D1D0CE] text-[#888884] bg-white hover:bg-[#F5F5F4] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className={`flex-1 h-10 rounded-[10px] text-sm font-semibold transition-colors ${
-                  saving ? 'bg-gray-200 text-gray-400' : 'bg-[#0F766E] text-white hover:bg-[#0d6b63]'
+                className={`flex-1 h-[52px] rounded-[14px] text-[15px] font-semibold transition-colors ${
+                  saving ? 'bg-[#F5F5F4] text-[#B0AFA9]' : 'bg-[#C58B1B] text-white hover:bg-[#A67516]'
                 }`}
               >
                 {saving ? 'Saving...' : 'Save Changes'}
@@ -321,10 +331,10 @@ export default function EditableReportView({ report: initialReport }: EditableRe
 
         {/* Name prompt modal */}
         {showNamePrompt && (
-          <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center px-4">
+          <div className="fixed inset-0 z-40 bg-[rgba(26,26,26,0.6)] flex items-center justify-center px-4">
             <div className="bg-white rounded-[14px] p-6 w-full max-w-[360px]">
-              <h3 className="text-sm font-bold text-[#101828] mb-3">Your name</h3>
-              <p className="text-xs text-[#667085] mb-3">
+              <h3 className="text-[15px] font-bold text-[#1A1A1A] mb-3">Your name</h3>
+              <p className="text-xs text-[#888884] mb-3">
                 Enter your name to track who made this update.
               </p>
               <input
@@ -332,13 +342,13 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                 value={editorName}
                 onChange={(e) => setEditorName(e.target.value)}
                 placeholder="e.g. John Smith"
-                className="w-full h-10 border border-[#E5E7EB] rounded-[10px] px-3 text-sm text-[#101828] placeholder:text-[#9CA3AF] mb-4"
+                className="w-full h-[52px] border border-[#D1D0CE] rounded-[14px] px-3 text-[15px] text-[#1A1A1A] placeholder:text-[#B0AFA9] mb-4 focus:border-[#C58B1B] focus:outline-none"
                 autoFocus
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowNamePrompt(false)}
-                  className="flex-1 h-10 rounded-[10px] text-sm font-semibold border border-[#E5E7EB] text-[#667085]"
+                  className="flex-1 h-[52px] rounded-[14px] text-[15px] font-semibold border border-[#D1D0CE] text-[#888884] bg-white"
                 >
                   Cancel
                 </button>
@@ -350,8 +360,8 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                     }
                   }}
                   disabled={!editorName.trim()}
-                  className={`flex-1 h-10 rounded-[10px] text-sm font-semibold ${
-                    editorName.trim() ? 'bg-[#0F766E] text-white' : 'bg-gray-200 text-gray-400'
+                  className={`flex-1 h-[52px] rounded-[14px] text-[15px] font-semibold ${
+                    editorName.trim() ? 'bg-[#C58B1B] text-white' : 'bg-[#F5F5F4] text-[#B0AFA9]'
                   }`}
                 >
                   Confirm
@@ -373,21 +383,21 @@ export default function EditableReportView({ report: initialReport }: EditableRe
               <div
                 key={item.id}
                 className={`bg-white rounded-[14px] border transition-colors ${
-                  result === 'pass' ? 'border-[#059669]/30' :
+                  result === 'pass' ? 'border-[#16A34A]/30' :
                   result === 'fail' ? 'border-[#DC2626]/30' :
-                  'border-[#9CA3AF]/30'
+                  'border-[#B0AFA9]/30'
                 }`}
               >
                 <div className="p-4">
                   <div className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium bg-[#0F766E] text-white flex-shrink-0 mt-0.5">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium bg-[#C58B1B] text-white flex-shrink-0 mt-0.5">
                       {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm text-[#101828] leading-snug">{item.item_label}</p>
+                        <p className="text-[15px] text-[#1A1A1A] leading-snug">{item.item_label}</p>
                         {item.is_blocking && (
-                          <span className="text-[10px] font-semibold text-[#DC2626] bg-red-50 px-1.5 py-0.5 rounded flex-shrink-0">
+                          <span className="text-[10px] font-semibold text-[#DC2626] bg-[rgba(220,38,38,0.12)] px-1.5 py-0.5 rounded flex-shrink-0">
                             BLOCKING
                           </span>
                         )}
@@ -396,9 +406,9 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                       {/* Result badge (view mode) or buttons (edit mode) */}
                       {!editing ? (
                         <span className={`inline-block mt-2 text-xs font-semibold px-2 py-1 rounded ${
-                          result === 'pass' ? 'bg-[#ECFDF5] text-[#059669]' :
-                          result === 'fail' ? 'bg-[#FEF2F2] text-[#DC2626]' :
-                          'bg-[#F3F4F6] text-[#6B7280]'
+                          result === 'pass' ? 'bg-[#D1FAE5] text-[#16A34A]' :
+                          result === 'fail' ? 'bg-[rgba(220,38,38,0.12)] text-[#DC2626]' :
+                          'bg-[#E5E5E3] text-[#888884]'
                         }`}>
                           {result === 'pass' ? 'PASS' : result === 'fail' ? 'FAIL' : 'N/A'}
                         </span>
@@ -411,12 +421,12 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                                 ...prev,
                                 [item.id]: { ...prev[item.id], result: r },
                               }))}
-                              className={`flex-1 h-9 rounded-[10px] text-xs font-semibold border transition-all ${
+                              className={`flex-1 h-[52px] rounded-[14px] text-xs font-semibold border transition-all ${
                                 result === r
-                                  ? r === 'pass' ? 'bg-[#ECFDF5] border-[#059669] text-[#059669]'
-                                    : r === 'fail' ? 'bg-[#FEF2F2] border-[#DC2626] text-[#DC2626]'
-                                    : 'bg-[#F3F4F6] border-[#9CA3AF] text-[#6B7280]'
-                                  : 'bg-gray-50 border-gray-200 text-[#667085]'
+                                  ? r === 'pass' ? 'bg-[#D1FAE5] border-[#16A34A] text-[#16A34A]'
+                                    : r === 'fail' ? 'bg-[rgba(220,38,38,0.12)] border-[#DC2626] text-[#DC2626]'
+                                    : 'bg-[#E5E5E3] border-[#B0AFA9] text-[#888884]'
+                                  : 'bg-[#F5F5F4] border-[#D1D0CE] text-[#888884]'
                               }`}
                             >
                               {r === 'pass' ? '\u2713 Pass' : r === 'fail' ? '\u2717 Fail' : 'N/A'}
@@ -434,7 +444,7 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                         ...prev,
                         [item.id]: { ...prev[item.id], showNotes: true },
                       }))}
-                      className="mt-2 ml-9 w-[calc(100%-2.25rem)] h-9 rounded-[10px] text-xs font-semibold text-[#0F766E] border border-dashed border-[#0F766E]/40 hover:bg-[#0F766E]/5 transition-colors"
+                      className="mt-2 ml-9 w-[calc(100%-2.25rem)] h-9 rounded-[14px] text-xs font-semibold text-[#C58B1B] border border-dashed border-[#C58B1B]/40 hover:bg-[#C58B1B]/5 transition-colors"
                     >
                       + Add Note
                     </button>
@@ -443,7 +453,7 @@ export default function EditableReportView({ report: initialReport }: EditableRe
 
                 {/* Photos + Notes section */}
                 {(item.photo_urls.length > 0 || notes || (editing && (edit?.showNotes || notes))) && (
-                  <div className="px-4 pb-4 ml-9 space-y-3 border-t border-[#F3F4F6] pt-3">
+                  <div className="px-4 pb-4 ml-9 space-y-3 border-t border-[#E5E5E3] pt-3">
                     {/* Existing photos */}
                     {item.photo_urls.length > 0 && (
                       <div className="flex flex-wrap gap-2">
@@ -451,7 +461,7 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                           <button
                             key={pi}
                             onClick={() => setLightbox({ photos: item.photo_urls, index: pi })}
-                            className="w-16 h-16 rounded-lg overflow-hidden border border-[#E5E7EB] hover:border-[#0F766E] transition-colors flex-shrink-0"
+                            className="w-16 h-16 rounded-[10px] overflow-hidden border border-[#D1D0CE] hover:border-[#C58B1B] transition-colors flex-shrink-0"
                           >
                             <img src={url} alt={`Photo ${pi + 1}`} className="w-full h-full object-cover" />
                           </button>
@@ -482,10 +492,10 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                         }))}
                         placeholder="Add a note..."
                         rows={2}
-                        className="w-full text-sm text-[#101828] placeholder:text-[#9CA3AF] border border-[#E5E7EB] rounded-[10px] px-3 py-2 resize-none"
+                        className="w-full text-[15px] text-[#1A1A1A] placeholder:text-[#B0AFA9] border border-[#D1D0CE] rounded-[14px] px-3 py-2 resize-none focus:border-[#C58B1B] focus:outline-none"
                       />
                     ) : notes ? (
-                      <p className="text-xs text-[#667085] italic">{notes}</p>
+                      <p className="text-xs text-[#888884] italic">{notes}</p>
                     ) : null}
                   </div>
                 )}
@@ -498,9 +508,9 @@ export default function EditableReportView({ report: initialReport }: EditableRe
         <div className="space-y-3 mb-8">
           <button
             onClick={copyLink}
-            className="w-full h-12 rounded-[10px] font-semibold text-base bg-[#0F766E] text-white hover:bg-[#0d6b63] transition-colors"
+            className="w-full h-[52px] rounded-[14px] font-semibold text-[15px] bg-[#C58B1B] text-white hover:bg-[#A67516] transition-colors"
           >
-            {copied ? 'Link Copied!' : 'Copy Link'}
+            {copied ? '\u2713 Link Copied!' : 'Copy Link'}
           </button>
 
           <button
@@ -515,13 +525,13 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                 copyLink()
               }
             }}
-            className="w-full h-12 rounded-[10px] font-semibold text-base border border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5 transition-colors"
+            className="w-full h-[52px] rounded-[14px] font-semibold text-[15px] border border-[#D1D0CE] text-[#888884] bg-white hover:bg-[#F5F5F4] transition-colors"
           >
             Share Report
           </button>
         </div>
 
-        <p className="text-center text-xs text-[#9CA3AF]">
+        <p className="text-center text-xs text-[#B0AFA9] pb-6">
           OnSite Club &mdash; Built for the trades
         </p>
       </div>
@@ -539,7 +549,7 @@ export default function EditableReportView({ report: initialReport }: EditableRe
 }
 
 function resultColorClass(result: string): string {
-  if (result === 'pass') return 'text-[#059669] font-semibold'
+  if (result === 'pass') return 'text-[#16A34A] font-semibold'
   if (result === 'fail') return 'text-[#DC2626] font-semibold'
-  return 'text-[#6B7280] font-semibold'
+  return 'text-[#888884] font-semibold'
 }

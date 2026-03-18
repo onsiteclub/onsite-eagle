@@ -45,8 +45,8 @@ export default function SelfCheckCompletePage() {
 
   if (!report) {
     return (
-      <div className="min-h-screen bg-[#F6F7F9] flex items-center justify-center">
-        <div className="text-[#667085]">Loading...</div>
+      <div className="min-h-screen bg-[#F5F5F4] flex items-center justify-center">
+        <div className="text-[#888884]">Loading...</div>
       </div>
     )
   }
@@ -108,74 +108,84 @@ export default function SelfCheckCompletePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] flex flex-col items-center px-4 py-8">
-      <div className="w-full max-w-[480px]">
+    <div className="min-h-screen bg-[#F5F5F4] flex flex-col items-center">
+      {/* Dark Header */}
+      <div className="w-full bg-[#1A1A1A] px-4 py-3 mb-6">
+        <div className="max-w-[480px] mx-auto flex items-center gap-2">
+          <div className="w-8 h-8 rounded-[10px] bg-[#C58B1B] flex items-center justify-center">
+            <span className="text-white font-bold text-sm">GC</span>
+          </div>
+          <span className="font-semibold text-white text-[15px]">Gate Check</span>
+        </div>
+      </div>
+
+      <div className="w-full max-w-[480px] px-4">
         {/* Result Banner */}
         <div className={`
           rounded-[14px] p-6 text-center mb-6
-          ${report.passed ? 'bg-[#ECFDF5] border border-[#059669]/30' : 'bg-[#FEF2F2] border border-[#DC2626]/30'}
+          ${report.passed ? 'bg-[#D1FAE5] border border-[#16A34A]/30' : 'bg-[rgba(220,38,38,0.12)] border border-[#DC2626]/30'}
         `}>
-          <div className={`text-4xl mb-2 ${report.passed ? 'text-[#059669]' : 'text-[#DC2626]'}`}>
+          <div className={`text-4xl mb-2 ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
             {report.passed ? '\u2713' : '\u2717'}
           </div>
-          <h1 className={`text-2xl font-bold ${report.passed ? 'text-[#059669]' : 'text-[#DC2626]'}`}>
+          <h1 className={`text-2xl font-bold ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
             {report.passed ? 'PASSED' : 'FAILED'}
           </h1>
-          <p className="text-sm text-[#667085] mt-1">{report.transitionLabel}</p>
-          <p className="text-xs text-[#9CA3AF] mt-1">
+          <p className="text-[15px] text-[#888884] mt-1">{report.transitionLabel}</p>
+          <p className="text-xs text-[#B0AFA9] mt-1">
             {report.jobsite} — {report.lotNumber}
           </p>
         </div>
 
         {/* Summary */}
-        <div className="bg-white rounded-[14px] border border-[#E5E7EB] p-5 mb-4">
-          <h2 className="text-sm font-semibold text-[#101828] mb-3">Summary</h2>
+        <div className="bg-white rounded-[14px] border border-[#D1D0CE] p-5 mb-4">
+          <h2 className="text-[15px] font-semibold text-[#1A1A1A] mb-3">Summary</h2>
           <div className="grid grid-cols-4 gap-2">
-            <div className="text-center p-3 bg-[#ECFDF5] rounded-[10px]">
-              <div className="text-lg font-bold text-[#059669]">{passCount}</div>
-              <div className="text-xs text-[#667085]">Pass</div>
+            <div className="text-center p-3 bg-[#D1FAE5] rounded-[14px]">
+              <div className="text-lg font-bold text-[#16A34A]">{passCount}</div>
+              <div className="text-xs text-[#888884]">Pass</div>
             </div>
-            <div className="text-center p-3 bg-[#FEF2F2] rounded-[10px]">
+            <div className="text-center p-3 bg-[rgba(220,38,38,0.12)] rounded-[14px]">
               <div className="text-lg font-bold text-[#DC2626]">{failCount}</div>
-              <div className="text-xs text-[#667085]">Fail</div>
+              <div className="text-xs text-[#888884]">Fail</div>
             </div>
-            <div className="text-center p-3 bg-[#F3F4F6] rounded-[10px]">
-              <div className="text-lg font-bold text-[#6B7280]">{naCount}</div>
-              <div className="text-xs text-[#667085]">N/A</div>
+            <div className="text-center p-3 bg-[#E5E5E3] rounded-[14px]">
+              <div className="text-lg font-bold text-[#888884]">{naCount}</div>
+              <div className="text-xs text-[#888884]">N/A</div>
             </div>
-            <div className="text-center p-3 bg-blue-50 rounded-[10px]">
-              <div className="text-lg font-bold text-blue-700">{totalPhotos}</div>
-              <div className="text-xs text-[#667085]">Photos</div>
+            <div className="text-center p-3 bg-[#FFF3D6] rounded-[14px]">
+              <div className="text-lg font-bold text-[#C58B1B]">{totalPhotos}</div>
+              <div className="text-xs text-[#888884]">Photos</div>
             </div>
           </div>
 
           {/* Inspector info */}
-          <div className="mt-4 pt-3 border-t border-[#F3F4F6] text-xs text-[#667085] space-y-1">
-            <p>Inspector: <span className="text-[#101828]">{report.name}</span></p>
-            {report.company && <p>Company: <span className="text-[#101828]">{report.company}</span></p>}
-            <p>Date: <span className="text-[#101828]">{new Date(report.completedAt).toLocaleString()}</span></p>
+          <div className="mt-4 pt-3 border-t border-[#E5E5E3] text-xs text-[#888884] space-y-1">
+            <p>Inspector: <span className="text-[#1A1A1A]">{report.name}</span></p>
+            {report.company && <p>Company: <span className="text-[#1A1A1A]">{report.company}</span></p>}
+            <p>Date: <span className="text-[#1A1A1A]">{new Date(report.completedAt).toLocaleString()}</span></p>
           </div>
         </div>
 
         {/* Failed Items */}
         {failedItems.length > 0 && (
-          <div className="bg-white rounded-[14px] border border-[#E5E7EB] p-5 mb-6">
-            <h2 className="text-sm font-semibold text-[#DC2626] mb-3">
+          <div className="bg-white rounded-[14px] border border-[#D1D0CE] p-5 mb-6">
+            <h2 className="text-[15px] font-semibold text-[#DC2626] mb-3">
               Failed Items ({failedItems.length})
             </h2>
             <div className="space-y-2">
               {failedItems.map((item) => (
-                <div key={item.code} className="flex items-start gap-2 text-sm">
+                <div key={item.code} className="flex items-start gap-2 text-[15px]">
                   <span className="text-[#DC2626] flex-shrink-0">&times;</span>
                   <div>
-                    <p className="text-[#101828]">{item.label}</p>
+                    <p className="text-[#1A1A1A]">{item.label}</p>
                     {item.isBlocking && (
-                      <span className="text-[9px] font-semibold text-[#DC2626] bg-red-50 px-1 py-0.5 rounded">
+                      <span className="text-[9px] font-semibold text-[#DC2626] bg-[rgba(220,38,38,0.12)] px-1 py-0.5 rounded">
                         BLOCKING
                       </span>
                     )}
                     {item.notes && (
-                      <p className="text-xs text-[#667085] mt-0.5 italic">{item.notes}</p>
+                      <p className="text-xs text-[#888884] mt-0.5 italic">{item.notes}</p>
                     )}
                   </div>
                 </div>
@@ -186,9 +196,9 @@ export default function SelfCheckCompletePage() {
 
         {/* Shareable Link (when token is available) */}
         {token && (
-          <div className="bg-white rounded-[14px] border border-[#0F766E]/30 p-5 mb-4">
+          <div className="bg-white rounded-[14px] border border-[#C58B1B]/30 p-5 mb-4">
             {reference && (
-              <p className="text-xs font-mono text-[#667085] mb-3">Ref: {reference}</p>
+              <p className="text-xs font-mono text-[#888884] mb-3">Ref: {reference}</p>
             )}
             <button
               onClick={() => {
@@ -197,11 +207,11 @@ export default function SelfCheckCompletePage() {
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2000)
               }}
-              className="w-full h-11 rounded-[10px] text-sm font-semibold bg-[#0F766E] text-white hover:bg-[#0d6b63] transition-colors"
+              className="w-full h-[52px] rounded-[14px] text-[15px] font-semibold bg-[#1A1A1A] text-white hover:bg-[#333] transition-colors"
             >
               {copied ? '\u2713 Link copied!' : 'Copy Report Link'}
             </button>
-            <p className="text-[11px] text-[#667085] mt-3 text-center">
+            <p className="text-[11px] text-[#888884] mt-3 text-center">
               Anyone with the link can view, edit, and expand photos.
             </p>
           </div>
@@ -209,9 +219,9 @@ export default function SelfCheckCompletePage() {
 
         {/* No photos warning (only when no token — fallback mode) */}
         {!token && hasNoPhotos && (
-          <div className="bg-amber-50 border border-amber-200 rounded-[14px] p-4 mb-4">
-            <p className="text-sm font-semibold text-amber-800">No photos attached</p>
-            <p className="text-xs text-amber-700 mt-1">
+          <div className="bg-[#FFF3D6] border border-[#F2D28B] rounded-[14px] p-4 mb-4">
+            <p className="text-[15px] font-semibold text-[#8F6513]">No photos attached</p>
+            <p className="text-xs text-[#8F6513] mt-1">
               This report has no photos. Reports without photos cannot be shared.
               Go back and attach cleanup photos (inside and outside the unit) to enable sharing.
             </p>
@@ -237,14 +247,14 @@ export default function SelfCheckCompletePage() {
                     setTimeout(() => setCopied(false), 2000)
                   }
                 }}
-                className="w-full h-12 rounded-[10px] font-semibold text-base bg-[#0F766E] text-white hover:bg-[#0d6b63] transition-colors"
+                className="w-full h-[52px] rounded-[14px] font-semibold text-[15px] bg-[#C58B1B] text-white hover:bg-[#A67516] transition-colors"
               >
                 Share Link
               </button>
 
               <button
                 onClick={() => router.push(`/report/${token}`)}
-                className="w-full h-12 rounded-[10px] font-semibold text-base border border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5 transition-colors"
+                className="w-full h-[52px] rounded-[14px] font-semibold text-[15px] border border-[#D1D0CE] text-[#888884] bg-white hover:bg-[#F5F5F4] transition-colors"
               >
                 Open Report
               </button>
@@ -252,7 +262,7 @@ export default function SelfCheckCompletePage() {
               <button
                 onClick={handleDownloadPDF}
                 disabled={generating}
-                className="w-full h-12 rounded-[10px] font-semibold text-base border border-[#E5E7EB] text-[#667085] hover:text-[#101828] transition-colors"
+                className="w-full h-[52px] rounded-[14px] font-semibold text-[15px] border border-[#D1D0CE] text-[#888884] bg-white hover:bg-[#F5F5F4] transition-colors"
               >
                 {generating ? 'Generating...' : 'Download PDF'}
               </button>
@@ -263,8 +273,8 @@ export default function SelfCheckCompletePage() {
                 onClick={handleDownloadPDF}
                 disabled={generating}
                 className={`
-                  w-full h-12 rounded-[10px] font-semibold text-base transition-colors
-                  ${generating ? 'bg-gray-200 text-gray-400' : 'bg-[#0F766E] text-white hover:bg-[#0d6b63]'}
+                  w-full h-[52px] rounded-[14px] font-semibold text-[15px] transition-colors
+                  ${generating ? 'bg-[#F5F5F4] text-[#B0AFA9]' : 'bg-[#C58B1B] text-white hover:bg-[#A67516]'}
                 `}
               >
                 {generating ? 'Generating...' : 'Download PDF'}
@@ -274,10 +284,10 @@ export default function SelfCheckCompletePage() {
                 onClick={handleShare}
                 disabled={generating || hasNoPhotos}
                 className={`
-                  w-full h-12 rounded-[10px] font-semibold text-base border transition-colors
+                  w-full h-[52px] rounded-[14px] font-semibold text-[15px] border transition-colors
                   ${hasNoPhotos
-                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5'}
+                    ? 'border-[#D1D0CE] text-[#B0AFA9] cursor-not-allowed bg-white'
+                    : 'border-[#D1D0CE] text-[#888884] bg-white hover:bg-[#F5F5F4]'}
                 `}
               >
                 {hasNoPhotos ? 'Share unavailable (no photos)' : 'Share Report'}
@@ -291,13 +301,13 @@ export default function SelfCheckCompletePage() {
               sessionStorage.removeItem('selfCheckResults')
               router.push('/self')
             }}
-            className="w-full h-12 rounded-[10px] font-semibold text-base text-[#667085] hover:text-[#101828] transition-colors"
+            className="w-full h-[52px] rounded-[14px] font-semibold text-[15px] text-[#888884] hover:text-[#1A1A1A] transition-colors"
           >
             New Checklist
           </button>
         </div>
 
-        <p className="text-center text-xs text-[#9CA3AF] mt-6">
+        <p className="text-center text-xs text-[#B0AFA9] mt-6">
           OnSite Club — Built for the trades
         </p>
       </div>

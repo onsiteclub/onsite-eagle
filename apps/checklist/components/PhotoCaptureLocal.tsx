@@ -64,7 +64,7 @@ export default function PhotoCaptureLocal({
         {photos.map((base64, index) => (
           <div
             key={index}
-            className="relative w-16 h-16 rounded-lg overflow-hidden border border-[#E5E7EB] flex-shrink-0"
+            className="relative w-16 h-16 rounded-[10px] overflow-hidden border border-[#D1D0CE] flex-shrink-0"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -75,12 +75,12 @@ export default function PhotoCaptureLocal({
             {!disabled && (
               <button
                 onClick={() => removePhoto(index)}
-                className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center text-white text-xs"
+                className="absolute top-0.5 right-0.5 w-5 h-5 bg-[rgba(26,26,26,0.6)] rounded-full flex items-center justify-center text-white text-xs"
               >
                 &times;
               </button>
             )}
-            <span className="absolute bottom-0.5 left-0.5 text-[9px] bg-black/50 text-white px-1 rounded">
+            <span className="absolute bottom-0.5 left-0.5 text-[9px] bg-[rgba(26,26,26,0.5)] text-white px-1 rounded">
               {index + 1}
             </span>
           </div>
@@ -90,18 +90,18 @@ export default function PhotoCaptureLocal({
         {canAdd && (
           <label
             className={`
-              w-16 h-16 rounded-lg border-2 border-dashed border-[#E5E7EB] flex-shrink-0
+              w-16 h-16 rounded-[10px] border-2 border-dashed border-[#D1D0CE] flex-shrink-0
               flex flex-col items-center justify-center cursor-pointer
-              hover:border-[#0F766E] transition-colors
+              hover:border-[#C58B1B] transition-colors
               ${processing ? 'opacity-50 pointer-events-none' : ''}
             `}
           >
             {processing ? (
-              <span className="text-[9px] text-[#667085]">...</span>
+              <span className="text-[9px] text-[#888884]">...</span>
             ) : (
               <>
-                <span className="text-lg text-[#9CA3AF] leading-none">+</span>
-                <span className="text-[9px] text-[#9CA3AF]">
+                <span className="text-lg text-[#B0AFA9] leading-none">+</span>
+                <span className="text-[9px] text-[#B0AFA9]">
                   {photos.length}/{maxPhotos}
                 </span>
               </>
@@ -121,13 +121,13 @@ export default function PhotoCaptureLocal({
 
       {/* Status text */}
       {photos.length > 0 && photos.length < maxPhotos && (
-        <p className="text-[10px] text-[#667085]">
+        <p className="text-[10px] text-[#888884]">
           {photos.length} photo{photos.length > 1 ? 's' : ''} attached — up to {maxPhotos - photos.length} more
         </p>
       )}
 
       {photos.length === maxPhotos && (
-        <p className="text-[10px] text-[#667085]">
+        <p className="text-[10px] text-[#888884]">
           Maximum {maxPhotos} photos reached
         </p>
       )}

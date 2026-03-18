@@ -34,7 +34,7 @@ export default function PhotoLightbox({ photos, initialIndex = 0, onClose }: Pho
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+      className="fixed inset-0 z-50 bg-[rgba(26,26,26,0.9)] flex items-center justify-center"
       onClick={onClose}
     >
       {/* Close button */}

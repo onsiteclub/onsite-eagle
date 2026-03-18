@@ -183,8 +183,8 @@ export default function ChecklistPage({ params }: Props) {
   if (error && !gateCheck) {
     return (
       <div className="py-8 text-center">
-        <p className="text-sm text-[#DC2626]">{error}</p>
-        <Link href={`/app/lot/${lotId}`} className="text-sm text-brand-500 mt-4 inline-block">
+        <p className="text-[15px] text-[#DC2626]">{error}</p>
+        <Link href={`/app/lot/${lotId}`} className="text-[13px] text-[#C58B1B] mt-4 inline-block">
           &larr; Back to lot
         </Link>
       </div>
@@ -192,7 +192,7 @@ export default function ChecklistPage({ params }: Props) {
   }
 
   if (!gateCheck) {
-    return <div className="py-8 text-center text-sm text-[#667085]">Loading checklist...</div>
+    return <div className="py-8 text-center text-[15px] text-[#888884]">Loading checklist...</div>
   }
 
   const label = TRANSITION_LABELS[transition] ?? transition
@@ -200,12 +200,12 @@ export default function ChecklistPage({ params }: Props) {
   return (
     <div className="pb-24">
       {/* Header */}
-      <div className="sticky top-[57px] z-40 bg-[#F6F7F9] pb-3 pt-1">
+      <div className="sticky top-[57px] z-40 bg-[#F5F5F4] pb-3 pt-1">
         <div className="flex items-center justify-between mb-2">
-          <Link href={`/app/lot/${lotId}`} className="text-sm text-brand-500">&larr; Back</Link>
-          <span className="text-xs text-[#667085] font-medium">{checked}/{total} checked</span>
+          <Link href={`/app/lot/${lotId}`} className="text-[13px] text-[#C58B1B]">&larr; Back</Link>
+          <span className="text-xs text-[#888884] font-medium">{checked}/{total} checked</span>
         </div>
-        <h1 className="text-lg font-bold text-[#101828] mb-2">{label}</h1>
+        <h1 className="text-lg font-bold text-[#1A1A1A] mb-2">{label}</h1>
         <ProgressBar checked={checked} total={total} />
       </div>
 
@@ -229,22 +229,22 @@ export default function ChecklistPage({ params }: Props) {
 
       {/* Error */}
       {error && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-[10px] text-sm text-[#DC2626]">
+        <div className="mt-4 p-3 bg-[rgba(220,38,38,0.12)] border border-[#DC2626]/30 rounded-[14px] text-[15px] text-[#DC2626]">
           {error}
         </div>
       )}
 
       {/* Submit */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E7EB] p-4 z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#D1D0CE] p-4 z-50">
         <div className="max-w-[480px] mx-auto">
           <button
             onClick={handleSubmit}
             disabled={!allChecked || submitting}
             className={`
-              w-full h-12 rounded-[10px] font-semibold text-sm transition-all
+              w-full h-[52px] rounded-[14px] font-semibold text-[15px] transition-all
               ${allChecked
-                ? 'bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700'
-                : 'bg-gray-100 text-[#9CA3AF] cursor-not-allowed'}
+                ? 'bg-[#C58B1B] text-white hover:bg-[#A67516]'
+                : 'bg-[#F5F5F4] text-[#B0AFA9] cursor-not-allowed'}
             `}
           >
             {submitting ? 'Submitting...' : allChecked ? 'Submit Gate Check' : `${total - checked} items remaining`}

@@ -25,7 +25,7 @@ export default function TransitionCard({ lotId, transition, gateCheck, userId, o
   const checked = items.filter(i => i.result !== 'pending').length
   const total = items.length
 
-  const statusColor = status === 'passed' ? '#059669' : status === 'failed' ? '#DC2626' : '#FF9500'
+  const statusColor = status === 'passed' ? '#16A34A' : status === 'failed' ? '#DC2626' : '#C58B1B'
   const statusLabel = status === 'passed' ? 'Passed' : status === 'failed' ? 'Failed' : status === 'in_progress' ? `In Progress (${checked}/${total})` : 'Not Started'
 
   async function handleTap() {
@@ -58,13 +58,13 @@ export default function TransitionCard({ lotId, transition, gateCheck, userId, o
     <button
       onClick={handleTap}
       disabled={loading}
-      className="w-full text-left bg-white rounded-[14px] border border-[#E5E7EB] p-4 hover:border-brand-500 transition-colors disabled:opacity-50"
+      className="w-full text-left bg-white rounded-[14px] border border-[#D1D0CE] p-4 hover:border-brand-500 transition-colors disabled:opacity-50"
     >
       <div className="flex items-center justify-between">
-        <span className="font-semibold text-[#101828] text-sm">{label}</span>
+        <span className="font-semibold text-[#1A1A1A] text-[15px]">{label}</span>
         <span
           className="text-xs font-medium px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: status ? statusColor + '20' : '#F3F4F6', color: status ? statusColor : '#9CA3AF' }}
+          style={{ backgroundColor: status ? statusColor + '20' : '#E5E5E3', color: status ? statusColor : '#B0AFA9' }}
         >
           {loading ? 'Starting...' : statusLabel}
         </span>
@@ -72,7 +72,7 @@ export default function TransitionCard({ lotId, transition, gateCheck, userId, o
 
       {status === 'in_progress' && total > 0 && (
         <div className="mt-3">
-          <div className="w-full bg-gray-100 rounded-full h-1.5">
+          <div className="w-full bg-[#E5E5E3] rounded-full h-1.5">
             <div
               className="bg-brand-500 h-1.5 rounded-full transition-all"
               style={{ width: `${(checked / total) * 100}%` }}
@@ -82,7 +82,7 @@ export default function TransitionCard({ lotId, transition, gateCheck, userId, o
       )}
 
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-xs text-[#667085]">
+        <span className="text-xs text-[#888884]">
           {total > 0 ? `${total} items` : 'Template required'}
         </span>
         <span className="text-xs font-medium text-brand-500">{ctaLabel} &rarr;</span>
