@@ -17,6 +17,7 @@ interface ItemState {
   result: ItemResult
   notes: string
   photos: string[] // base64 array (up to 5)
+  showNotes: boolean
 }
 
 interface SelfCheckInfo {
@@ -36,6 +37,8 @@ export default function SelfChecklistPage() {
   const [info, setInfo] = useState<SelfCheckInfo | null>(null)
   const [items, setItems] = useState<TemplateItem[]>([])
   const [state, setState] = useState<Record<string, ItemState>>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Load templates and session info
   useEffect(() => {
@@ -58,7 +61,7 @@ export default function SelfChecklistPage() {
     // Init state for each item
     const initial: Record<string, ItemState> = {}
     templates.forEach((t) => {
-      initial[t.code] = { result: 'pending', notes: '', photos: [] }
+      initial[t.code] = { result: 'pending', notes: '', photos: [], showNotes: false }
     })
     setState(initial)
   }, [transition, router])
@@ -102,8 +105,12 @@ export default function SelfChecklistPage() {
 
   const canSubmit = allChecked && !cleanupPhotosMissing
 
-  function handleSubmit() {
-    sessionStorage.setItem('selfCheckResults', JSON.stringify({
+  async function handleSubmit() {
+    if (!info) return
+    setSubmitting(true)
+    setSubmitError(null)
+
+    const payload = {
       info,
       transition,
       transitionLabel: TRANSITION_LABELS[transition],
@@ -115,9 +122,34 @@ export default function SelfChecklistPage() {
       })),
       completedAt: new Date().toISOString(),
       passed: !hasBlockingFail,
-    }))
+      startedAt: info.startedAt,
+    }
 
-    router.push(`/self/check/${transition}/complete`)
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) throw new Error('Failed to save report')
+
+      const { token, reference } = await res.json()
+
+      // Also store in sessionStorage for PDF fallback on complete page
+      sessionStorage.setItem('selfCheckResults', JSON.stringify(payload))
+
+      router.push(`/self/check/${transition}/complete?token=${token}&ref=${encodeURIComponent(reference)}`)
+    } catch (err) {
+      console.error('Submit error:', err)
+      setSubmitError('Failed to upload. You can still download a PDF.')
+
+      // Fallback: save to sessionStorage and navigate without token
+      sessionStorage.setItem('selfCheckResults', JSON.stringify(payload))
+      router.push(`/self/check/${transition}/complete`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (!info || items.length === 0) {
@@ -172,8 +204,8 @@ export default function SelfChecklistPage() {
             const s = state[item.code]
             if (!s) return null
             const isChecked = s.result !== 'pending'
-            const showNotes = s.result === 'fail'
             const needsPhotos = s.result !== 'pending' && s.result !== 'na'
+            const notesVisible = s.showNotes || s.result === 'fail' || s.notes.length > 0
 
             return (
               <div
@@ -243,13 +275,26 @@ export default function SelfChecklistPage() {
                       N/A
                     </button>
                   </div>
+
+                  {/* + Add Note button (mobile-friendly, full width) */}
+                  {isChecked && !notesVisible && (
+                    <button
+                      onClick={() => setState((prev) => ({
+                        ...prev,
+                        [item.code]: { ...prev[item.code], showNotes: true },
+                      }))}
+                      className="mt-2 ml-9 w-[calc(100%-2.25rem)] h-9 rounded-[10px] text-xs font-semibold text-[#0F766E] border border-dashed border-[#0F766E]/40 hover:bg-[#0F766E]/5 transition-colors"
+                    >
+                      + Add Note
+                    </button>
+                  )}
                 </div>
 
-                {/* Photo + Notes section — visible for pass and fail (not N/A) */}
-                {needsPhotos && (
+                {/* Photo + Notes section */}
+                {(needsPhotos || notesVisible) && (
                   <div className="px-4 pb-4 ml-9 space-y-3 border-t border-[#F3F4F6] pt-3">
                     {/* Photo guidance for cleanup items */}
-                    {item.photoGuidance && (
+                    {needsPhotos && item.photoGuidance && (
                       <div className={`rounded-[8px] px-3 py-2 text-[11px] ${
                         item.minPhotos && s.photos.length < item.minPhotos
                           ? 'bg-amber-50 border border-amber-200 text-amber-800'
@@ -261,16 +306,18 @@ export default function SelfChecklistPage() {
                       </div>
                     )}
 
-                    <PhotoCaptureLocal
-                      itemCode={item.code}
-                      photos={s.photos}
-                      maxPhotos={item.maxPhotos}
-                      onPhotosChanged={(p) => updatePhotos(item.code, p)}
-                    />
+                    {needsPhotos && (
+                      <PhotoCaptureLocal
+                        itemCode={item.code}
+                        photos={s.photos}
+                        maxPhotos={item.maxPhotos}
+                        onPhotosChanged={(p) => updatePhotos(item.code, p)}
+                      />
+                    )}
 
-                    {showNotes && (
+                    {notesVisible && (
                       <textarea
-                        placeholder="Notes (describe the issue)..."
+                        placeholder={s.result === 'fail' ? 'Notes (describe the issue)...' : 'Add a note...'}
                         value={s.notes}
                         onChange={(e) => updateNotes(item.code, e.target.value)}
                         rows={2}
@@ -288,21 +335,28 @@ export default function SelfChecklistPage() {
       {/* Sticky Submit */}
       <div className="sticky bottom-0 bg-white border-t border-[#E5E7EB] p-4">
         <div className="max-w-[480px] mx-auto">
+          {submitError && (
+            <div className="mb-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-[8px] px-3 py-2">
+              {submitError}
+            </div>
+          )}
           <button
             onClick={handleSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || submitting}
             className={`
               w-full h-12 rounded-[10px] font-semibold text-base transition-colors
-              ${canSubmit
+              ${canSubmit && !submitting
                 ? 'bg-[#0F766E] text-white hover:bg-[#0d6b63]'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
             `}
           >
-            {!allChecked
-              ? `Check all items (${totalCount - checkedCount} remaining)`
-              : cleanupPhotosMissing
-                ? 'Cleanup photos required (see last item)'
-                : 'Generate Report'}
+            {submitting
+              ? 'Uploading photos...'
+              : !allChecked
+                ? `Check all items (${totalCount - checkedCount} remaining)`
+                : cleanupPhotosMissing
+                  ? 'Cleanup photos required (see last item)'
+                  : 'Generate Report'}
           </button>
         </div>
       </div>

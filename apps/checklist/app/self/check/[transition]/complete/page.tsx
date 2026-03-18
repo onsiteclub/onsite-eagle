@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { generateChecklistPDF, type ReportInfo } from '@/lib/pdf-report'
 
 interface StoredResults {
@@ -15,8 +15,12 @@ interface StoredResults {
 
 export default function SelfCheckCompletePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const token = searchParams.get('token')
+  const reference = searchParams.get('ref')
   const [report, setReport] = useState<ReportInfo | null>(null)
   const [generating, setGenerating] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const stored = sessionStorage.getItem('selfCheckResults')
@@ -25,7 +29,6 @@ export default function SelfCheckCompletePage() {
       return
     }
     const data = JSON.parse(stored) as StoredResults
-    // Flatten info into ReportInfo shape
     setReport({
       name: data.info.name,
       company: data.info.company,
@@ -181,8 +184,31 @@ export default function SelfCheckCompletePage() {
           </div>
         )}
 
-        {/* No photos warning */}
-        {hasNoPhotos && (
+        {/* Shareable Link (when token is available) */}
+        {token && (
+          <div className="bg-white rounded-[14px] border border-[#0F766E]/30 p-5 mb-4">
+            {reference && (
+              <p className="text-xs font-mono text-[#667085] mb-3">Ref: {reference}</p>
+            )}
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/report/${token}`
+                navigator.clipboard.writeText(url)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="w-full h-11 rounded-[10px] text-sm font-semibold bg-[#0F766E] text-white hover:bg-[#0d6b63] transition-colors"
+            >
+              {copied ? '\u2713 Link copied!' : 'Copy Report Link'}
+            </button>
+            <p className="text-[11px] text-[#667085] mt-3 text-center">
+              Anyone with the link can view, edit, and expand photos.
+            </p>
+          </div>
+        )}
+
+        {/* No photos warning (only when no token — fallback mode) */}
+        {!token && hasNoPhotos && (
           <div className="bg-amber-50 border border-amber-200 rounded-[14px] p-4 mb-4">
             <p className="text-sm font-semibold text-amber-800">No photos attached</p>
             <p className="text-xs text-amber-700 mt-1">
@@ -194,29 +220,70 @@ export default function SelfCheckCompletePage() {
 
         {/* Actions */}
         <div className="space-y-3">
-          <button
-            onClick={handleDownloadPDF}
-            disabled={generating}
-            className={`
-              w-full h-12 rounded-[10px] font-semibold text-base transition-colors
-              ${generating ? 'bg-gray-200 text-gray-400' : 'bg-[#0F766E] text-white hover:bg-[#0d6b63]'}
-            `}
-          >
-            {generating ? 'Generating...' : 'Download PDF'}
-          </button>
+          {token ? (
+            <>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/report/${token}`
+                  if (navigator.share) {
+                    navigator.share({
+                      title: `${report!.transitionLabel} — ${report!.lotNumber}`,
+                      text: `Gate check ${report!.passed ? 'PASSED' : 'FAILED'}${reference ? ` (${reference})` : ''}`,
+                      url,
+                    })
+                  } else {
+                    navigator.clipboard.writeText(url)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }
+                }}
+                className="w-full h-12 rounded-[10px] font-semibold text-base bg-[#0F766E] text-white hover:bg-[#0d6b63] transition-colors"
+              >
+                Share Link
+              </button>
 
-          <button
-            onClick={handleShare}
-            disabled={generating || hasNoPhotos}
-            className={`
-              w-full h-12 rounded-[10px] font-semibold text-base border transition-colors
-              ${hasNoPhotos
-                ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-                : 'border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5'}
-            `}
-          >
-            {hasNoPhotos ? 'Share unavailable (no photos)' : 'Share Report'}
-          </button>
+              <button
+                onClick={() => router.push(`/report/${token}`)}
+                className="w-full h-12 rounded-[10px] font-semibold text-base border border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5 transition-colors"
+              >
+                Open Report
+              </button>
+
+              <button
+                onClick={handleDownloadPDF}
+                disabled={generating}
+                className="w-full h-12 rounded-[10px] font-semibold text-base border border-[#E5E7EB] text-[#667085] hover:text-[#101828] transition-colors"
+              >
+                {generating ? 'Generating...' : 'Download PDF'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleDownloadPDF}
+                disabled={generating}
+                className={`
+                  w-full h-12 rounded-[10px] font-semibold text-base transition-colors
+                  ${generating ? 'bg-gray-200 text-gray-400' : 'bg-[#0F766E] text-white hover:bg-[#0d6b63]'}
+                `}
+              >
+                {generating ? 'Generating...' : 'Download PDF'}
+              </button>
+
+              <button
+                onClick={handleShare}
+                disabled={generating || hasNoPhotos}
+                className={`
+                  w-full h-12 rounded-[10px] font-semibold text-base border transition-colors
+                  ${hasNoPhotos
+                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'border-[#0F766E] text-[#0F766E] hover:bg-[#0F766E]/5'}
+                `}
+              >
+                {hasNoPhotos ? 'Share unavailable (no photos)' : 'Share Report'}
+              </button>
+            </>
+          )}
 
           <button
             onClick={() => {
