@@ -21,6 +21,7 @@
     "dev:operator": "turbo dev --filter=@onsite/operator",
     "dev:architecture": "turbo dev --filter=@onsite/architecture",
     "dev:checklist": "turbo dev --filter=@onsite/checklist-app",
+    "dev:requests": "turbo dev --filter=@onsite/requests",
     "clean": "turbo clean && rm -rf node_modules",
     "android": "expo run:android",
     "ios": "expo run:ios",
