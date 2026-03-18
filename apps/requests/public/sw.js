@@ -1,4 +1,4 @@
-const CACHE_NAME = "onsite-requests-v1";
+const CACHE_NAME = "onsite-requests-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -18,18 +18,21 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Network-first for API/auth, cache-first for static assets
-  if (
-    event.request.url.includes("/api/") ||
-    event.request.url.includes("supabase.co")
-  ) {
-    return;
-  }
+  const url = event.request.url;
+
+  // Only handle http(s) requests
+  if (!url.startsWith("http")) return;
+
+  // Network-first for API/auth — don't intercept
+  if (url.includes("/api/") || url.includes("supabase.co")) return;
+
+  // Cache static assets with network-first strategy
+  if (event.request.method !== "GET") return;
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response.ok && event.request.method === "GET") {
+        if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
