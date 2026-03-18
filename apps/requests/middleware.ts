@@ -1,12 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+type Role = "worker" | "operator" | "supervisor";
+
 // Hostname → forced role mapping
-function getRoleFromHost(host: string): "worker" | "operator" | null {
+function getRoleFromHost(host: string): Role | null {
   const h = host.split(":")[0]; // strip port for localhost
   if (h.startsWith("operator.") || h.startsWith("operator-")) return "operator";
   if (h.startsWith("worker.") || h.startsWith("worker-")) return "worker";
+  if (h.startsWith("supervisor.") || h.startsWith("supervisor-")) return "supervisor";
   return null; // generic host — show role picker
 }
+
+const ROLE_PATHS: Record<Role, string> = {
+  worker: "/request",
+  operator: "/operator",
+  supervisor: "/supervisor",
+};
+
+const ALL_ROLE_PATHS = Object.values(ROLE_PATHS);
 
 export function middleware(request: NextRequest) {
   const name = request.cookies.get("onsite-name")?.value;
@@ -19,11 +30,13 @@ export function middleware(request: NextRequest) {
 
   // If hostname forces a role, enforce the correct route
   if (hostRole) {
-    const correctPath = hostRole === "operator" ? "/operator" : "/request";
-    const wrongPath = hostRole === "operator" ? "/request" : "/operator";
+    const correctPath = ROLE_PATHS[hostRole];
 
-    // Block access to the other role's page
-    if (pathname.startsWith(wrongPath)) {
+    // Block access to other role pages
+    const isOnWrongRolePage = ALL_ROLE_PATHS.some(
+      (p) => p !== correctPath && pathname.startsWith(p)
+    );
+    if (isOnWrongRolePage) {
       return NextResponse.redirect(new URL(correctPath, request.url));
     }
 
@@ -43,12 +56,13 @@ export function middleware(request: NextRequest) {
   // Generic host (localhost, custom domain) — original behavior
   const role = request.cookies.get("onsite-role")?.value;
 
-  if ((pathname.startsWith("/request") || pathname.startsWith("/operator")) && !name) {
+  const isProtected = ALL_ROLE_PATHS.some((p) => pathname.startsWith(p));
+  if (isProtected && !name) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
   if (pathname === "/" && name && role) {
-    const target = role === "operator" ? "/operator" : "/request";
+    const target = ROLE_PATHS[role as Role] ?? "/request";
     return NextResponse.redirect(new URL(target, request.url));
   }
 
@@ -56,5 +70,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/request/:path*", "/operator/:path*"],
+  matcher: ["/", "/request/:path*", "/operator/:path*", "/supervisor/:path*"],
 };
