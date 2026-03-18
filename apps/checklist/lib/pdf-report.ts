@@ -47,17 +47,32 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
   const naCount = report.items.filter((i) => i.result === 'na').length
   const totalPhotos = report.items.reduce((sum, i) => sum + i.photos.length, 0)
 
-  // Header
+  // Header — dark background always, amber is the accent
   let y = addBrandHeader(doc, {
     title: report.transitionLabel,
     subtitle: `${report.jobsite} — ${report.lotNumber}`,
-    backgroundColor: report.passed ? BRAND_COLORS.accent : BRAND_COLORS.error,
+    backgroundColor: BRAND_COLORS.dark,
   })
+
+  // Logo — white version on dark header (top-right)
+  try {
+    const logoRes = await fetch('/onsite-club-white.png')
+    const logoBlob = await logoRes.blob()
+    const logoBase64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.readAsDataURL(logoBlob)
+    })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    doc.addImage(logoBase64, 'PNG', pageWidth - 55, 5, 40, 12)
+  } catch {
+    // Logo not available — skip silently
+  }
 
   // Result badge
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...(report.passed ? BRAND_COLORS.accent : BRAND_COLORS.error))
+  doc.setTextColor(...(report.passed ? BRAND_COLORS.success : BRAND_COLORS.error))
   doc.text(report.passed ? 'PASSED' : 'FAILED', margin, y)
   y += 8
 
@@ -81,7 +96,7 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
   ], y)
 
   // Items section
-  y = addSectionTitle(doc, 'Checklist Items', y, { accentColor: BRAND_COLORS.accent })
+  y = addSectionTitle(doc, 'Checklist Items', y, { accentColor: BRAND_COLORS.primary })
 
   const cardPadding = 4 // mm padding inside card
   const cardGap = 3 // mm between cards
@@ -102,21 +117,21 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
 
     y = checkBreak(y, totalCardHeight)
 
-    // Card colors based on result
+    // Card colors based on result — amber/stone design system
     const resultColor =
-      item.result === 'pass' ? [5, 150, 105] as [number, number, number] :
-      item.result === 'fail' ? [220, 38, 38] as [number, number, number] :
-      [156, 163, 175] as [number, number, number]
+      item.result === 'pass' ? [22, 163, 74] as [number, number, number] :   // #16A34A
+      item.result === 'fail' ? [220, 38, 38] as [number, number, number] :   // #DC2626
+      [176, 175, 169] as [number, number, number]                             // #B0AFA9
 
     const cardBorderColor =
-      item.result === 'pass' ? [209, 250, 229] as [number, number, number] :
-      item.result === 'fail' ? [254, 226, 226] as [number, number, number] :
-      [229, 231, 235] as [number, number, number]
+      item.result === 'pass' ? [209, 250, 229] as [number, number, number] : // #D1FAE5
+      item.result === 'fail' ? [252, 210, 210] as [number, number, number] : // soft red
+      [209, 208, 206] as [number, number, number]                             // #D1D0CE
 
     const cardBgColor =
-      item.result === 'pass' ? [252, 255, 253] as [number, number, number] :
-      item.result === 'fail' ? [255, 253, 253] as [number, number, number] :
-      [250, 250, 251] as [number, number, number]
+      item.result === 'pass' ? [248, 255, 250] as [number, number, number] :
+      item.result === 'fail' ? [255, 250, 250] as [number, number, number] :
+      [245, 245, 244] as [number, number, number]                             // #F5F5F4
 
     const resultText =
       item.result === 'pass' ? 'PASS' :
@@ -161,7 +176,7 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
     // Blocking badge
     if (item.isBlocking) {
       const blockX = margin + contentWidth - cardPadding - 20
-      doc.setFillColor(254, 242, 242)
+      doc.setFillColor(255, 240, 240)
       doc.roundedRect(blockX, cy, 20, 6, 1, 1, 'F')
       doc.setTextColor(220, 38, 38)
       doc.setFontSize(5)

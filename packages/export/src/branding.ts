@@ -29,34 +29,37 @@ export const BRAND_COLORS = {
   primarySoft: [255, 243, 214] as RGB,   // #FFF3D6
   primaryLine: [242, 210, 139] as RGB,   // #F2D28B
 
-  // Utility green (#0F766E)
-  accent: [15, 118, 110] as RGB,
-  accentLight: [20, 184, 166] as RGB,    // #14B8A6
-  accentSoft: [209, 250, 229] as RGB,    // #D1FAE5
+  // Accent — amber (#C58B1B), same as primary
+  accent: [197, 139, 27] as RGB,         // #C58B1B
+  accentLight: [224, 184, 77] as RGB,    // #E0B84D
+  accentSoft: [255, 243, 214] as RGB,    // #FFF3D6
+
+  // Dark — charcoal for headers/contrast
+  dark: [26, 26, 26] as RGB,             // #1A1A1A
 
   // Text
-  text: [16, 24, 40] as RGB,             // #101828
-  textSecondary: [102, 112, 133] as RGB, // #667085
-  textMuted: [152, 162, 179] as RGB,     // #98A2B3
+  text: [26, 26, 26] as RGB,             // #1A1A1A
+  textSecondary: [136, 136, 132] as RGB, // #888884
+  textMuted: [176, 175, 169] as RGB,     // #B0AFA9
 
   // Surfaces
   white: [255, 255, 255] as RGB,
   surface: [255, 255, 255] as RGB,
-  surfaceMuted: [246, 247, 249] as RGB,  // #F6F7F9
-  surfaceLight: [242, 244, 247] as RGB,  // #F2F4F7
+  surfaceMuted: [245, 245, 244] as RGB,  // #F5F5F4
+  surfaceLight: [229, 229, 227] as RGB,  // #E5E5E3
 
   // Borders
-  border: [227, 231, 238] as RGB,        // #E3E7EE
+  border: [209, 208, 206] as RGB,        // #D1D0CE
 
   // Feedback
   error: [220, 38, 38] as RGB,           // #DC2626
-  success: [15, 118, 110] as RGB,        // #0F766E
+  success: [22, 163, 74] as RGB,         // #16A34A
   warning: [197, 139, 27] as RGB,        // #C58B1B
-  info: [59, 130, 246] as RGB,           // #3B82F6
+  info: [197, 139, 27] as RGB,           // #C58B1B (amber, not blue)
 
   // Positive/Negative change indicators
-  positive: [34, 197, 94] as RGB,        // green-500
-  negative: [239, 68, 68] as RGB,        // red-500
+  positive: [22, 163, 74] as RGB,        // #16A34A
+  negative: [220, 38, 38] as RGB,        // #DC2626
 } as const;
 
 /**
