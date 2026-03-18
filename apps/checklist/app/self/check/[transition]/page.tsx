@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   CHECKLIST_TEMPLATES,
@@ -40,8 +40,12 @@ export default function SelfChecklistPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Load templates and session info
+  // Load templates and session info — only once
+  const initialized = useRef(false)
   useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
+
     const templates = CHECKLIST_TEMPLATES[transition]
     if (!templates) {
       router.push('/self')
@@ -64,7 +68,8 @@ export default function SelfChecklistPage() {
       initial[t.code] = { result: 'pending', notes: '', photos: [], showNotes: false }
     })
     setState(initial)
-  }, [transition, router])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transition])
 
   const checkedCount = Object.values(state).filter((s) => s.result !== 'pending').length
   const totalCount = items.length
