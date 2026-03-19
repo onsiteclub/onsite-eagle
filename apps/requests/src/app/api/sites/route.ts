@@ -37,11 +37,9 @@ export async function POST(req: NextRequest) {
       .from("frm_jobsites")
       .insert({
         name: name.trim(),
+        builder_name: name.trim(),
         address: address?.trim() || null,
         city: city?.trim() || null,
-        status: "active",
-        total_lots: 0,
-        completed_lots: 0,
       })
       .select("id, name")
       .single();
