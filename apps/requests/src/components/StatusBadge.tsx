@@ -1,19 +1,19 @@
 "use client";
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  requested: { label: "Solicitado", bg: "bg-gray-100", text: "text-gray-700" },
-  authorized: { label: "Autorizado", bg: "bg-purple-100", text: "text-purple-700" },
-  acknowledged: { label: "Confirmado", bg: "bg-purple-100", text: "text-purple-700" },
-  in_transit: { label: "Em Trânsito", bg: "bg-cyan-100", text: "text-cyan-700" },
-  delivered: { label: "Entregue", bg: "bg-green-100", text: "text-green-700" },
-  cancelled: { label: "Cancelado", bg: "bg-red-100", text: "text-red-700" },
+  requested: { label: "Requested", bg: "bg-gray-100", text: "text-gray-700" },
+  authorized: { label: "Authorized", bg: "bg-purple-100", text: "text-purple-700" },
+  acknowledged: { label: "Acknowledged", bg: "bg-purple-100", text: "text-purple-700" },
+  in_transit: { label: "In Transit", bg: "bg-cyan-100", text: "text-cyan-700" },
+  delivered: { label: "Delivered", bg: "bg-green-100", text: "text-green-700" },
+  cancelled: { label: "Cancelled", bg: "bg-red-100", text: "text-red-700" },
 };
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string }> = {
-  low: { label: "Baixa", color: "text-text-muted" },
+  low: { label: "Low", color: "text-text-muted" },
   medium: { label: "Normal", color: "text-warning" },
-  high: { label: "Alta", color: "text-orange-500" },
-  critical: { label: "Urgente", color: "text-critical" },
+  high: { label: "High", color: "text-orange-500" },
+  critical: { label: "Urgent", color: "text-critical" },
 };
 
 export function StatusBadge({ status }: { status: string }) {

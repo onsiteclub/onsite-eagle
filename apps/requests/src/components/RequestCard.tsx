@@ -1,7 +1,6 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { StatusBadge, UrgencyBadge } from "./StatusBadge";
 import { Package } from "lucide-react";
 
@@ -22,7 +21,6 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
   const lotNumber = request.lot?.lot_number ?? "—";
   const timeAgo = formatDistanceToNow(new Date(request.requested_at), {
     addSuffix: true,
-    locale: ptBR,
   });
 
   return (

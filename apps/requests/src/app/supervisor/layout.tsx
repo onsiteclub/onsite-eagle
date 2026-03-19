@@ -32,7 +32,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
             <button
               onClick={handleSignOut}
               className="text-white/70 hover:text-white p-1"
-              title="Sair"
+              title="Sign out"
             >
               <LogOut size={18} />
             </button>

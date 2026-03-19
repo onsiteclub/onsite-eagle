@@ -106,17 +106,17 @@ export default function SupervisorPage() {
       {/* Stats + filters */}
       <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto">
         <FilterChip
-          label={`Todos (${requests.length})`}
+          label={`All (${requests.length})`}
           active={filter === "all"}
           onClick={() => setFilter("all")}
         />
         <FilterChip
-          label={`Pendentes (${pendingCount})`}
+          label={`Pending (${pendingCount})`}
           active={filter === "pending"}
           onClick={() => setFilter("pending")}
         />
         <FilterChip
-          label={`Entregues (${deliveredCount})`}
+          label={`Delivered (${deliveredCount})`}
           active={filter === "delivered"}
           onClick={() => setFilter("delivered")}
         />
@@ -127,13 +127,13 @@ export default function SupervisorPage() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-text-muted">
             <Inbox size={48} className="mb-3" />
-            <p className="text-base font-medium">Nenhum pedido</p>
+            <p className="text-base font-medium">No requests</p>
             {siteCount === 0 && (
               <button
                 onClick={() => router.push("/supervisor/setup")}
                 className="mt-3 text-sm text-brand font-medium hover:underline"
               >
-                Criar primeiro site →
+                Create first site →
               </button>
             )}
           </div>

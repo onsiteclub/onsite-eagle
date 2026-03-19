@@ -132,7 +132,7 @@ export default function SetupPage() {
           className="flex items-center gap-1 text-sm text-text-secondary hover:text-text"
         >
           <ArrowLeft size={16} />
-          Voltar ao feed
+          Back to feed
         </button>
       </div>
 
@@ -141,7 +141,7 @@ export default function SetupPage() {
         <section className="bg-card rounded-xl border border-border p-4 space-y-4">
           <h2 className="font-semibold text-text flex items-center gap-2">
             <MapPin size={18} className="text-brand" />
-            Criar Site
+            Create Site
           </h2>
 
           <form onSubmit={createSite} className="space-y-3">
@@ -151,7 +151,7 @@ export default function SetupPage() {
               value={siteName}
               onChange={(e) => setSiteName(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-              placeholder="Nome do site *"
+              placeholder="Site name *"
             />
             <div className="grid grid-cols-2 gap-3">
               <input
@@ -159,14 +159,14 @@ export default function SetupPage() {
                 value={siteAddress}
                 onChange={(e) => setSiteAddress(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                placeholder="Endereço"
+                placeholder="Address"
               />
               <input
                 type="text"
                 value={siteCity}
                 onChange={(e) => setSiteCity(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                placeholder="Cidade"
+                placeholder="City"
               />
             </div>
             <button
@@ -179,14 +179,14 @@ export default function SetupPage() {
               ) : (
                 <Plus size={16} />
               )}
-              Criar Site
+              Create Site
             </button>
           </form>
 
           {/* Existing sites */}
           {sites.length > 0 && (
             <div className="space-y-2 pt-2 border-t border-border">
-              <p className="text-xs text-text-muted font-medium uppercase">Sites existentes</p>
+              <p className="text-xs text-text-muted font-medium uppercase">Existing sites</p>
               {sites.map((site) => (
                 <div
                   key={site.id}
@@ -206,7 +206,7 @@ export default function SetupPage() {
                     )}
                   </div>
                   <span className="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded-full">
-                    {site.total_lots} lotes
+                    {site.total_lots} lots
                   </span>
                 </div>
               ))}
@@ -219,7 +219,7 @@ export default function SetupPage() {
           <section className="bg-card rounded-xl border border-border p-4 space-y-4">
             <h2 className="font-semibold text-text flex items-center gap-2">
               <Plus size={18} className="text-brand" />
-              Criar Lotes
+              Create Lots
             </h2>
 
             <p className="text-sm text-text-secondary">
@@ -228,7 +228,7 @@ export default function SetupPage() {
 
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <label className="block text-xs text-text-secondary mb-1">Quantidade</label>
+                <label className="block text-xs text-text-secondary mb-1">Quantity</label>
                 <input
                   type="number"
                   min={1}
@@ -249,7 +249,7 @@ export default function SetupPage() {
                 ) : (
                   <Plus size={16} />
                 )}
-                Criar {lotCount || 0} lotes
+                Create {lotCount || 0} lots
               </button>
             </div>
 
@@ -258,7 +258,7 @@ export default function SetupPage() {
               <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <Check size={16} className="text-green-600" />
                 <span className="text-sm text-green-700">
-                  {createdLots.length} lotes criados (Lot {createdLots[0].lot_number}
+                  {createdLots.length} lots created (Lot {createdLots[0].lot_number}
                   {createdLots.length > 1 && ` — ${createdLots[createdLots.length - 1].lot_number}`})
                 </span>
               </div>
@@ -271,10 +271,10 @@ export default function SetupPage() {
           <section className="bg-card rounded-xl border border-border p-4 space-y-3">
             <h2 className="font-semibold text-text flex items-center gap-2">
               <Link2 size={18} className="text-brand" />
-              Links dos Lotes
+              Lot Links
             </h2>
             <p className="text-xs text-text-muted">
-              Compartilhe o link com o trabalhador de cada lote.
+              Share the link with the worker assigned to each lot.
             </p>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {allLots.map((lot) => (
@@ -286,7 +286,9 @@ export default function SetupPage() {
                   <button
                     onClick={() => {
                       const url = `${window.location.origin}/request/${lot.id}`;
-                      navigator.clipboard.writeText(url);
+                      const selectedSiteName = sites.find((s) => s.id === selectedSite)?.name ?? "";
+                      const msg = `Material Requests — Lot ${lot.lot_number}${selectedSiteName ? `\n${selectedSiteName}` : ""}\n${url}`;
+                      navigator.clipboard.writeText(msg);
                       setCopiedId(lot.id);
                       setTimeout(() => setCopiedId(null), 2000);
                     }}
@@ -299,12 +301,12 @@ export default function SetupPage() {
                     {copiedId === lot.id ? (
                       <>
                         <Check size={12} />
-                        Copiado
+                        Copied
                       </>
                     ) : (
                       <>
                         <Copy size={12} />
-                        Copiar Link
+                        Copy Link
                       </>
                     )}
                   </button>

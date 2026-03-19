@@ -1,7 +1,6 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { StatusBadge, UrgencyBadge } from "./StatusBadge";
 import { Package, ArrowRight, User, Truck } from "lucide-react";
 
@@ -29,7 +28,6 @@ export function TransactionCard({ request }: { request: MaterialRequest }) {
   const siteName = request.jobsite?.name ?? "";
   const timeAgo = formatDistanceToNow(new Date(request.requested_at), {
     addSuffix: true,
-    locale: ptBR,
   });
 
   const urgencyBorder =

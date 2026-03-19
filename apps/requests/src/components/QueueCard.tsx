@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { StatusBadge, UrgencyBadge } from "./StatusBadge";
 import { Package, Truck, CheckCircle } from "lucide-react";
 
@@ -38,7 +37,6 @@ export function QueueCard({
   const siteName = request.jobsite?.name ?? "";
   const timeAgo = formatDistanceToNow(new Date(request.requested_at), {
     addSuffix: true,
-    locale: ptBR,
   });
 
   async function updateStatus(status: string, extra?: Record<string, string>) {
@@ -105,7 +103,7 @@ export function QueueCard({
         <textarea
           value={deliveryNotes}
           onChange={(e) => setDeliveryNotes(e.target.value)}
-          placeholder="Notas da entrega (opcional)"
+          placeholder="Delivery notes (optional)"
           rows={2}
           className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm text-text outline-none focus:ring-2 focus:ring-brand/30 resize-none"
         />
@@ -124,7 +122,7 @@ export function QueueCard({
             ) : (
               <>
                 <Truck size={16} />
-                Em Trânsito
+                In Transit
               </>
             )}
           </button>
@@ -136,7 +134,7 @@ export function QueueCard({
             className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 text-green-700 font-medium py-2.5 px-3 rounded-xl text-sm hover:bg-green-100 active:scale-[0.98] transition"
           >
             <CheckCircle size={16} />
-            Entregue
+            Delivered
           </button>
         )}
 
@@ -146,7 +144,7 @@ export function QueueCard({
               onClick={() => setShowDeliveryNotes(false)}
               className="px-3 py-2.5 text-sm text-text-secondary rounded-xl hover:bg-gray-100"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               onClick={() => updateStatus("delivered", { delivery_notes: deliveryNotes.trim() })}
@@ -158,7 +156,7 @@ export function QueueCard({
               ) : (
                 <>
                   <CheckCircle size={16} />
-                  Confirmar
+                  Confirm
                 </>
               )}
             </button>

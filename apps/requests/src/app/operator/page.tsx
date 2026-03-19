@@ -78,11 +78,11 @@ export default function OperatorPage() {
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-1.5">
           <RefreshCw size={12} className="text-brand animate-spin" style={{ animationDuration: "3s" }} />
-          <span className="text-xs text-text-muted">Atualiza a cada 4s</span>
+          <span className="text-xs text-text-muted">Refreshes every 4s</span>
         </div>
         <div className="flex items-center gap-3 text-sm">
           <span className="text-text-secondary">
-            <span className="font-semibold text-text">{pendingCount}</span> pendente{pendingCount !== 1 ? "s" : ""}
+            <span className="font-semibold text-text">{pendingCount}</span> pending
           </span>
           <span className="text-text-muted">&middot;</span>
           <span className="text-text-secondary">
@@ -96,8 +96,8 @@ export default function OperatorPage() {
         {requests.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-text-muted">
             <CheckCircle size={48} className="mb-3 text-success" />
-            <p className="text-base font-medium text-text">Tudo entregue!</p>
-            <p className="text-sm mt-1">Nenhum pedido pendente no momento</p>
+            <p className="text-base font-medium text-text">All delivered!</p>
+            <p className="text-sm mt-1">No pending requests at the moment</p>
           </div>
         ) : (
           requests.map((req) => (

@@ -10,19 +10,19 @@ interface Lot {
 }
 
 const UNITS = [
-  { value: "pcs", label: "Pecas" },
-  { value: "boards", label: "Tabuas" },
-  { value: "sheets", label: "Folhas" },
-  { value: "bundles", label: "Feixes" },
-  { value: "bags", label: "Sacos" },
-  { value: "rolls", label: "Rolos" },
+  { value: "pcs", label: "Pieces" },
+  { value: "boards", label: "Boards" },
+  { value: "sheets", label: "Sheets" },
+  { value: "bundles", label: "Bundles" },
+  { value: "bags", label: "Bags" },
+  { value: "rolls", label: "Rolls" },
 ];
 
 const URGENCY = [
-  { value: "low", label: "Baixa — 24h+" },
-  { value: "medium", label: "Normal — Hoje" },
-  { value: "high", label: "Alta — Em horas" },
-  { value: "critical", label: "Urgente — Bloqueando trabalho" },
+  { value: "low", label: "Low — 24h+" },
+  { value: "medium", label: "Normal — Today" },
+  { value: "high", label: "High — Within hours" },
+  { value: "critical", label: "Urgent — Blocking work" },
 ];
 
 // Two modes: fixed lot (from URL) or lot picker (legacy)
@@ -76,7 +76,7 @@ export function NewRequestModal(props: Props) {
     });
 
     if (!res.ok) {
-      setError("Erro ao enviar pedido. Tente novamente.");
+      setError("Failed to submit request. Please try again.");
       setLoading(false);
       return;
     }
@@ -90,7 +90,7 @@ export function NewRequestModal(props: Props) {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-card w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto safe-bottom">
         <div className="sticky top-0 bg-card flex items-center justify-between p-4 border-b border-border rounded-t-2xl">
-          <h2 className="text-lg font-semibold text-text">Novo Pedido</h2>
+          <h2 className="text-lg font-semibold text-text">New Request</h2>
           <button onClick={onClose} className="p-1 text-text-secondary hover:text-text">
             <X size={20} />
           </button>
@@ -120,7 +120,7 @@ export function NewRequestModal(props: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-text mb-1">Quantidade *</label>
+              <label className="block text-sm font-medium text-text mb-1">Quantity *</label>
               <input
                 type="number"
                 required
@@ -133,7 +133,7 @@ export function NewRequestModal(props: Props) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text mb-1">Unidade</label>
+              <label className="block text-sm font-medium text-text mb-1">Unit</label>
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
@@ -149,14 +149,14 @@ export function NewRequestModal(props: Props) {
           {/* Lot picker — only for legacy mode */}
           {lots && !fixedLotId && (
             <div>
-              <label className="block text-sm font-medium text-text mb-1">Lote *</label>
+              <label className="block text-sm font-medium text-text mb-1">Lot *</label>
               <select
                 required
                 value={selectedLotId}
                 onChange={(e) => setSelectedLotId(e.target.value)}
                 className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
               >
-                <option value="">Selecione o lote</option>
+                <option value="">Select lot</option>
                 {lots.map((lot) => (
                   <option key={lot.id} value={lot.id}>
                     Lot {lot.lot_number} {lot.jobsite ? `— ${lot.jobsite.name}` : ""}
@@ -167,7 +167,7 @@ export function NewRequestModal(props: Props) {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-text mb-1">Urgencia</label>
+            <label className="block text-sm font-medium text-text mb-1">Urgency</label>
             <select
               value={urgency}
               onChange={(e) => setUrgency(e.target.value)}
@@ -180,13 +180,13 @@ export function NewRequestModal(props: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text mb-1">Notas</label>
+            <label className="block text-sm font-medium text-text mb-1">Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand resize-none"
-              placeholder="Detalhes adicionais..."
+              placeholder="Additional details..."
             />
           </div>
 
@@ -202,7 +202,7 @@ export function NewRequestModal(props: Props) {
             {loading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
             ) : (
-              "Enviar Pedido"
+              "Submit Request"
             )}
           </button>
         </form>

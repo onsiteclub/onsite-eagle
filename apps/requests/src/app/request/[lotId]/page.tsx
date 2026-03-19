@@ -102,15 +102,21 @@ export default function LotRequestPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
         <AlertTriangle size={48} className="text-yellow-500 mb-3" />
-        <h2 className="text-lg font-semibold text-text">Lote nao encontrado</h2>
+        <h2 className="text-lg font-semibold text-text">Lot not found</h2>
         <p className="text-sm text-text-muted mt-1">
-          Verifique o link com seu supervisor.
+          Check the link with your supervisor.
         </p>
       </div>
     );
   }
 
   const siteName = lotInfo.jobsite?.name ?? "";
+  const lotLabel = `Lot ${lotInfo.lot_number}${siteName ? ` — ${siteName}` : ""}`;
+
+  // Set page title
+  useEffect(() => {
+    document.title = `Material Requests ${lotLabel}`;
+  }, [lotLabel]);
 
   // Login inline — no name cookie yet
   if (!userName) {
@@ -121,8 +127,8 @@ export default function LotRequestPage() {
             <div className="inline-flex items-center gap-2 bg-brand/10 text-brand px-3 py-1.5 rounded-full text-sm font-medium mb-4">
               Lot {lotInfo.lot_number} {siteName && `— ${siteName}`}
             </div>
-            <h2 className="text-xl font-bold text-text">Pedidos de Material</h2>
-            <p className="text-sm text-text-muted mt-1">Digite seu nome para continuar</p>
+            <h2 className="text-xl font-bold text-text">Material Requests</h2>
+            <p className="text-sm text-text-muted mt-1">Enter your name to continue</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -133,7 +139,7 @@ export default function LotRequestPage() {
               autoCapitalize="words"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
-              placeholder="Seu nome"
+              placeholder="Your name"
               className="w-full px-4 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand text-center"
             />
             <button
@@ -141,7 +147,7 @@ export default function LotRequestPage() {
               disabled={!nameInput.trim()}
               className="w-full bg-brand text-white font-medium py-3 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
             >
-              Entrar
+              Enter
             </button>
           </form>
         </div>
@@ -171,8 +177,8 @@ export default function LotRequestPage() {
         {requests.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-text-muted">
             <Inbox size={48} className="mb-3" />
-            <p className="text-base font-medium">Nenhum pedido neste lote</p>
-            <p className="text-sm mt-1">Toque no + para solicitar material</p>
+            <p className="text-base font-medium">No requests for this lot</p>
+            <p className="text-sm mt-1">Tap + to request material</p>
           </div>
         ) : (
           requests.map((req) => <RequestCard key={req.id} request={req} />)

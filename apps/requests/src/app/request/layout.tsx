@@ -25,14 +25,14 @@ export default function RequestLayout({ children }: { children: React.ReactNode 
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2 text-white">
             <HardHat size={20} />
-            <h1 className="font-semibold text-lg">Pedidos</h1>
+            <h1 className="font-semibold text-lg">Requests</h1>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-white/70 text-sm">{userName}</span>
             <button
               onClick={handleSignOut}
               className="text-white/70 hover:text-white p-1"
-              title="Sair"
+              title="Sign out"
             >
               <LogOut size={18} />
             </button>
