@@ -118,6 +118,11 @@ export async function PATCH(req: NextRequest) {
     } else if (status === "problem") {
       updates.delivered_by_name = delivered_by_name || null;
       updates.delivery_notes = delivery_notes || null;
+    } else if (status === "requested") {
+      // Problem resolved — reset delivery fields
+      updates.delivered_by_name = null;
+      updates.delivery_notes = null;
+      updates.in_transit_at = null;
     }
 
     const { error } = await supabase

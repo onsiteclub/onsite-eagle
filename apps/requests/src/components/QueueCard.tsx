@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { CheckCircle, Camera, AlertTriangle } from "lucide-react";
+import { CheckCircle, Camera, AlertTriangle, RotateCcw } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
 
@@ -178,6 +178,22 @@ export function QueueCard({
     onUpdate();
   }
 
+  async function handleResolve() {
+    setActionLoading("resolve");
+    await fetch("/api/requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: request.id,
+        status: "requested",
+        delivered_by_name: null,
+        delivery_notes: null,
+      }),
+    });
+    setActionLoading(null);
+    onUpdate();
+  }
+
   return (
     <div
       className={`bg-card rounded-xl border border-border overflow-hidden shadow-sm transition ${
@@ -240,6 +256,26 @@ export function QueueCard({
             disabled={disabled}
             transitDisabled={hasActiveTransit}
           />
+        </div>
+      )}
+
+      {/* ─── PROBLEM RESOLVED ─── */}
+      {mode === "idle" && request.status === "problem" && (
+        <div className="px-3.5 pb-3.5">
+          <button
+            onClick={handleResolve}
+            disabled={actionLoading !== null}
+            className="w-full flex items-center justify-center gap-1.5 bg-brand text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+          >
+            {actionLoading === "resolve" ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <RotateCcw size={16} />
+                Problem Resolved — Back to Queue
+              </>
+            )}
+          </button>
         </div>
       )}
 
