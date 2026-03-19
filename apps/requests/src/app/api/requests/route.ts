@@ -52,17 +52,21 @@ export async function POST(req: NextRequest) {
       .eq("id", lot_id)
       .single();
 
+    // PWA test user — no real auth, use existing test profile
+    const ANON_USER_ID = "0ea274f3-5cc0-4157-a16a-92fa0e05f9d4";
+
     const { data, error } = await supabase
       .from("frm_material_requests")
       .insert({
         lot_id,
-        phase_id: lot?.current_phase || null,
+        phase_id: lot?.current_phase || "floor_1",
         jobsite_id: lot?.jobsite_id,
         material_name: material_name.trim(),
         quantity: parseInt(quantity),
         unit: unit || "pcs",
         urgency_level: urgency_level || "medium",
         urgency_reason: notes?.trim() || null,
+        requested_by: ANON_USER_ID,
         requested_by_name: requested_by_name || "Unknown",
         status: "requested",
       })
