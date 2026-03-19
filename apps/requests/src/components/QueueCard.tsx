@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { StatusBadge, UrgencyBadge } from "./StatusBadge";
-import { Package, Truck, CheckCircle } from "lucide-react";
+import { Truck, CheckCircle, Camera } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
@@ -20,6 +19,20 @@ interface MaterialRequest {
   jobsite: { name: string } | null;
 }
 
+const STATUS_BORDER: Record<string, string> = {
+  requested: "#DC2626",
+  acknowledged: "#F59E0B",
+  in_transit: "#0F766E",
+  delivered: "#D1D5DB",
+};
+
+const URGENCY_COLORS: Record<string, string> = {
+  critical: "#DC2626",
+  high: "#F59E0B",
+  medium: "#C58B1B",
+  low: "#9CA3AF",
+};
+
 export function QueueCard({
   request,
   operatorName,
@@ -30,14 +43,18 @@ export function QueueCard({
   onUpdate: () => void;
 }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [showDeliveryNotes, setShowDeliveryNotes] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const lotNumber = request.lot?.lot_number ?? "—";
+  const lotNumber = request.lot?.lot_number ?? null;
   const siteName = request.jobsite?.name ?? "";
-  const timeAgo = formatDistanceToNow(new Date(request.requested_at), {
-    addSuffix: true,
-  });
+  const borderColor = STATUS_BORDER[request.status] || "#D1D5DB";
+  const urgencyColor = URGENCY_COLORS[request.urgency_level] || "#9CA3AF";
+  const timeAgo = formatDistanceToNow(new Date(request.requested_at), { addSuffix: true });
+  const isPending = request.status === "requested" || request.status === "acknowledged";
 
   async function updateStatus(status: string, extra?: Record<string, string>) {
     const key = status === "in_transit" ? "transit" : "deliver";
@@ -55,114 +72,209 @@ export function QueueCard({
     });
 
     setActionLoading(null);
-    setShowDeliveryNotes(false);
+    setExpanded(false);
+    setPhotoFile(null);
+    setPhotoPreview(null);
     onUpdate();
   }
 
-  const urgencyBorder =
-    request.urgency_level === "critical"
-      ? "border-l-4 border-l-critical"
-      : request.urgency_level === "high"
-        ? "border-l-4 border-l-orange-400"
-        : "";
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+
+  async function handleDelivered() {
+    setActionLoading("deliver");
+    setUploading(true);
+
+    let photoUrl: string | undefined;
+
+    // Upload photo if taken
+    if (photoFile) {
+      const formData = new FormData();
+      formData.append("file", photoFile);
+      formData.append("request_id", request.id);
+
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      if (uploadRes.ok) {
+        const data = await uploadRes.json();
+        photoUrl = data.url;
+      }
+    }
+
+    setUploading(false);
+
+    await fetch("/api/requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: request.id,
+        status: "delivered",
+        delivered_by_name: operatorName,
+        delivery_notes: deliveryNotes.trim() || null,
+        photo_url: photoUrl || null,
+      }),
+    });
+
+    setActionLoading(null);
+    setExpanded(false);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setDeliveryNotes("");
+    onUpdate();
+  }
 
   return (
-    <div className={`bg-card rounded-xl border border-border p-4 space-y-3 ${urgencyBorder}`}>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Package size={16} className="text-brand shrink-0" />
-          <span className="font-semibold text-text truncate">{request.material_name}</span>
-          <span className="text-sm text-text-secondary">x{request.quantity}</span>
+    <div
+      className="bg-card rounded-xl border border-border overflow-hidden shadow-sm"
+      style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
+    >
+      {/* Card content */}
+      <div className="p-3.5 pb-2">
+        {/* Row 1: urgency dot + material name + quantity + lot badge */}
+        <div className="flex items-center gap-2 mb-1">
+          <span
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: urgencyColor }}
+          />
+          <span className="font-semibold text-text text-[15px] truncate flex-1">
+            {request.material_name}
+            {request.quantity ? ` x${request.quantity}` : ""}
+          </span>
+          {lotNumber && (
+            <span className="text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded shrink-0">
+              Lot {lotNumber}
+            </span>
+          )}
         </div>
-        <span className="text-sm font-medium text-text-secondary shrink-0">Lot {lotNumber}</span>
+
+        {/* Row 2: meta line */}
+        <p className="text-[13px] text-text-secondary ml-[18px] truncate">
+          {siteName || "Site"}
+          {request.requested_by_name ? ` \u00b7 ${request.requested_by_name}` : ""}
+          {" \u00b7 "}
+          {timeAgo}
+        </p>
+
+        {/* Notes / urgency reason */}
+        {(request.notes || request.urgency_reason) && (
+          <p className="text-[13px] text-text-secondary italic ml-[18px] mt-1 line-clamp-2">
+            {request.notes || request.urgency_reason}
+          </p>
+        )}
       </div>
 
-      {/* Meta */}
-      <div className="flex items-center gap-2 text-sm text-text-secondary flex-wrap">
-        {siteName && <span>{siteName}</span>}
-        {request.requested_by_name && (
-          <>
-            <span className="text-text-muted">&middot;</span>
-            <span>{request.requested_by_name}</span>
-          </>
-        )}
-        <span className="text-text-muted">&middot;</span>
-        <span className="text-text-muted">{timeAgo}</span>
-        <span className="text-text-muted">&middot;</span>
-        <StatusBadge status={request.status} />
-        <UrgencyBadge urgency={request.urgency_level} />
-      </div>
+      {/* Delivery confirmation (expanded) */}
+      {expanded && (
+        <div className="px-3.5 pb-3 space-y-3 border-t border-border pt-3">
+          {/* Photo capture */}
+          {photoPreview ? (
+            <div className="relative rounded-lg overflow-hidden">
+              <img src={photoPreview} alt="Delivery" className="w-full h-40 object-cover" />
+              <div className="flex items-center gap-2 p-2 bg-gray-50">
+                <span className="text-xs text-green-600 font-medium flex items-center gap-1 flex-1">
+                  <CheckCircle size={14} /> Photo ready
+                </span>
+                <label className="text-xs text-text-secondary bg-gray-100 px-2 py-1 rounded cursor-pointer hover:bg-gray-200">
+                  Retake
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
+                </label>
+                <button
+                  onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                  className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <label className="flex flex-col items-center gap-2 py-5 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand/40 hover:bg-brand/5 transition">
+              <Camera size={28} className="text-brand" />
+              <span className="text-sm font-medium text-brand">Take Photo</span>
+              <span className="text-xs text-text-muted">Document the delivery</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
+            </label>
+          )}
 
-      {(request.notes || request.urgency_reason) && (
-        <p className="text-sm text-text-secondary italic">{request.notes || request.urgency_reason}</p>
-      )}
+          {/* Notes */}
+          <textarea
+            value={deliveryNotes}
+            onChange={(e) => setDeliveryNotes(e.target.value)}
+            placeholder="Delivery notes (optional)"
+            rows={2}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm text-text outline-none focus:ring-2 focus:ring-brand/30 resize-none"
+          />
 
-      {/* Delivery notes input */}
-      {showDeliveryNotes && (
-        <textarea
-          value={deliveryNotes}
-          onChange={(e) => setDeliveryNotes(e.target.value)}
-          placeholder="Delivery notes (optional)"
-          rows={2}
-          className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm text-text outline-none focus:ring-2 focus:ring-brand/30 resize-none"
-        />
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center gap-2">
-        {(request.status === "requested" || request.status === "acknowledged") && (
-          <button
-            onClick={() => updateStatus("in_transit")}
-            disabled={actionLoading !== null}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-cyan-50 text-cyan-700 font-medium py-2.5 px-3 rounded-xl text-sm hover:bg-cyan-100 active:scale-[0.98] transition disabled:opacity-50"
-          >
-            {actionLoading === "transit" ? (
-              <div className="w-4 h-4 border-2 border-cyan-400/30 border-t-cyan-600 rounded-full animate-spin" />
-            ) : (
-              <>
-                <Truck size={16} />
-                In Transit
-              </>
-            )}
-          </button>
-        )}
-
-        {request.status === "in_transit" && !showDeliveryNotes && (
-          <button
-            onClick={() => setShowDeliveryNotes(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 text-green-700 font-medium py-2.5 px-3 rounded-xl text-sm hover:bg-green-100 active:scale-[0.98] transition"
-          >
-            <CheckCircle size={16} />
-            Delivered
-          </button>
-        )}
-
-        {showDeliveryNotes && (
-          <>
+          {/* Confirm / Cancel */}
+          <div className="flex gap-2">
             <button
-              onClick={() => setShowDeliveryNotes(false)}
-              className="px-3 py-2.5 text-sm text-text-secondary rounded-xl hover:bg-gray-100"
+              onClick={() => { setExpanded(false); setPhotoFile(null); setPhotoPreview(null); setDeliveryNotes(""); }}
+              className="px-4 py-2.5 text-sm text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
-              onClick={() => updateStatus("delivered", { delivery_notes: deliveryNotes.trim() })}
-              disabled={actionLoading !== null}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-success text-white font-medium py-2.5 px-3 rounded-xl text-sm hover:bg-green-600 active:scale-[0.98] transition disabled:opacity-50"
+              onClick={handleDelivered}
+              disabled={actionLoading !== null || uploading}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-green-700 active:scale-[0.98] transition disabled:opacity-50"
             >
               {actionLoading === "deliver" ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
                   <CheckCircle size={16} />
-                  Confirm
+                  Confirm Delivery
                 </>
               )}
             </button>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons (collapsed) */}
+      {!expanded && (
+        <div className="flex gap-2 px-3.5 pb-3.5 pt-2">
+          {isPending && (
+            <button
+              onClick={() => updateStatus("in_transit")}
+              disabled={actionLoading !== null}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-brand text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+            >
+              {actionLoading === "transit" ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Truck size={16} />
+                  In Transit
+                </>
+              )}
+            </button>
+          )}
+
+          <button
+            onClick={() => setExpanded(true)}
+            disabled={actionLoading !== null}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-green-700 active:scale-[0.98] transition disabled:opacity-50"
+          >
+            <CheckCircle size={16} />
+            Delivered
+          </button>
+        </div>
+      )}
     </div>
   );
 }
