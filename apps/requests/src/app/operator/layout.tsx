@@ -1,22 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { getCookie, clearSession } from "@/lib/cookies";
 import { LogOut, Truck } from "lucide-react";
 
 export default function OperatorLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const [userName, setUserName] = useState("");
 
   useEffect(() => {
-    setUserName(getCookie("onsite-name") ?? "Operator");
+    setUserName(getCookie("onsite-name") ?? "");
   }, []);
 
   function handleSignOut() {
     clearSession();
-    router.push("/");
-    router.refresh();
+    window.location.reload();
   }
 
   return (
@@ -27,16 +24,18 @@ export default function OperatorLayout({ children }: { children: React.ReactNode
             <Truck size={20} />
             <h1 className="font-semibold text-lg">Deliveries</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-white/70 text-sm">{userName}</span>
-            <button
-              onClick={handleSignOut}
-              className="text-white/70 hover:text-white p-1"
-              title="Sign out"
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
+          {userName && (
+            <div className="flex items-center gap-3">
+              <span className="text-white/70 text-sm">{userName}</span>
+              <button
+                onClick={handleSignOut}
+                className="text-white/70 hover:text-white p-1"
+                title="Sign out"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
+          )}
         </div>
       </header>
       {children}

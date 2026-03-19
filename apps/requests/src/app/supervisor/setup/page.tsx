@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, MapPin, Loader2, Check, Copy, Link2 } from "lucide-react";
+import { ArrowLeft, Plus, MapPin, Loader2, Check, Copy, Link2, Truck } from "lucide-react";
 
 interface Site {
   id: string;
@@ -36,6 +36,7 @@ export default function SetupPage() {
   const [createdLots, setCreatedLots] = useState<Lot[]>([]);
   const [allLots, setAllLots] = useState<Lot[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedSiteId, setCopiedSiteId] = useState<string | null>(null);
 
   async function loadSites() {
     const res = await fetch("/api/sites");
@@ -190,24 +191,55 @@ export default function SetupPage() {
               {sites.map((site) => (
                 <div
                   key={site.id}
-                  className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition ${
+                  className={`p-3 rounded-lg border cursor-pointer transition ${
                     selectedSite === site.id
                       ? "border-brand bg-brand/5"
                       : "border-border hover:bg-gray-50"
                   }`}
                   onClick={() => setSelectedSite(site.id)}
                 >
-                  <div>
-                    <div className="text-sm font-medium text-text">{site.name}</div>
-                    {(site.city || site.address) && (
-                      <div className="text-xs text-text-muted">
-                        {[site.address, site.city].filter(Boolean).join(", ")}
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-text">{site.name}</div>
+                      {(site.city || site.address) && (
+                        <div className="text-xs text-text-muted">
+                          {[site.address, site.city].filter(Boolean).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded-full">
+                      {site.total_lots} lots
+                    </span>
                   </div>
-                  <span className="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded-full">
-                    {site.total_lots} lots
-                  </span>
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const url = `${window.location.origin}/operator/${site.id}`;
+                        const msg = `Deliveries — ${site.name}\n${url}`;
+                        navigator.clipboard.writeText(msg);
+                        setCopiedSiteId(site.id);
+                        setTimeout(() => setCopiedSiteId(null), 2000);
+                      }}
+                      className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition ${
+                        copiedSiteId === site.id
+                          ? "bg-green-50 text-green-600"
+                          : "bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
+                      }`}
+                    >
+                      {copiedSiteId === site.id ? (
+                        <>
+                          <Check size={12} />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Truck size={12} />
+                          Copy Operator Link
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

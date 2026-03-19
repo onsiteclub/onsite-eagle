@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { HardHat, Truck, ClipboardList } from "lucide-react";
+import { HardHat, ClipboardList } from "lucide-react";
 
 type Role = "worker" | "operator" | "supervisor";
 
@@ -16,9 +16,9 @@ function getRoleFromHost(): Role | null {
   return null;
 }
 
-const ROLE_CONFIG: Record<Role, { label: string; desc: string; path: string; Icon: typeof Truck }> = {
-  worker: { label: "Worker", desc: "Request materials", path: "/request", Icon: Truck },
-  operator: { label: "Operator", desc: "Deliver materials", path: "/operator", Icon: Truck },
+const ROLE_CONFIG: Record<Role, { label: string; desc: string; path: string; Icon: typeof ClipboardList }> = {
+  worker: { label: "Worker", desc: "Request materials", path: "/request", Icon: ClipboardList },
+  operator: { label: "Operator", desc: "Deliver materials", path: "/operator", Icon: ClipboardList },
   supervisor: { label: "Supervisor", desc: "Manage sites & requests", path: "/supervisor", Icon: ClipboardList },
 };
 
@@ -66,7 +66,7 @@ export default function LoginPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && name.trim()) enter(hostRole ?? "operator");
+                if (e.key === "Enter" && name.trim()) enter(hostRole ?? "supervisor");
               }}
               className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition"
               placeholder="e.g. John Smith"
@@ -84,36 +84,19 @@ export default function LoginPage() {
               Enter as {cfg.label}
             </button>
           ) : (
-            /* Generic host — Operator + Supervisor only (worker enters via lot link) */
+            /* Generic host — Supervisor only (worker + operator enter via links) */
             <div className="space-y-3">
-              <p className="text-sm text-text-secondary text-center">Enter as:</p>
-
-              <button
-                onClick={() => enter("operator")}
-                disabled={!name.trim()}
-                className="w-full flex items-center gap-3 bg-brand text-white font-medium py-3.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-40"
-              >
-                <Truck size={20} />
-                <div className="text-left">
-                  <div className="font-semibold">Operator</div>
-                  <div className="text-xs text-white/70">Deliver materials</div>
-                </div>
-              </button>
-
               <button
                 onClick={() => enter("supervisor")}
                 disabled={!name.trim()}
-                className="w-full flex items-center gap-3 bg-card text-text border-2 border-brand font-medium py-3.5 px-4 rounded-xl hover:bg-brand/5 active:scale-[0.98] transition disabled:opacity-40"
+                className="w-full flex items-center justify-center gap-2 bg-brand text-white font-medium py-3.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-40"
               >
-                <ClipboardList size={20} className="text-brand" />
-                <div className="text-left">
-                  <div className="font-semibold">Supervisor</div>
-                  <div className="text-xs text-text-secondary">Manage sites & requests</div>
-                </div>
+                <ClipboardList size={20} />
+                Enter as Supervisor
               </button>
 
               <p className="text-xs text-text-muted text-center pt-1">
-                Worker? Use the lot link shared by your supervisor.
+                Worker or Operator? Use the link shared by your supervisor.
               </p>
             </div>
           )}

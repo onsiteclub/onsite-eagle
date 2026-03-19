@@ -41,9 +41,10 @@ export function middleware(request: NextRequest) {
     }
 
     // Not logged in → show login (stays on /)
-    // Exception: /request/[lotId] handles login inline
+    // Exception: /request/[lotId] and /operator/[siteId] handle login inline
     const isLotPageHosted = pathname.match(/^\/request\/[^/]+$/);
-    if (pathname !== "/" && !name && !isLotPageHosted) {
+    const isSitePageHosted = pathname.match(/^\/operator\/[^/]+$/);
+    if (pathname !== "/" && !name && !isLotPageHosted && !isSitePageHosted) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
@@ -58,11 +59,12 @@ export function middleware(request: NextRequest) {
   // Generic host (localhost, custom domain) — original behavior
   const role = request.cookies.get("onsite-role")?.value;
 
-  // /request/[lotId] pages handle login inline — skip redirect
+  // /request/[lotId] and /operator/[siteId] handle login inline — skip redirect
   const isLotPage = pathname.match(/^\/request\/[^/]+$/);
+  const isSitePage = pathname.match(/^\/operator\/[^/]+$/);
 
   const isProtected = ALL_ROLE_PATHS.some((p) => pathname.startsWith(p));
-  if (isProtected && !name && !isLotPage) {
+  if (isProtected && !name && !isLotPage && !isSitePage) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

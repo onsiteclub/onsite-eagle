@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     const statusFilter = req.nextUrl.searchParams.get("status");
     const lotIdFilter = req.nextUrl.searchParams.get("lot_id");
+    const siteIdFilter = req.nextUrl.searchParams.get("site_id");
 
     let query = supabase
       .from("frm_material_requests")
@@ -19,6 +20,10 @@ export async function GET(req: NextRequest) {
 
     if (lotIdFilter) {
       query = query.eq("lot_id", lotIdFilter);
+    }
+
+    if (siteIdFilter) {
+      query = query.eq("jobsite_id", siteIdFilter);
     }
 
     if (statusFilter) {
