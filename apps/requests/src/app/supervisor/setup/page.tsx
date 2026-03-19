@@ -163,69 +163,63 @@ export default function SetupPage() {
       <div className="px-4 py-4 space-y-6">
         {/* Section 1: Create jobsite */}
         <section className="bg-card rounded-xl border border-border p-4 space-y-4">
-          <h2 className="font-semibold text-text flex items-center gap-2">
-            <MapPin size={18} className="text-brand" />
-            Create Site
-          </h2>
+          {/* Create form — only when no sites exist */}
+          {sites.length === 0 && (
+            <>
+              <h2 className="font-semibold text-text flex items-center gap-2">
+                <MapPin size={18} className="text-brand" />
+                Create Site
+              </h2>
 
-          <form onSubmit={createSite} className="space-y-3">
-            <input
-              type="text"
-              required
-              value={siteName}
-              onChange={(e) => setSiteName(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-              placeholder="Site name *"
-            />
-            <div className="grid grid-cols-3 gap-3">
-              <input
-                type="text"
-                value={siteAddress}
-                onChange={(e) => setSiteAddress(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                placeholder="Address"
-              />
-              <input
-                type="text"
-                value={siteCity}
-                onChange={(e) => setSiteCity(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                placeholder="City"
-              />
-              <input
-                type="number"
-                min={1}
-                max={500}
-                inputMode="numeric"
-                value={lotCount}
-                onChange={(e) => setLotCount(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                placeholder="Lots"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={creatingSite || !siteName.trim() || !lotCount || parseInt(lotCount) < 1}
-              className="flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
-            >
-              {creatingSite ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Plus size={16} />
-              )}
-              Create Site + {lotCount || 0} lots
-            </button>
-          </form>
-
-          {/* Created lots feedback */}
-          {createdLots.length > 0 && (
-            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <Check size={16} className="text-green-600" />
-              <span className="text-sm text-green-700">
-                {createdLots.length} lots created (Lot {createdLots[0].lot_number}
-                {createdLots.length > 1 && ` — ${createdLots[createdLots.length - 1].lot_number}`})
-              </span>
-            </div>
+              <form onSubmit={createSite} className="space-y-3">
+                <input
+                  type="text"
+                  required
+                  value={siteName}
+                  onChange={(e) => setSiteName(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                  placeholder="Site name *"
+                />
+                <div className="grid grid-cols-3 gap-3">
+                  <input
+                    type="text"
+                    value={siteAddress}
+                    onChange={(e) => setSiteAddress(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    placeholder="Address"
+                  />
+                  <input
+                    type="text"
+                    value={siteCity}
+                    onChange={(e) => setSiteCity(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    placeholder="City"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    inputMode="numeric"
+                    value={lotCount}
+                    onChange={(e) => setLotCount(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    placeholder="Lots"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={creatingSite || !siteName.trim() || !lotCount || parseInt(lotCount) < 1}
+                  className="flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                >
+                  {creatingSite ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Plus size={16} />
+                  )}
+                  Create Site + {lotCount || 0} lots
+                </button>
+              </form>
+            </>
           )}
 
           {/* Existing sites */}
