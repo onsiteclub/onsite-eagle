@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Truck, CheckCircle, Camera, AlertTriangle } from "lucide-react";
+import { CheckCircle, Camera, AlertTriangle } from "lucide-react";
+import { StatusStepper } from "./StatusStepper";
 
 interface MaterialRequest {
   id: string;
@@ -54,11 +55,8 @@ export function QueueCard({
   request: MaterialRequest;
   operatorName: string;
   onUpdate: () => void;
-  /** Card is blocked because another card is being processed */
   disabled?: boolean;
-  /** Another request is already in_transit */
   hasActiveTransit?: boolean;
-  /** Notify parent when this card enters/exits active mode */
   onActiveChange?: (active: boolean) => void;
 }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -78,12 +76,9 @@ export function QueueCard({
   const urgencyColor = URGENCY_COLORS[request.urgency_level] || "#9CA3AF";
   const timeAgo = formatDistanceToNow(new Date(request.requested_at), { addSuffix: true });
 
-  const isPending = request.status === "requested" || request.status === "acknowledged";
-  const isInTransit = request.status === "in_transit";
-  const isProblem = request.status === "problem";
   const isActive = mode !== "idle";
+  const dimmed = disabled && !isActive;
 
-  // Notify parent when mode changes
   useEffect(() => {
     onActiveChange?.(isActive);
   }, [isActive, onActiveChange]);
@@ -97,23 +92,6 @@ export function QueueCard({
     setProblemNotes("");
   }
 
-  async function handleInTransit() {
-    setActionLoading("transit");
-
-    await fetch("/api/requests", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: request.id,
-        status: "in_transit",
-        delivered_by_name: operatorName,
-      }),
-    });
-
-    setActionLoading(null);
-    onUpdate();
-  }
-
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -121,10 +99,25 @@ export function QueueCard({
     setPhotoPreview(URL.createObjectURL(file));
   }
 
-  function startDelivery() {
-    setMode("deliver");
-    // Auto-open camera after render
-    setTimeout(() => cameraRef.current?.click(), 100);
+  async function handleStepClick(step: "in_transit" | "delivered") {
+    if (step === "in_transit") {
+      setActionLoading("transit");
+      await fetch("/api/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: request.id,
+          status: "in_transit",
+          delivered_by_name: operatorName,
+        }),
+      });
+      setActionLoading(null);
+      onUpdate();
+    } else if (step === "delivered") {
+      // Enter delivery mode + auto-open camera
+      setMode("deliver");
+      setTimeout(() => cameraRef.current?.click(), 100);
+    }
   }
 
   async function handleDelivered() {
@@ -133,7 +126,6 @@ export function QueueCard({
     setUploading(true);
 
     let photoUrl: string | undefined;
-
     const formData = new FormData();
     formData.append("file", photoFile);
     formData.append("request_id", request.id);
@@ -143,7 +135,6 @@ export function QueueCard({
       const data = await uploadRes.json();
       photoUrl = data.url;
     }
-
     setUploading(false);
 
     await fetch("/api/requests", {
@@ -188,9 +179,6 @@ export function QueueCard({
     onUpdate();
   }
 
-  // Dimmed overlay when disabled by another active card
-  const dimmed = disabled && !isActive;
-
   return (
     <div
       className={`bg-card rounded-xl border border-border overflow-hidden shadow-sm transition ${
@@ -223,24 +211,6 @@ export function QueueCard({
           {timeAgo}
         </p>
 
-        {/* Status badges */}
-        {isInTransit && (
-          <div className="flex items-center gap-1.5 ml-[18px] mt-1.5">
-            <Truck size={13} className="text-teal-600" />
-            <span className="text-xs font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">
-              In Transit
-            </span>
-          </div>
-        )}
-        {isProblem && (
-          <div className="flex items-center gap-1.5 ml-[18px] mt-1.5">
-            <AlertTriangle size={13} className="text-red-500" />
-            <span className="text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded">
-              Problem
-            </span>
-          </div>
-        )}
-
         {(request.notes || request.urgency_reason) && (
           <p className="text-[13px] text-text-secondary italic ml-[18px] mt-1 line-clamp-2">
             {request.notes || request.urgency_reason}
@@ -248,10 +218,24 @@ export function QueueCard({
         )}
       </div>
 
-      {/* ─── DELIVERY CONFIRMATION (photo mandatory) ─── */}
+      {/* ─── STEPPER (replaces old buttons) ─── */}
+      {mode === "idle" && (
+        <div className="px-3.5 pb-3.5 pt-1">
+          <StatusStepper
+            status={request.status}
+            interactive
+            onStepClick={handleStepClick}
+            showProblemButton={request.status !== "problem"}
+            onProblemClick={() => setMode("problem")}
+            disabled={disabled}
+            transitDisabled={hasActiveTransit}
+          />
+        </div>
+      )}
+
+      {/* ─── DELIVERY CONFIRMATION ─── */}
       {mode === "deliver" && (
         <div className="px-3.5 pb-3 space-y-3 border-t border-border pt-3">
-          {/* Hidden camera input — auto-triggered on mount */}
           <input
             ref={cameraRef}
             type="file"
@@ -373,61 +357,6 @@ export function QueueCard({
               )}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* ─── ACTION BUTTONS ─── */}
-      {mode === "idle" && (
-        <div className="flex gap-2 px-3.5 pb-3.5 pt-2">
-          {/* PENDING: In Transit (disabled if another is already in_transit) + Problem */}
-          {isPending && (
-            <>
-              <button
-                onClick={handleInTransit}
-                disabled={actionLoading !== null || hasActiveTransit}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-brand text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
-              >
-                {actionLoading === "transit" ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Truck size={16} />
-                    In Transit
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setMode("problem")}
-                disabled={actionLoading !== null}
-                className="flex items-center justify-center gap-1.5 bg-white text-red-600 font-medium py-2.5 px-3 rounded-lg text-sm border border-red-200 hover:bg-red-50 active:scale-[0.98] transition disabled:opacity-50"
-              >
-                <AlertTriangle size={16} />
-              </button>
-            </>
-          )}
-
-          {/* IN TRANSIT: Delivered + Problem */}
-          {isInTransit && (
-            <>
-              <button
-                onClick={startDelivery}
-                disabled={actionLoading !== null}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-green-700 active:scale-[0.98] transition disabled:opacity-50"
-              >
-                <CheckCircle size={16} />
-                Delivered
-              </button>
-              <button
-                onClick={() => setMode("problem")}
-                disabled={actionLoading !== null}
-                className="flex items-center justify-center gap-1.5 bg-white text-red-600 font-medium py-2.5 px-3 rounded-lg text-sm border border-red-200 hover:bg-red-50 active:scale-[0.98] transition disabled:opacity-50"
-              >
-                <AlertTriangle size={16} />
-              </button>
-            </>
-          )}
-
-          {/* PROBLEM: no actions (already reported) */}
         </div>
       )}
     </div>

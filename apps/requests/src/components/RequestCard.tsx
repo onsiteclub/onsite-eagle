@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+import { StatusStepper } from "./StatusStepper";
 
 interface MaterialRequest {
   id: string;
@@ -28,15 +29,6 @@ const STATUS_BORDER: Record<string, string> = {
   cancelled: "#9CA3AF",
 };
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  requested: { label: "Requested", bg: "bg-red-50", text: "text-red-700" },
-  acknowledged: { label: "Acknowledged", bg: "bg-amber-50", text: "text-amber-700" },
-  in_transit: { label: "In Transit", bg: "bg-teal-50", text: "text-teal-700" },
-  delivered: { label: "Delivered", bg: "bg-green-50", text: "text-green-700" },
-  problem: { label: "Problem", bg: "bg-red-50", text: "text-red-700" },
-  cancelled: { label: "Cancelled", bg: "bg-gray-100", text: "text-gray-500" },
-};
-
 const URGENCY_COLORS: Record<string, string> = {
   critical: "#DC2626",
   high: "#F59E0B",
@@ -48,7 +40,6 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
   const lotNumber = request.lot?.lot_number ?? null;
   const borderColor = STATUS_BORDER[request.status] || "#D1D5DB";
   const urgencyColor = URGENCY_COLORS[request.urgency_level] || "#9CA3AF";
-  const statusCfg = STATUS_CONFIG[request.status] || STATUS_CONFIG.requested;
   const timeAgo = formatDistanceToNow(new Date(request.requested_at), { addSuffix: true });
 
   return (
@@ -74,17 +65,12 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
           )}
         </div>
 
-        {/* Row 2: meta + status badge */}
-        <div className="flex items-center gap-2 ml-[18px] flex-wrap">
-          <span className="text-[13px] text-text-secondary truncate">
-            {request.requested_by_name || "Worker"}
-            {" \u00b7 "}
-            {timeAgo}
-          </span>
-          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold capitalize ${statusCfg.bg} ${statusCfg.text}`}>
-            {statusCfg.label}
-          </span>
-        </div>
+        {/* Row 2: meta */}
+        <p className="text-[13px] text-text-secondary ml-[18px] truncate">
+          {request.requested_by_name || "Worker"}
+          {" \u00b7 "}
+          {timeAgo}
+        </p>
 
         {/* Notes */}
         {(request.notes || request.urgency_reason) && (
@@ -92,6 +78,11 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
             {request.notes || request.urgency_reason}
           </p>
         )}
+
+        {/* Stepper (read-only) */}
+        <div className="mt-3">
+          <StatusStepper status={request.status} />
+        </div>
 
         {/* Delivery info (if delivered) */}
         {request.status === "delivered" && request.delivered_by_name && (
@@ -101,6 +92,20 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
             </p>
             {request.delivery_notes && (
               <p className="text-[12px] text-green-600 mt-0.5">{request.delivery_notes}</p>
+            )}
+          </div>
+        )}
+
+        {/* Problem info */}
+        {request.status === "problem" && request.delivery_notes && (
+          <div className="ml-[18px] mt-2 bg-red-50 rounded-lg px-3 py-2">
+            <p className="text-[13px] text-red-700 font-medium">
+              {request.delivery_notes}
+            </p>
+            {request.delivered_by_name && (
+              <p className="text-[12px] text-red-600 mt-0.5">
+                Reported by {request.delivered_by_name}
+              </p>
             )}
           </div>
         )}
