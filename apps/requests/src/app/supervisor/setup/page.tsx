@@ -319,8 +319,7 @@ export default function SetupPage() {
                       onClick={(e) => {
                         e.stopPropagation();
                         const url = `${window.location.origin}/operator/${site.id}`;
-                        const msg = `Deliveries — ${site.name}\n${url}`;
-                        navigator.clipboard.writeText(msg);
+                        navigator.clipboard.writeText(url);
                         setCopiedSiteId(site.id);
                         setTimeout(() => setCopiedSiteId(null), 2000);
                       }}
@@ -416,9 +415,7 @@ export default function SetupPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       const url = `${window.location.origin}/request/${lot.id}`;
-                      const selectedSiteName = sites.find((s) => s.id === selectedSite)?.name ?? "";
-                      const msg = `Material Requests — Lot ${lot.lot_number}${selectedSiteName ? `\n${selectedSiteName}` : ""}\n${url}`;
-                      navigator.clipboard.writeText(msg);
+                      navigator.clipboard.writeText(url);
                       setCopiedId(lot.id);
                       setTimeout(() => setCopiedId(null), 2000);
                     }}
@@ -472,9 +469,7 @@ export default function SetupPage() {
                       <button
                         onClick={() => {
                           const url = `${window.location.origin}/bundle/${bundle.id}`;
-                          const siteName = sites.find((s) => s.id === selectedSite)?.name ?? "";
-                          const msg = `Material Requests — ${bundle.label || "Your lots"}\n${siteName}\n${url}`;
-                          navigator.clipboard.writeText(msg);
+                          navigator.clipboard.writeText(url);
                           setCopiedBundleId(bundle.id);
                           setTimeout(() => setCopiedBundleId(null), 2000);
                         }}
