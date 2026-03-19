@@ -24,6 +24,7 @@ const STATUS_BORDER: Record<string, string> = {
   acknowledged: "#F59E0B",
   in_transit: "#0F766E",
   delivered: "#D1D5DB",
+  problem: "#EF4444",
   cancelled: "#9CA3AF",
 };
 
@@ -32,6 +33,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
   acknowledged: { label: "Acknowledged", bg: "bg-amber-50", text: "text-amber-700" },
   in_transit: { label: "In Transit", bg: "bg-teal-50", text: "text-teal-700" },
   delivered: { label: "Delivered", bg: "bg-green-50", text: "text-green-700" },
+  problem: { label: "Problem", bg: "bg-red-50", text: "text-red-700" },
   cancelled: { label: "Cancelled", bg: "bg-gray-100", text: "text-gray-500" },
 };
 

@@ -56,7 +56,7 @@ export default function SiteOperatorPage() {
   // Load requests for this site only
   const loadQueue = useCallback(async () => {
     const res = await fetch(
-      `/api/requests?site_id=${siteId}&status=requested,acknowledged,in_transit`
+      `/api/requests?site_id=${siteId}&status=requested,acknowledged,in_transit,problem`
     );
     if (res.ok) {
       const data = await res.json();
@@ -169,6 +169,8 @@ export default function SiteOperatorPage() {
   const pendingCount = requests.filter(
     (r) => r.status === "requested" || r.status === "acknowledged"
   ).length;
+  const problemCount = requests.filter((r) => r.status === "problem").length;
+  const transitCount = requests.filter((r) => r.status === "in_transit").length;
 
   return (
     <main className="pb-8">
@@ -190,12 +192,24 @@ export default function SiteOperatorPage() {
       <div className="flex items-center justify-end px-4 pt-1">
         <div className="flex items-center gap-3 text-sm">
           <span className="text-text-secondary">
-            <span className="font-semibold text-text">{pendingCount}</span> pending
+            <span className="font-semibold text-red-600">{pendingCount}</span> pending
           </span>
-          <span className="text-text-muted">&middot;</span>
-          <span className="text-text-secondary">
-            <span className="font-semibold text-text">{requests.length}</span> total
-          </span>
+          {transitCount > 0 && (
+            <>
+              <span className="text-text-muted">&middot;</span>
+              <span className="text-text-secondary">
+                <span className="font-semibold text-teal-600">{transitCount}</span> in transit
+              </span>
+            </>
+          )}
+          {problemCount > 0 && (
+            <>
+              <span className="text-text-muted">&middot;</span>
+              <span className="text-text-secondary">
+                <span className="font-semibold text-red-500">{problemCount}</span> problems
+              </span>
+            </>
+          )}
         </div>
       </div>
 

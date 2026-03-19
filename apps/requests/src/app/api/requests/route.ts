@@ -109,11 +109,15 @@ export async function PATCH(req: NextRequest) {
 
     if (status === "in_transit") {
       updates.in_transit_at = new Date().toISOString();
+      updates.delivered_by_name = delivered_by_name || null;
     } else if (status === "delivered") {
       updates.delivered_at = new Date().toISOString();
       updates.delivered_by_name = delivered_by_name || null;
       updates.delivery_notes = delivery_notes || null;
       if (photo_url) updates.photo_url = photo_url;
+    } else if (status === "problem") {
+      updates.delivered_by_name = delivered_by_name || null;
+      updates.delivery_notes = delivery_notes || null;
     }
 
     const { error } = await supabase
