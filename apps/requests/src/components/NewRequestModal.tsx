@@ -10,8 +10,8 @@ interface Lot {
 }
 
 const UNITS = [
-  { value: "pcs", label: "Peças" },
-  { value: "boards", label: "Tábuas" },
+  { value: "pcs", label: "Pecas" },
+  { value: "boards", label: "Tabuas" },
   { value: "sheets", label: "Folhas" },
   { value: "bundles", label: "Feixes" },
   { value: "bags", label: "Sacos" },
@@ -25,29 +25,38 @@ const URGENCY = [
   { value: "critical", label: "Urgente — Bloqueando trabalho" },
 ];
 
-export function NewRequestModal({
-  lots,
-  userName,
-  onClose,
-  onCreated,
-}: {
-  lots: Lot[];
+// Two modes: fixed lot (from URL) or lot picker (legacy)
+type Props = {
   userName: string;
   onClose: () => void;
   onCreated: () => void;
-}) {
+} & (
+  | { lotId: string; lotLabel: string; lots?: never }
+  | { lots: Lot[]; lotId?: never; lotLabel?: never }
+);
+
+export function NewRequestModal(props: Props) {
+  const { userName, onClose, onCreated } = props;
+  const fixedLotId = "lotId" in props ? props.lotId : undefined;
+  const fixedLotLabel = "lotLabel" in props ? props.lotLabel : undefined;
+  const lots = "lots" in props ? props.lots : undefined;
+
   const [material, setMaterial] = useState("");
   const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState("pcs");
-  const [lotId, setLotId] = useState(lots.length === 1 ? lots[0].id : "");
+  const [selectedLotId, setSelectedLotId] = useState(
+    fixedLotId ?? (lots?.length === 1 ? lots[0].id : "")
+  );
   const [urgency, setUrgency] = useState("medium");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const effectiveLotId = fixedLotId ?? selectedLotId;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!material.trim() || !quantity || !lotId) return;
+    if (!material.trim() || !quantity || !effectiveLotId) return;
 
     setLoading(true);
     setError("");
@@ -59,7 +68,7 @@ export function NewRequestModal({
         material_name: material.trim(),
         quantity: parseInt(quantity),
         unit,
-        lot_id: lotId,
+        lot_id: effectiveLotId,
         urgency_level: urgency,
         notes: notes.trim() || null,
         requested_by_name: userName,
@@ -88,11 +97,19 @@ export function NewRequestModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {/* Fixed lot badge */}
+          {fixedLotLabel && (
+            <div className="bg-brand/5 border border-brand/20 rounded-xl px-3 py-2 text-sm text-brand font-medium">
+              {fixedLotLabel}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-text mb-1">Material *</label>
             <input
               type="text"
               required
+              autoFocus
               autoCapitalize="words"
               value={material}
               onChange={(e) => setMaterial(e.target.value)}
@@ -129,25 +146,28 @@ export function NewRequestModal({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">Lote *</label>
-            <select
-              required
-              value={lotId}
-              onChange={(e) => setLotId(e.target.value)}
-              className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-            >
-              <option value="">Selecione o lote</option>
-              {lots.map((lot) => (
-                <option key={lot.id} value={lot.id}>
-                  Lot {lot.lot_number} {lot.jobsite ? `— ${lot.jobsite.name}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Lot picker — only for legacy mode */}
+          {lots && !fixedLotId && (
+            <div>
+              <label className="block text-sm font-medium text-text mb-1">Lote *</label>
+              <select
+                required
+                value={selectedLotId}
+                onChange={(e) => setSelectedLotId(e.target.value)}
+                className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              >
+                <option value="">Selecione o lote</option>
+                {lots.map((lot) => (
+                  <option key={lot.id} value={lot.id}>
+                    Lot {lot.lot_number} {lot.jobsite ? `— ${lot.jobsite.name}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
-            <label className="block text-sm font-medium text-text mb-1">Urgência</label>
+            <label className="block text-sm font-medium text-text mb-1">Urgencia</label>
             <select
               value={urgency}
               onChange={(e) => setUrgency(e.target.value)}
@@ -176,7 +196,7 @@ export function NewRequestModal({
 
           <button
             type="submit"
-            disabled={loading || !material.trim() || !quantity || !lotId}
+            disabled={loading || !material.trim() || !quantity || !effectiveLotId}
             className="w-full bg-brand text-white font-medium py-3 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
           >
             {loading ? (

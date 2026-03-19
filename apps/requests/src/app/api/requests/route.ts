@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminClient();
     const statusFilter = req.nextUrl.searchParams.get("status");
+    const lotIdFilter = req.nextUrl.searchParams.get("lot_id");
 
     let query = supabase
       .from("frm_material_requests")
@@ -15,6 +16,10 @@ export async function GET(req: NextRequest) {
       .is("deleted_at", null)
       .order("requested_at", { ascending: false })
       .limit(200);
+
+    if (lotIdFilter) {
+      query = query.eq("lot_id", lotIdFilter);
+    }
 
     if (statusFilter) {
       const statuses = statusFilter.split(",");

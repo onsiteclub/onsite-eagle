@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, MapPin, Loader2, Check } from "lucide-react";
+import { ArrowLeft, Plus, MapPin, Loader2, Check, Copy, Link2 } from "lucide-react";
 
 interface Site {
   id: string;
@@ -15,6 +15,7 @@ interface Site {
 interface Lot {
   id: string;
   lot_number: string;
+  jobsite_id?: string;
 }
 
 export default function SetupPage() {
@@ -33,6 +34,8 @@ export default function SetupPage() {
   const [lotCount, setLotCount] = useState("10");
   const [creatingLots, setCreatingLots] = useState(false);
   const [createdLots, setCreatedLots] = useState<Lot[]>([]);
+  const [allLots, setAllLots] = useState<Lot[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   async function loadSites() {
     const res = await fetch("/api/sites");
@@ -46,10 +49,22 @@ export default function SetupPage() {
     setLoading(false);
   }
 
+  async function loadLots(siteId: string) {
+    const res = await fetch("/api/lots");
+    if (res.ok) {
+      const data: Lot[] = await res.json();
+      setAllLots(data.filter((l) => l.jobsite_id === siteId));
+    }
+  }
+
   useEffect(() => {
     loadSites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (selectedSite) loadLots(selectedSite);
+  }, [selectedSite]);
 
   async function createSite(e: React.FormEvent) {
     e.preventDefault();
@@ -95,6 +110,7 @@ export default function SetupPage() {
       const lots = await res.json();
       setCreatedLots(lots);
       await loadSites();
+      if (selectedSite) await loadLots(selectedSite);
     }
     setCreatingLots(false);
   }
@@ -247,6 +263,54 @@ export default function SetupPage() {
                 </span>
               </div>
             )}
+          </section>
+        )}
+
+        {/* Section 3: Lot links for sharing */}
+        {selectedSite && allLots.length > 0 && (
+          <section className="bg-card rounded-xl border border-border p-4 space-y-3">
+            <h2 className="font-semibold text-text flex items-center gap-2">
+              <Link2 size={18} className="text-brand" />
+              Links dos Lotes
+            </h2>
+            <p className="text-xs text-text-muted">
+              Compartilhe o link com o trabalhador de cada lote.
+            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {allLots.map((lot) => (
+                <div
+                  key={lot.id}
+                  className="flex items-center justify-between p-2.5 rounded-lg border border-border hover:bg-gray-50"
+                >
+                  <span className="text-sm font-medium text-text">Lot {lot.lot_number}</span>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/request/${lot.id}`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedId(lot.id);
+                      setTimeout(() => setCopiedId(null), 2000);
+                    }}
+                    className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition ${
+                      copiedId === lot.id
+                        ? "bg-green-50 text-green-600"
+                        : "bg-brand/10 text-brand hover:bg-brand/20"
+                    }`}
+                  >
+                    {copiedId === lot.id ? (
+                      <>
+                        <Check size={12} />
+                        Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={12} />
+                        Copiar Link
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
           </section>
         )}
       </div>
