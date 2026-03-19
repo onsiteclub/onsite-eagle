@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, Camera, AlertTriangle } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
+import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
 
 interface MaterialRequest {
   id: string;
@@ -74,7 +74,6 @@ export function QueueCard({
   const siteName = request.jobsite?.name ?? "";
   const borderColor = STATUS_BORDER[request.status] || "#D1D5DB";
   const urgencyColor = URGENCY_COLORS[request.urgency_level] || "#9CA3AF";
-  const timeAgo = formatDistanceToNow(new Date(request.requested_at), { addSuffix: true });
 
   const isActive = mode !== "idle";
   const dimmed = disabled && !isActive;
@@ -204,18 +203,29 @@ export function QueueCard({
           )}
         </div>
 
-        <p className="text-[13px] text-text-secondary ml-[18px] truncate">
-          {siteName || "Site"}
-          {request.requested_by_name ? ` \u00b7 ${request.requested_by_name}` : ""}
-          {" \u00b7 "}
-          {timeAgo}
-        </p>
+        <div className="flex items-center gap-2 ml-[18px] mt-0.5">
+          <span className="text-[13px] text-text-secondary truncate">
+            {siteName || "Site"}
+            {request.requested_by_name ? ` \u00b7 ${request.requested_by_name}` : ""}
+          </span>
+          <DeadlineBadge
+            requestedAt={request.requested_at}
+            urgency={request.urgency_level}
+            status={request.status}
+            compact
+          />
+        </div>
 
         {(request.notes || request.urgency_reason) && (
           <p className="text-[13px] text-text-secondary italic ml-[18px] mt-1 line-clamp-2">
             {request.notes || request.urgency_reason}
           </p>
         )}
+      </div>
+
+      {/* ─── DEADLINE BAR ─── */}
+      <div className="px-3.5">
+        <DeadlineBar requestedAt={request.requested_at} urgency={request.urgency_level} status={request.status} />
       </div>
 
       {/* ─── STEPPER (replaces old buttons) ─── */}

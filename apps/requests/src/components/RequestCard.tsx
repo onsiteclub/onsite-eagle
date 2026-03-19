@@ -1,7 +1,7 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { StatusStepper } from "./StatusStepper";
+import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
 
 interface MaterialRequest {
   id: string;
@@ -40,7 +40,6 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
   const lotNumber = request.lot?.lot_number ?? null;
   const borderColor = STATUS_BORDER[request.status] || "#D1D5DB";
   const urgencyColor = URGENCY_COLORS[request.urgency_level] || "#9CA3AF";
-  const timeAgo = formatDistanceToNow(new Date(request.requested_at), { addSuffix: true });
 
   return (
     <div
@@ -65,12 +64,18 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
           )}
         </div>
 
-        {/* Row 2: meta */}
-        <p className="text-[13px] text-text-secondary ml-[18px] truncate">
-          {request.requested_by_name || "Worker"}
-          {" \u00b7 "}
-          {timeAgo}
-        </p>
+        {/* Row 2: meta + deadline */}
+        <div className="flex items-center gap-2 ml-[18px] mt-0.5">
+          <span className="text-[13px] text-text-secondary truncate">
+            {request.requested_by_name || "Worker"}
+          </span>
+          <DeadlineBadge
+            requestedAt={request.requested_at}
+            urgency={request.urgency_level}
+            status={request.status}
+            compact
+          />
+        </div>
 
         {/* Notes */}
         {(request.notes || request.urgency_reason) && (
@@ -78,6 +83,11 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
             {request.notes || request.urgency_reason}
           </p>
         )}
+
+        {/* Deadline bar */}
+        <div className="mt-2 ml-[18px]">
+          <DeadlineBar requestedAt={request.requested_at} urgency={request.urgency_level} status={request.status} />
+        </div>
 
         {/* Stepper (read-only) */}
         <div className="mt-3">

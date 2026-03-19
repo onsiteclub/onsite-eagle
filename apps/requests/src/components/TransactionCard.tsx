@@ -1,8 +1,9 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { UrgencyBadge } from "./StatusBadge";
 import { StatusStepper } from "./StatusStepper";
+import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
+import { formatRequestTime } from "@/lib/deadline";
 import { Package, User, Truck } from "lucide-react";
 
 interface MaterialRequest {
@@ -27,9 +28,6 @@ interface MaterialRequest {
 export function TransactionCard({ request }: { request: MaterialRequest }) {
   const lotNumber = request.lot?.lot_number ?? "—";
   const siteName = request.jobsite?.name ?? "";
-  const timeAgo = formatDistanceToNow(new Date(request.requested_at), {
-    addSuffix: true,
-  });
 
   const urgencyBorder =
     request.urgency_level === "critical"
@@ -53,6 +51,9 @@ export function TransactionCard({ request }: { request: MaterialRequest }) {
         </div>
       </div>
 
+      {/* Deadline bar */}
+      <DeadlineBar requestedAt={request.requested_at} urgency={request.urgency_level} status={request.status} />
+
       {/* Stepper (read-only) */}
       <StatusStepper status={request.status} />
 
@@ -70,9 +71,15 @@ export function TransactionCard({ request }: { request: MaterialRequest }) {
         )}
       </div>
 
-      {/* Meta line */}
+      {/* Meta line: time + deadline + urgency */}
       <div className="flex items-center gap-2 text-xs text-text-muted flex-wrap">
-        <span>{timeAgo}</span>
+        <span>{formatRequestTime(request.requested_at)}</span>
+        <DeadlineBadge
+          requestedAt={request.requested_at}
+          urgency={request.urgency_level}
+          status={request.status}
+          compact
+        />
         <UrgencyBadge urgency={request.urgency_level} />
         {request.delivery_notes && (
           <>
