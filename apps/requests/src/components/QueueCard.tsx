@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Truck, CheckCircle, Camera, AlertTriangle, X } from "lucide-react";
+import { Truck, CheckCircle, Camera, AlertTriangle } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
@@ -47,10 +47,19 @@ export function QueueCard({
   request,
   operatorName,
   onUpdate,
+  disabled,
+  hasActiveTransit,
+  onActiveChange,
 }: {
   request: MaterialRequest;
   operatorName: string;
   onUpdate: () => void;
+  /** Card is blocked because another card is being processed */
+  disabled?: boolean;
+  /** Another request is already in_transit */
+  hasActiveTransit?: boolean;
+  /** Notify parent when this card enters/exits active mode */
+  onActiveChange?: (active: boolean) => void;
 }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [mode, setMode] = useState<"idle" | "deliver" | "problem">("idle");
@@ -61,6 +70,8 @@ export function QueueCard({
   const [selectedProblem, setSelectedProblem] = useState<string | null>(null);
   const [problemNotes, setProblemNotes] = useState("");
 
+  const cameraRef = useRef<HTMLInputElement>(null);
+
   const lotNumber = request.lot?.lot_number ?? null;
   const siteName = request.jobsite?.name ?? "";
   const borderColor = STATUS_BORDER[request.status] || "#D1D5DB";
@@ -69,6 +80,13 @@ export function QueueCard({
 
   const isPending = request.status === "requested" || request.status === "acknowledged";
   const isInTransit = request.status === "in_transit";
+  const isProblem = request.status === "problem";
+  const isActive = mode !== "idle";
+
+  // Notify parent when mode changes
+  useEffect(() => {
+    onActiveChange?.(isActive);
+  }, [isActive, onActiveChange]);
 
   function resetMode() {
     setMode("idle");
@@ -103,8 +121,14 @@ export function QueueCard({
     setPhotoPreview(URL.createObjectURL(file));
   }
 
+  function startDelivery() {
+    setMode("deliver");
+    // Auto-open camera after render
+    setTimeout(() => cameraRef.current?.click(), 100);
+  }
+
   async function handleDelivered() {
-    if (!photoFile) return; // photo is mandatory
+    if (!photoFile) return;
     setActionLoading("deliver");
     setUploading(true);
 
@@ -164,14 +188,18 @@ export function QueueCard({
     onUpdate();
   }
 
+  // Dimmed overlay when disabled by another active card
+  const dimmed = disabled && !isActive;
+
   return (
     <div
-      className="bg-card rounded-xl border border-border overflow-hidden shadow-sm"
+      className={`bg-card rounded-xl border border-border overflow-hidden shadow-sm transition ${
+        dimmed ? "opacity-40 pointer-events-none" : ""
+      }`}
       style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
     >
       {/* Card content */}
       <div className="p-3.5 pb-2">
-        {/* Row 1: urgency dot + material name + quantity + lot badge */}
         <div className="flex items-center gap-2 mb-1">
           <span
             className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -188,7 +216,6 @@ export function QueueCard({
           )}
         </div>
 
-        {/* Row 2: meta line */}
         <p className="text-[13px] text-text-secondary ml-[18px] truncate">
           {siteName || "Site"}
           {request.requested_by_name ? ` \u00b7 ${request.requested_by_name}` : ""}
@@ -196,7 +223,7 @@ export function QueueCard({
           {timeAgo}
         </p>
 
-        {/* In Transit badge */}
+        {/* Status badges */}
         {isInTransit && (
           <div className="flex items-center gap-1.5 ml-[18px] mt-1.5">
             <Truck size={13} className="text-teal-600" />
@@ -205,8 +232,15 @@ export function QueueCard({
             </span>
           </div>
         )}
+        {isProblem && (
+          <div className="flex items-center gap-1.5 ml-[18px] mt-1.5">
+            <AlertTriangle size={13} className="text-red-500" />
+            <span className="text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded">
+              Problem
+            </span>
+          </div>
+        )}
 
-        {/* Notes / urgency reason */}
         {(request.notes || request.urgency_reason) && (
           <p className="text-[13px] text-text-secondary italic ml-[18px] mt-1 line-clamp-2">
             {request.notes || request.urgency_reason}
@@ -217,7 +251,16 @@ export function QueueCard({
       {/* ─── DELIVERY CONFIRMATION (photo mandatory) ─── */}
       {mode === "deliver" && (
         <div className="px-3.5 pb-3 space-y-3 border-t border-border pt-3">
-          {/* Photo capture — mandatory */}
+          {/* Hidden camera input — auto-triggered on mount */}
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoChange}
+          />
+
           {photoPreview ? (
             <div className="relative rounded-lg overflow-hidden">
               <img src={photoPreview} alt="Delivery" className="w-full h-40 object-cover" />
@@ -225,34 +268,25 @@ export function QueueCard({
                 <span className="text-xs text-green-600 font-medium flex items-center gap-1 flex-1">
                   <CheckCircle size={14} /> Photo ready
                 </span>
-                <label className="text-xs text-text-secondary bg-gray-100 px-2 py-1 rounded cursor-pointer hover:bg-gray-200">
+                <button
+                  onClick={() => cameraRef.current?.click()}
+                  className="text-xs text-text-secondary bg-gray-100 px-2 py-1 rounded cursor-pointer hover:bg-gray-200"
+                >
                   Retake
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={handlePhotoChange}
-                  />
-                </label>
+                </button>
               </div>
             </div>
           ) : (
-            <label className="flex flex-col items-center gap-2 py-5 border-2 border-dashed border-red-300 rounded-lg cursor-pointer hover:border-brand/40 hover:bg-brand/5 transition bg-red-50/30">
+            <button
+              onClick={() => cameraRef.current?.click()}
+              className="w-full flex flex-col items-center gap-2 py-5 border-2 border-dashed border-red-300 rounded-lg hover:border-brand/40 hover:bg-brand/5 transition bg-red-50/30"
+            >
               <Camera size={28} className="text-brand" />
               <span className="text-sm font-medium text-brand">Take Photo *</span>
               <span className="text-xs text-red-500 font-medium">Required to confirm delivery</span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handlePhotoChange}
-              />
-            </label>
+            </button>
           )}
 
-          {/* Notes */}
           <textarea
             value={deliveryNotes}
             onChange={(e) => setDeliveryNotes(e.target.value)}
@@ -261,7 +295,6 @@ export function QueueCard({
             className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm text-text outline-none focus:ring-2 focus:ring-brand/30 resize-none"
           />
 
-          {/* Confirm / Cancel */}
           <div className="flex gap-2">
             <button
               onClick={resetMode}
@@ -343,15 +376,15 @@ export function QueueCard({
         </div>
       )}
 
-      {/* ─── ACTION BUTTONS (when not expanded) ─── */}
+      {/* ─── ACTION BUTTONS ─── */}
       {mode === "idle" && (
         <div className="flex gap-2 px-3.5 pb-3.5 pt-2">
-          {/* PENDING: In Transit + Problem */}
+          {/* PENDING: In Transit (disabled if another is already in_transit) + Problem */}
           {isPending && (
             <>
               <button
                 onClick={handleInTransit}
-                disabled={actionLoading !== null}
+                disabled={actionLoading !== null || hasActiveTransit}
                 className="flex-1 flex items-center justify-center gap-1.5 bg-brand text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
               >
                 {actionLoading === "transit" ? (
@@ -377,7 +410,7 @@ export function QueueCard({
           {isInTransit && (
             <>
               <button
-                onClick={() => setMode("deliver")}
+                onClick={startDelivery}
                 disabled={actionLoading !== null}
                 className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-green-700 active:scale-[0.98] transition disabled:opacity-50"
               >
@@ -393,6 +426,8 @@ export function QueueCard({
               </button>
             </>
           )}
+
+          {/* PROBLEM: no actions (already reported) */}
         </div>
       )}
     </div>

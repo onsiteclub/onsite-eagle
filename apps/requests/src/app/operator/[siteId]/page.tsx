@@ -40,6 +40,7 @@ export default function SiteOperatorPage() {
   const [siteError, setSiteError] = useState(false);
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
   // Load site details
   const loadSite = useCallback(async () => {
@@ -60,8 +61,15 @@ export default function SiteOperatorPage() {
     );
     if (res.ok) {
       const data = await res.json();
-      // Sort: urgency desc, then oldest first
+      // Sort: in_transit first, then urgency desc, then oldest first
       data.sort((a: MaterialRequest, b: MaterialRequest) => {
+        // in_transit always on top
+        if (a.status === "in_transit" && b.status !== "in_transit") return -1;
+        if (b.status === "in_transit" && a.status !== "in_transit") return 1;
+        // problem at bottom (but still visible)
+        if (a.status === "problem" && b.status !== "problem") return 1;
+        if (b.status === "problem" && a.status !== "problem") return -1;
+        // then by urgency
         const urgencyOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
         const ua = urgencyOrder[a.urgency_level] ?? 2;
         const ub = urgencyOrder[b.urgency_level] ?? 2;
@@ -228,6 +236,11 @@ export default function SiteOperatorPage() {
               request={req}
               operatorName={userName}
               onUpdate={loadQueue}
+              disabled={activeCardId !== null && activeCardId !== req.id}
+              hasActiveTransit={transitCount > 0 && req.status !== "in_transit"}
+              onActiveChange={(active) =>
+                setActiveCardId(active ? req.id : null)
+              }
             />
           ))
         )}
