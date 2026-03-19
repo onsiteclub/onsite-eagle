@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Plus, MapPin, Loader2, Check, Copy, Link2,
+  Plus, MapPin, Loader2, Check, Copy, Link2,
   Truck, Trash2, AlertTriangle, Package, Users, X,
 } from "lucide-react";
 
@@ -29,7 +28,6 @@ interface Bundle {
 }
 
 export default function SetupPage() {
-  const router = useRouter();
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -214,17 +212,6 @@ export default function SetupPage() {
 
   return (
     <main className="pb-8">
-      {/* Back */}
-      <div className="px-4 pt-3">
-        <button
-          onClick={() => router.push("/supervisor")}
-          className="flex items-center gap-1 text-sm text-text-secondary hover:text-text"
-        >
-          <ArrowLeft size={16} />
-          Back to feed
-        </button>
-      </div>
-
       <div className="px-4 py-4 space-y-6">
         {/* Section 1: Site */}
         <section className="bg-card rounded-xl border border-border p-4 space-y-4">

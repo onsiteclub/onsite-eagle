@@ -1,8 +1,9 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { StatusBadge, UrgencyBadge } from "./StatusBadge";
-import { Package, ArrowRight, User, Truck } from "lucide-react";
+import { UrgencyBadge } from "./StatusBadge";
+import { StatusStepper } from "./StatusStepper";
+import { Package, User, Truck } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
@@ -52,22 +53,20 @@ export function TransactionCard({ request }: { request: MaterialRequest }) {
         </div>
       </div>
 
-      {/* Flow: requester → status → deliverer */}
-      <div className="flex items-center gap-2 text-sm flex-wrap">
-        <span className="flex items-center gap-1 text-text">
-          <User size={14} className="text-text-muted" />
+      {/* Stepper (read-only) */}
+      <StatusStepper status={request.status} />
+
+      {/* People involved */}
+      <div className="flex items-center gap-3 text-xs text-text-muted">
+        <span className="flex items-center gap-1">
+          <User size={12} />
           {request.requested_by_name || "—"}
         </span>
-        <ArrowRight size={14} className="text-text-muted" />
-        <StatusBadge status={request.status} />
         {request.delivered_by_name && (
-          <>
-            <ArrowRight size={14} className="text-text-muted" />
-            <span className="flex items-center gap-1 text-text">
-              <Truck size={14} className="text-text-muted" />
-              {request.delivered_by_name}
-            </span>
-          </>
+          <span className="flex items-center gap-1">
+            <Truck size={12} />
+            {request.delivered_by_name}
+          </span>
         )}
       </div>
 

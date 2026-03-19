@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { TransactionCard } from "@/components/TransactionCard";
-import { RefreshCw, Loader2, Settings, Inbox } from "lucide-react";
+import { RefreshCw, Loader2, Inbox } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
@@ -82,44 +82,29 @@ export default function SupervisorPage() {
 
   return (
     <main className="pb-8">
-      {/* Setup bar */}
-      <div className="flex items-center justify-between px-4 pt-3">
-        <button
-          onClick={() => router.push("/supervisor/setup")}
-          className="flex items-center gap-1.5 text-sm text-brand font-medium hover:underline"
-        >
-          <Settings size={14} />
-          Setup
-          {siteCount > 0 && (
-            <span className="bg-brand/10 text-brand text-xs px-1.5 py-0.5 rounded-full">
-              {siteCount} site{siteCount !== 1 ? "s" : ""}
-            </span>
-          )}
-        </button>
-
-        <div className="flex items-center gap-1.5">
+      {/* Filters + live indicator */}
+      <div className="flex items-center px-4 pt-3 pb-2">
+        <div className="flex items-center gap-2 flex-1 overflow-x-auto">
+          <FilterChip
+            label={`All (${requests.length})`}
+            active={filter === "all"}
+            onClick={() => setFilter("all")}
+          />
+          <FilterChip
+            label={`Pending (${pendingCount})`}
+            active={filter === "pending"}
+            onClick={() => setFilter("pending")}
+          />
+          <FilterChip
+            label={`Delivered (${deliveredCount})`}
+            active={filter === "delivered"}
+            onClick={() => setFilter("delivered")}
+          />
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
           <RefreshCw size={12} className="text-brand animate-spin" style={{ animationDuration: "3s" }} />
           <span className="text-xs text-text-muted">4s</span>
         </div>
-      </div>
-
-      {/* Stats + filters */}
-      <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto">
-        <FilterChip
-          label={`All (${requests.length})`}
-          active={filter === "all"}
-          onClick={() => setFilter("all")}
-        />
-        <FilterChip
-          label={`Pending (${pendingCount})`}
-          active={filter === "pending"}
-          onClick={() => setFilter("pending")}
-        />
-        <FilterChip
-          label={`Delivered (${deliveredCount})`}
-          active={filter === "delivered"}
-          onClick={() => setFilter("delivered")}
-        />
       </div>
 
       {/* Feed */}
