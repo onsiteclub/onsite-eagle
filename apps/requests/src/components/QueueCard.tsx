@@ -44,6 +44,31 @@ const PROBLEM_REASONS = [
   { value: "other", label: "Other" },
 ];
 
+/** Compress image client-side to fit Vercel's 4.5MB body limit */
+function compressImage(file: File, maxWidth: number, quality: number): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(
+        (blob) => {
+          resolve(new File([blob!], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export function QueueCard({
   request,
   operatorName,
@@ -91,11 +116,14 @@ export function QueueCard({
     setProblemNotes("");
   }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+
+    // Compress to max 1200px wide, ~0.7 quality JPEG (<500KB typically)
+    const compressed = await compressImage(file, 1200, 0.7);
+    setPhotoFile(compressed);
+    setPhotoPreview(URL.createObjectURL(compressed));
   }
 
   async function handleStepClick(step: "in_transit" | "delivered") {
