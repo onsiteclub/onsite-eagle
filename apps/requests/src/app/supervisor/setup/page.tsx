@@ -29,10 +29,9 @@ export default function SetupPage() {
   const [siteCity, setSiteCity] = useState("");
   const [creatingSite, setCreatingSite] = useState(false);
 
-  // Create lots
+  // Lots
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
   const [lotCount, setLotCount] = useState("10");
-  const [creatingLots, setCreatingLots] = useState(false);
   const [createdLots, setCreatedLots] = useState<Lot[]>([]);
   const [allLots, setAllLots] = useState<Lot[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -74,9 +73,14 @@ export default function SetupPage() {
 
   async function createSite(e: React.FormEvent) {
     e.preventDefault();
-    if (!siteName.trim()) return;
-    setCreatingSite(true);
+    if (!siteName.trim() || !lotCount) return;
+    const count = parseInt(lotCount);
+    if (count < 1 || count > 500) return;
 
+    setCreatingSite(true);
+    setCreatedLots([]);
+
+    // 1. Create site
     const res = await fetch("/api/sites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -89,36 +93,27 @@ export default function SetupPage() {
 
     if (res.ok) {
       const site = await res.json();
+
+      // 2. Create lots
+      const lotsRes = await fetch("/api/lots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobsite_id: site.id, count }),
+      });
+
+      if (lotsRes.ok) {
+        const lots = await lotsRes.json();
+        setCreatedLots(lots);
+      }
+
       setSiteName("");
       setSiteAddress("");
       setSiteCity("");
       setSelectedSite(site.id);
       await loadSites();
+      await loadLots(site.id);
     }
     setCreatingSite(false);
-  }
-
-  async function createLots() {
-    if (!selectedSite || !lotCount) return;
-    const count = parseInt(lotCount);
-    if (count < 1 || count > 500) return;
-
-    setCreatingLots(true);
-    setCreatedLots([]);
-
-    const res = await fetch("/api/lots", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobsite_id: selectedSite, count }),
-    });
-
-    if (res.ok) {
-      const lots = await res.json();
-      setCreatedLots(lots);
-      await loadSites();
-      if (selectedSite) await loadLots(selectedSite);
-    }
-    setCreatingLots(false);
   }
 
   async function deleteSite() {
@@ -182,7 +177,7 @@ export default function SetupPage() {
               className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
               placeholder="Site name *"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <input
                 type="text"
                 value={siteAddress}
@@ -197,10 +192,20 @@ export default function SetupPage() {
                 className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                 placeholder="City"
               />
+              <input
+                type="number"
+                min={1}
+                max={500}
+                inputMode="numeric"
+                value={lotCount}
+                onChange={(e) => setLotCount(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                placeholder="Lots"
+              />
             </div>
             <button
               type="submit"
-              disabled={creatingSite || !siteName.trim()}
+              disabled={creatingSite || !siteName.trim() || !lotCount || parseInt(lotCount) < 1}
               className="flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
             >
               {creatingSite ? (
@@ -208,9 +213,20 @@ export default function SetupPage() {
               ) : (
                 <Plus size={16} />
               )}
-              Create Site
+              Create Site + {lotCount || 0} lots
             </button>
           </form>
+
+          {/* Created lots feedback */}
+          {createdLots.length > 0 && (
+            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <Check size={16} className="text-green-600" />
+              <span className="text-sm text-green-700">
+                {createdLots.length} lots created (Lot {createdLots[0].lot_number}
+                {createdLots.length > 1 && ` — ${createdLots[createdLots.length - 1].lot_number}`})
+              </span>
+            </div>
+          )}
 
           {/* Existing sites */}
           {sites.length > 0 && (
@@ -274,59 +290,7 @@ export default function SetupPage() {
           )}
         </section>
 
-        {/* Section 2: Create lots (only if site selected) */}
-        {selectedSite && (
-          <section className="bg-card rounded-xl border border-border p-4 space-y-4">
-            <h2 className="font-semibold text-text flex items-center gap-2">
-              <Plus size={18} className="text-brand" />
-              Create Lots
-            </h2>
-
-            <p className="text-sm text-text-secondary">
-              Site: <strong>{sites.find((s) => s.id === selectedSite)?.name}</strong>
-            </p>
-
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
-                <label className="block text-xs text-text-secondary mb-1">Quantity</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={500}
-                  inputMode="numeric"
-                  value={lotCount}
-                  onChange={(e) => setLotCount(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                />
-              </div>
-              <button
-                onClick={createLots}
-                disabled={creatingLots || !lotCount || parseInt(lotCount) < 1}
-                className="flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
-              >
-                {creatingLots ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Plus size={16} />
-                )}
-                Create {lotCount || 0} lots
-              </button>
-            </div>
-
-            {/* Created lots feedback */}
-            {createdLots.length > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <Check size={16} className="text-green-600" />
-                <span className="text-sm text-green-700">
-                  {createdLots.length} lots created (Lot {createdLots[0].lot_number}
-                  {createdLots.length > 1 && ` — ${createdLots[createdLots.length - 1].lot_number}`})
-                </span>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Section 3: Lot links for sharing */}
+        {/* Section 2: Lot links for sharing */}
         {selectedSite && allLots.length > 0 && (
           <section className="bg-card rounded-xl border border-border p-4 space-y-3">
             <h2 className="font-semibold text-text flex items-center gap-2">
