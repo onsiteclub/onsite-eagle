@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, MapPin, Loader2, Check, Copy, Link2, Truck, Trash2, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft, Plus, MapPin, Loader2, Check, Copy, Link2,
+  Truck, Trash2, AlertTriangle, Package, Users, X,
+} from "lucide-react";
 
 interface Site {
   id: string;
@@ -16,6 +19,13 @@ interface Lot {
   id: string;
   lot_number: string;
   jobsite_id?: string;
+}
+
+interface Bundle {
+  id: string;
+  jobsite_id: string;
+  label: string | null;
+  lot_ids: string[];
 }
 
 export default function SetupPage() {
@@ -32,10 +42,16 @@ export default function SetupPage() {
   // Lots
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
   const [lotCount, setLotCount] = useState("10");
-  const [createdLots, setCreatedLots] = useState<Lot[]>([]);
   const [allLots, setAllLots] = useState<Lot[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedSiteId, setCopiedSiteId] = useState<string | null>(null);
+
+  // Bundles
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [selectedLots, setSelectedLots] = useState<Set<string>>(new Set());
+  const [bundleLabel, setBundleLabel] = useState("");
+  const [creatingBundle, setCreatingBundle] = useState(false);
+  const [copiedBundleId, setCopiedBundleId] = useState<string | null>(null);
 
   // Delete site
   const [deleteTarget, setDeleteTarget] = useState<Site | null>(null);
@@ -62,13 +78,25 @@ export default function SetupPage() {
     }
   }
 
+  async function loadBundles(siteId: string) {
+    const res = await fetch(`/api/bundles?site_id=${siteId}`);
+    if (res.ok) {
+      const data = await res.json();
+      setBundles(data);
+    }
+  }
+
   useEffect(() => {
     loadSites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (selectedSite) loadLots(selectedSite);
+    if (selectedSite) {
+      loadLots(selectedSite);
+      loadBundles(selectedSite);
+      setSelectedLots(new Set());
+    }
   }, [selectedSite]);
 
   async function createSite(e: React.FormEvent) {
@@ -78,9 +106,7 @@ export default function SetupPage() {
     if (count < 1 || count > 500) return;
 
     setCreatingSite(true);
-    setCreatedLots([]);
 
-    // 1. Create site
     const res = await fetch("/api/sites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -94,17 +120,11 @@ export default function SetupPage() {
     if (res.ok) {
       const site = await res.json();
 
-      // 2. Create lots
-      const lotsRes = await fetch("/api/lots", {
+      await fetch("/api/lots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobsite_id: site.id, count }),
       });
-
-      if (lotsRes.ok) {
-        const lots = await lotsRes.json();
-        setCreatedLots(lots);
-      }
 
       setSiteName("");
       setSiteAddress("");
@@ -114,6 +134,42 @@ export default function SetupPage() {
       await loadLots(site.id);
     }
     setCreatingSite(false);
+  }
+
+  function toggleLot(lotId: string) {
+    setSelectedLots((prev) => {
+      const next = new Set(prev);
+      if (next.has(lotId)) next.delete(lotId);
+      else next.add(lotId);
+      return next;
+    });
+  }
+
+  async function createBundle() {
+    if (!selectedSite || selectedLots.size === 0) return;
+    setCreatingBundle(true);
+
+    const res = await fetch("/api/bundles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jobsite_id: selectedSite,
+        label: bundleLabel.trim() || null,
+        lot_ids: Array.from(selectedLots),
+      }),
+    });
+
+    if (res.ok) {
+      setSelectedLots(new Set());
+      setBundleLabel("");
+      await loadBundles(selectedSite);
+    }
+    setCreatingBundle(false);
+  }
+
+  async function deleteBundle(bundleId: string) {
+    await fetch(`/api/bundles/${bundleId}`, { method: "DELETE" });
+    if (selectedSite) await loadBundles(selectedSite);
   }
 
   async function deleteSite() {
@@ -130,13 +186,22 @@ export default function SetupPage() {
       if (selectedSite === deleteTarget.id) {
         setSelectedSite(null);
         setAllLots([]);
-        setCreatedLots([]);
+        setBundles([]);
       }
       setDeleteTarget(null);
       setDeleteConfirm("");
       await loadSites();
     }
     setDeleting(false);
+  }
+
+  // Helper: get lot numbers for a bundle
+  function bundleLotNumbers(bundle: Bundle): string {
+    return bundle.lot_ids
+      .map((id) => allLots.find((l) => l.id === id)?.lot_number)
+      .filter(Boolean)
+      .sort((a, b) => parseInt(a!) - parseInt(b!))
+      .join(", ");
   }
 
   if (loading) {
@@ -161,7 +226,7 @@ export default function SetupPage() {
       </div>
 
       <div className="px-4 py-4 space-y-6">
-        {/* Section 1: Create jobsite */}
+        {/* Section 1: Site */}
         <section className="bg-card rounded-xl border border-border p-4 space-y-4">
           {/* Create form — only when no sites exist */}
           {sites.length === 0 && (
@@ -224,8 +289,8 @@ export default function SetupPage() {
 
           {/* Existing sites */}
           {sites.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-border">
-              <p className="text-xs text-text-muted font-medium uppercase">Existing sites</p>
+            <div className="space-y-2">
+              <p className="text-xs text-text-muted font-medium uppercase">Site</p>
               {sites.map((site) => (
                 <div
                   key={site.id}
@@ -284,7 +349,7 @@ export default function SetupPage() {
           )}
         </section>
 
-        {/* Section 2: Lot links for sharing */}
+        {/* Section 2: Lots + Bundle creation */}
         {selectedSite && allLots.length > 0 && (
           <section className="bg-card rounded-xl border border-border p-4 space-y-3">
             <h2 className="font-semibold text-text flex items-center gap-2">
@@ -292,17 +357,64 @@ export default function SetupPage() {
               Lot Links
             </h2>
             <p className="text-xs text-text-muted">
-              Share the link with the worker assigned to each lot.
+              Select lots to create a worker bundle, or copy individual links.
             </p>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+
+            {/* Bundle creation bar */}
+            {selectedLots.size > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-brand/5 border border-brand/20 rounded-lg">
+                <input
+                  type="text"
+                  value={bundleLabel}
+                  onChange={(e) => setBundleLabel(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-text text-sm outline-none focus:ring-2 focus:ring-brand/30"
+                  placeholder="Worker name (optional)"
+                />
+                <button
+                  onClick={createBundle}
+                  disabled={creatingBundle}
+                  className="flex items-center gap-1.5 bg-brand text-white text-sm font-medium py-2 px-3 rounded-lg hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50 whitespace-nowrap"
+                >
+                  {creatingBundle ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Users size={14} />
+                  )}
+                  Bundle {selectedLots.size} lots
+                </button>
+                <button
+                  onClick={() => setSelectedLots(new Set())}
+                  className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-white transition"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Lot list with checkboxes */}
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {allLots.map((lot) => (
                 <div
                   key={lot.id}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-border hover:bg-gray-50"
+                  className={`flex items-center gap-3 p-2.5 rounded-lg border transition cursor-pointer ${
+                    selectedLots.has(lot.id)
+                      ? "border-brand bg-brand/5"
+                      : "border-border hover:bg-gray-50"
+                  }`}
+                  onClick={() => toggleLot(lot.id)}
                 >
-                  <span className="text-sm font-medium text-text">Lot {lot.lot_number}</span>
+                  <input
+                    type="checkbox"
+                    checked={selectedLots.has(lot.id)}
+                    onChange={() => toggleLot(lot.id)}
+                    className="w-4 h-4 rounded border-border text-brand focus:ring-brand/30 accent-[var(--color-brand,#0F766E)]"
+                  />
+                  <span className="text-sm font-medium text-text flex-1">
+                    Lot {lot.lot_number}
+                  </span>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       const url = `${window.location.origin}/request/${lot.id}`;
                       const selectedSiteName = sites.find((s) => s.id === selectedSite)?.name ?? "";
                       const msg = `Material Requests — Lot ${lot.lot_number}${selectedSiteName ? `\n${selectedSiteName}` : ""}\n${url}`;
@@ -310,7 +422,7 @@ export default function SetupPage() {
                       setCopiedId(lot.id);
                       setTimeout(() => setCopiedId(null), 2000);
                     }}
-                    className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition ${
+                    className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition ${
                       copiedId === lot.id
                         ? "bg-green-50 text-green-600"
                         : "bg-brand/10 text-brand hover:bg-brand/20"
@@ -318,16 +430,80 @@ export default function SetupPage() {
                   >
                     {copiedId === lot.id ? (
                       <>
-                        <Check size={12} />
+                        <Check size={10} />
                         Copied
                       </>
                     ) : (
                       <>
-                        <Copy size={12} />
-                        Copy Link
+                        <Copy size={10} />
+                        Link
                       </>
                     )}
                   </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Section 3: Existing bundles */}
+        {selectedSite && bundles.length > 0 && (
+          <section className="bg-card rounded-xl border border-border p-4 space-y-3">
+            <h2 className="font-semibold text-text flex items-center gap-2">
+              <Package size={18} className="text-brand" />
+              Worker Bundles
+            </h2>
+            <div className="space-y-2">
+              {bundles.map((bundle) => (
+                <div
+                  key={bundle.id}
+                  className="p-3 rounded-lg border border-border"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-text">
+                        {bundle.label || "Unnamed worker"}
+                      </div>
+                      <div className="text-xs text-text-muted">
+                        Lots: {bundleLotNumbers(bundle) || `${bundle.lot_ids.length} lots`}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/bundle/${bundle.id}`;
+                          const siteName = sites.find((s) => s.id === selectedSite)?.name ?? "";
+                          const msg = `Material Requests — ${bundle.label || "Your lots"}\n${siteName}\n${url}`;
+                          navigator.clipboard.writeText(msg);
+                          setCopiedBundleId(bundle.id);
+                          setTimeout(() => setCopiedBundleId(null), 2000);
+                        }}
+                        className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition ${
+                          copiedBundleId === bundle.id
+                            ? "bg-green-50 text-green-600"
+                            : "bg-brand/10 text-brand hover:bg-brand/20"
+                        }`}
+                      >
+                        {copiedBundleId === bundle.id ? (
+                          <>
+                            <Check size={12} />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={12} />
+                            Copy Link
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => deleteBundle(bundle.id)}
+                        className="p-1.5 text-text-muted hover:text-red-500 rounded-lg hover:bg-red-50 transition"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

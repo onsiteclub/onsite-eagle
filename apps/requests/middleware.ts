@@ -25,8 +25,9 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const hostRole = getRoleFromHost(host);
 
-  // API routes pass through
+  // API routes and bundle pages pass through (bundles handle login inline)
   if (pathname.startsWith("/api/")) return NextResponse.next();
+  if (pathname.startsWith("/bundle/")) return NextResponse.next();
 
   // If hostname forces a role, enforce the correct route
   if (hostRole) {
@@ -77,5 +78,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/request/:path*", "/operator/:path*", "/supervisor/:path*"],
+  matcher: ["/", "/request/:path*", "/operator/:path*", "/supervisor/:path*", "/bundle/:path*"],
 };
