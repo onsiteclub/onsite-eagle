@@ -26,7 +26,7 @@ export async function GET(
   }
 }
 
-// DELETE — remove site + its lots + their requests
+// DELETE — remove site + all related data (lots, requests, etc.)
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ siteId: string }> }
@@ -54,29 +54,20 @@ export async function DELETE(
       );
     }
 
-    // 1. Delete all requests for this site
-    await supabase
-      .from("frm_material_requests")
-      .delete()
-      .eq("jobsite_id", siteId);
-
-    // 2. Delete all lots for this site
-    await supabase
-      .from("frm_lots")
-      .delete()
-      .eq("jobsite_id", siteId);
-
-    // 3. Delete the site itself
-    const { error } = await supabase
-      .from("frm_jobsites")
-      .delete()
-      .eq("id", siteId);
+    // Use DB function that handles full FK cascade
+    const { data, error } = await supabase.rpc("delete_site_cascade", {
+      target_site_id: siteId,
+    });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, deleted: site.name });
+    if (data?.error) {
+      return NextResponse.json({ error: data.error }, { status: 400 });
+    }
+
+    return NextResponse.json(data);
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
