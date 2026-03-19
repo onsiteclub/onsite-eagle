@@ -91,6 +91,13 @@ export default function SiteOperatorPage() {
     return () => clearInterval(interval);
   }, [loadQueue, userName]);
 
+  // Set page title
+  useEffect(() => {
+    if (siteInfo?.name) {
+      document.title = `Deliveries — ${siteInfo.name}`;
+    }
+  }, [siteInfo?.name]);
+
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     const name = nameInput.trim();
@@ -120,11 +127,6 @@ export default function SiteOperatorPage() {
       </div>
     );
   }
-
-  // Set page title
-  useEffect(() => {
-    document.title = `Deliveries — ${siteInfo.name}`;
-  }, [siteInfo.name]);
 
   // Login inline
   if (!userName) {

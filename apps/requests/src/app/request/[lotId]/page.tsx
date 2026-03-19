@@ -75,10 +75,19 @@ export default function LotRequestPage() {
 
   // Polling
   useEffect(() => {
-    if (!userName) return; // Don't poll before login
+    if (!userName) return;
     const interval = setInterval(loadRequests, POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [loadRequests, userName]);
+
+  // Set page title
+  useEffect(() => {
+    if (lotInfo) {
+      const site = lotInfo.jobsite?.name ?? "";
+      const label = `Lot ${lotInfo.lot_number}${site ? ` — ${site}` : ""}`;
+      document.title = `Material Requests ${label}`;
+    }
+  }, [lotInfo]);
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -111,12 +120,6 @@ export default function LotRequestPage() {
   }
 
   const siteName = lotInfo.jobsite?.name ?? "";
-  const lotLabel = `Lot ${lotInfo.lot_number}${siteName ? ` — ${siteName}` : ""}`;
-
-  // Set page title
-  useEffect(() => {
-    document.title = `Material Requests ${lotLabel}`;
-  }, [lotLabel]);
 
   // Login inline — no name cookie yet
   if (!userName) {
