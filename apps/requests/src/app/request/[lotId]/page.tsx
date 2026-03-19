@@ -23,6 +23,9 @@ interface MaterialRequest {
   urgency_level: string;
   requested_at: string;
   requested_by_name: string | null;
+  delivered_by_name: string | null;
+  delivery_notes: string | null;
+  photo_url: string | null;
   notes: string | null;
   urgency_reason: string | null;
   lot: { lot_number: string } | null;

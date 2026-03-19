@@ -17,6 +17,7 @@ interface MaterialRequest {
   requested_by_name: string | null;
   delivered_by_name: string | null;
   delivery_notes: string | null;
+  photo_url: string | null;
   in_transit_at: string | null;
   delivered_at: string | null;
   notes: string | null;
@@ -88,6 +89,17 @@ export function TransactionCard({ request }: { request: MaterialRequest }) {
           </>
         )}
       </div>
+
+      {/* Delivery photo */}
+      {request.photo_url && (
+        <a href={request.photo_url} target="_blank" rel="noopener noreferrer">
+          <img
+            src={request.photo_url}
+            alt="Delivery photo"
+            className="w-20 h-20 object-cover rounded-lg border border-border hover:opacity-80 transition"
+          />
+        </a>
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ interface MaterialRequest {
   requested_by_name: string | null;
   delivered_by_name: string | null;
   delivery_notes: string | null;
+  photo_url: string | null;
   in_transit_at: string | null;
   delivered_at: string | null;
   notes: string | null;
