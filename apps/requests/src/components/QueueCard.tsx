@@ -13,6 +13,8 @@ interface MaterialRequest {
   status: string;
   urgency_level: string;
   requested_at: string;
+  in_transit_at: string | null;
+  delivered_at: string | null;
   requested_by_name: string | null;
   notes: string | null;
   urgency_reason: string | null;
@@ -231,25 +233,23 @@ export function QueueCard({
     >
       {/* Card content */}
       <div className="p-3.5 pb-2">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-0.5">
           <span
             className="w-2.5 h-2.5 rounded-full shrink-0"
             style={{ backgroundColor: urgencyColor }}
           />
-          <span className="font-semibold text-text text-[15px] truncate flex-1">
-            {request.material_name}
-            {request.quantity ? ` x${request.quantity}` : ""}
+          <span className="font-bold text-text text-[17px] truncate flex-1">
+            {lotNumber ? `Lot ${lotNumber}` : "—"}
           </span>
-          {lotNumber && (
-            <span className="text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded shrink-0">
-              Lot {lotNumber}
-            </span>
+          {siteName && (
+            <span className="text-xs text-text-muted shrink-0">{siteName}</span>
           )}
         </div>
 
         <div className="flex items-center gap-2 ml-[18px] mt-0.5">
           <span className="text-[13px] text-text-secondary truncate">
-            {siteName || "Site"}
+            {request.material_name}
+            {request.quantity ? ` x${request.quantity}` : ""}
             {request.requested_by_name ? ` \u00b7 ${request.requested_by_name}` : ""}
           </span>
           <DeadlineBadge
@@ -277,6 +277,11 @@ export function QueueCard({
         <div className="px-3.5 pb-3.5 pt-1">
           <StatusStepper
             status={request.status}
+            timestamps={{
+              requested_at: request.requested_at,
+              in_transit_at: request.in_transit_at,
+              delivered_at: request.delivered_at,
+            }}
             interactive
             onStepClick={handleStepClick}
             showProblemButton={request.status !== "problem"}

@@ -22,6 +22,8 @@ interface MaterialRequest {
   status: string;
   urgency_level: string;
   requested_at: string;
+  in_transit_at: string | null;
+  delivered_at: string | null;
   requested_by_name: string | null;
   delivered_by_name: string | null;
   delivery_notes: string | null;

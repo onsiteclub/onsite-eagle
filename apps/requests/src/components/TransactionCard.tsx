@@ -39,24 +39,32 @@ export function TransactionCard({ request }: { request: MaterialRequest }) {
 
   return (
     <div className={`bg-card rounded-xl border border-border p-4 space-y-2.5 ${urgencyBorder}`}>
-      {/* Header: material + lot */}
+      {/* Header: Lot (prominent) + site */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Package size={16} className="text-brand shrink-0" />
-          <span className="font-semibold text-text truncate">{request.material_name}</span>
-          <span className="text-sm text-text-secondary">x{request.quantity}</span>
+          <span className="font-bold text-text text-[17px]">Lot {lotNumber}</span>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-sm font-medium text-text-secondary">Lot {lotNumber}</div>
-          {siteName && <div className="text-xs text-text-muted">{siteName}</div>}
-        </div>
+        {siteName && <span className="text-xs text-text-muted shrink-0">{siteName}</span>}
+      </div>
+
+      {/* Material + quantity */}
+      <div className="text-[13px] text-text-secondary">
+        {request.material_name} x{request.quantity}
       </div>
 
       {/* Deadline bar */}
       <DeadlineBar requestedAt={request.requested_at} urgency={request.urgency_level} status={request.status} />
 
       {/* Stepper (read-only) */}
-      <StatusStepper status={request.status} />
+      <StatusStepper
+        status={request.status}
+        timestamps={{
+          requested_at: request.requested_at,
+          in_transit_at: request.in_transit_at,
+          delivered_at: request.delivered_at,
+        }}
+      />
 
       {/* People involved */}
       <div className="flex items-center gap-3 text-xs text-text-muted">

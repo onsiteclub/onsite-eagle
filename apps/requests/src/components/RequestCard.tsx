@@ -11,6 +11,8 @@ interface MaterialRequest {
   status: string;
   urgency_level: string;
   requested_at: string;
+  in_transit_at?: string | null;
+  delivered_at?: string | null;
   requested_by_name?: string | null;
   notes?: string | null;
   urgency_reason?: string | null;
@@ -47,27 +49,23 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
       style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
     >
       <div className="p-3.5">
-        {/* Row 1: urgency dot + material + quantity + lot badge */}
-        <div className="flex items-center gap-2 mb-1">
+        {/* Row 1: Lot number (prominent) */}
+        <div className="flex items-center gap-2 mb-0.5">
           <span
             className="w-2.5 h-2.5 rounded-full shrink-0"
             style={{ backgroundColor: urgencyColor }}
           />
-          <span className="font-semibold text-text text-[15px] truncate flex-1">
-            {request.material_name}
-            {request.quantity ? ` x${request.quantity}` : ""}
+          <span className="font-bold text-text text-[17px] truncate flex-1">
+            {lotNumber ? `Lot ${lotNumber}` : "—"}
           </span>
-          {lotNumber && (
-            <span className="text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded shrink-0">
-              Lot {lotNumber}
-            </span>
-          )}
         </div>
 
-        {/* Row 2: meta + deadline */}
+        {/* Row 2: material + requester + deadline */}
         <div className="flex items-center gap-2 ml-[18px] mt-0.5">
           <span className="text-[13px] text-text-secondary truncate">
-            {request.requested_by_name || "Worker"}
+            {request.material_name}
+            {request.quantity ? ` x${request.quantity}` : ""}
+            {request.requested_by_name ? ` \u00b7 ${request.requested_by_name}` : ""}
           </span>
           <DeadlineBadge
             requestedAt={request.requested_at}
@@ -91,7 +89,14 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
 
         {/* Stepper (read-only) */}
         <div className="mt-3">
-          <StatusStepper status={request.status} />
+          <StatusStepper
+            status={request.status}
+            timestamps={{
+              requested_at: request.requested_at,
+              in_transit_at: request.in_transit_at,
+              delivered_at: request.delivered_at,
+            }}
+          />
         </div>
 
         {/* Delivery info (if delivered) */}

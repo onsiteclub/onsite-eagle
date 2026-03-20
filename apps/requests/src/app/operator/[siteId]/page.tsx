@@ -23,6 +23,8 @@ interface MaterialRequest {
   urgency_level: string;
   urgency_score: number;
   requested_at: string;
+  in_transit_at: string | null;
+  delivered_at: string | null;
   requested_by_name: string | null;
   notes: string | null;
   urgency_reason: string | null;
