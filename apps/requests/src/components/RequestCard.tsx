@@ -1,7 +1,16 @@
 "use client";
 
+import { useState } from "react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
+
+const CONTEST_REASONS = [
+  { value: "not_received", label: "Not received" },
+  { value: "wrong_material", label: "Wrong material" },
+  { value: "wrong_quantity", label: "Wrong quantity" },
+  { value: "damaged", label: "Damaged" },
+];
 
 interface MaterialRequest {
   id: string;
@@ -38,10 +47,40 @@ const URGENCY_COLORS: Record<string, string> = {
   low: "#9CA3AF",
 };
 
-export function RequestCard({ request }: { request: MaterialRequest }) {
+export function RequestCard({ request, onUpdate }: { request: MaterialRequest; onUpdate?: () => void }) {
   const lotNumber = request.lot?.lot_number ?? null;
   const borderColor = STATUS_BORDER[request.status] || "#D1D5DB";
   const urgencyColor = URGENCY_COLORS[request.urgency_level] || "#9CA3AF";
+
+  const [contesting, setContesting] = useState(false);
+  const [contestReason, setContestReason] = useState<string | null>(null);
+  const [contestNote, setContestNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submitContest() {
+    if (!contestReason) return;
+    setSubmitting(true);
+    const label = CONTEST_REASONS.find((r) => r.value === contestReason)?.label ?? contestReason;
+    const note = contestNote.trim()
+      ? `Worker: ${label} — ${contestNote.trim()}`
+      : `Worker: ${label}`;
+
+    await fetch("/api/requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: request.id,
+        status: "problem",
+        delivery_notes: note,
+      }),
+    });
+
+    setSubmitting(false);
+    setContesting(false);
+    setContestReason(null);
+    setContestNote("");
+    onUpdate?.();
+  }
 
   return (
     <div
@@ -108,6 +147,70 @@ export function RequestCard({ request }: { request: MaterialRequest }) {
             {request.delivery_notes && (
               <p className="text-[12px] text-green-600 mt-0.5">{request.delivery_notes}</p>
             )}
+          </div>
+        )}
+
+        {/* Contest delivery — worker can report issue */}
+        {request.status === "delivered" && !contesting && (
+          <div className="ml-[18px] mt-2">
+            <button
+              onClick={() => setContesting(true)}
+              className="text-xs text-text-muted hover:text-amber-600 transition"
+            >
+              Something wrong?
+            </button>
+          </div>
+        )}
+
+        {request.status === "delivered" && contesting && (
+          <div className="ml-[18px] mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2.5">
+            <p className="text-sm font-medium text-amber-800">What happened?</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {CONTEST_REASONS.map((r) => (
+                <button
+                  key={r.value}
+                  onClick={() => setContestReason(r.value)}
+                  className={`px-2.5 py-2 rounded-lg border text-xs font-medium text-left transition active:scale-[0.97] ${
+                    contestReason === r.value
+                      ? "border-amber-500 bg-amber-100 text-amber-800"
+                      : "border-border bg-white text-text hover:border-amber-300"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            {contestReason && (
+              <textarea
+                value={contestNote}
+                onChange={(e) => setContestNote(e.target.value)}
+                placeholder="Details (optional)"
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm text-text outline-none focus:ring-2 focus:ring-amber-200 resize-none"
+              />
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setContesting(false); setContestReason(null); setContestNote(""); }}
+                className="px-3 py-2 text-xs text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitContest}
+                disabled={!contestReason || submitting}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-amber-600 text-white font-medium py-2 px-3 rounded-lg text-xs hover:bg-amber-700 active:scale-[0.98] transition disabled:opacity-50"
+              >
+                {submitting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <>
+                    <AlertTriangle size={14} />
+                    Report Issue
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 

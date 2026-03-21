@@ -150,21 +150,22 @@ export function QueueCard({
   }
 
   async function handleDelivered() {
-    if (!photoFile) return;
     setActionLoading("deliver");
-    setUploading(true);
 
     let photoUrl: string | undefined;
-    const formData = new FormData();
-    formData.append("file", photoFile);
-    formData.append("request_id", request.id);
+    if (photoFile) {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("file", photoFile);
+      formData.append("request_id", request.id);
 
-    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-    if (uploadRes.ok) {
-      const data = await uploadRes.json();
-      photoUrl = data.url;
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      if (uploadRes.ok) {
+        const data = await uploadRes.json();
+        photoUrl = data.url;
+      }
+      setUploading(false);
     }
-    setUploading(false);
 
     await fetch("/api/requests", {
       method: "PATCH",
@@ -342,11 +343,11 @@ export function QueueCard({
           ) : (
             <button
               onClick={() => cameraRef.current?.click()}
-              className="w-full flex flex-col items-center gap-2 py-5 border-2 border-dashed border-red-300 rounded-lg hover:border-brand/40 hover:bg-brand/5 transition bg-red-50/30"
+              className="w-full flex flex-col items-center gap-2 py-5 border-2 border-dashed border-border rounded-lg hover:border-brand/40 hover:bg-brand/5 transition"
             >
               <Camera size={28} className="text-brand" />
-              <span className="text-sm font-medium text-brand">Take Photo *</span>
-              <span className="text-xs text-red-500 font-medium">Required to confirm delivery</span>
+              <span className="text-sm font-medium text-brand">Take Photo</span>
+              <span className="text-xs text-text-muted">Optional</span>
             </button>
           )}
 
@@ -367,7 +368,7 @@ export function QueueCard({
             </button>
             <button
               onClick={handleDelivered}
-              disabled={!photoFile || actionLoading !== null || uploading}
+              disabled={actionLoading !== null || uploading}
               className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-green-700 active:scale-[0.98] transition disabled:opacity-50"
             >
               {actionLoading === "deliver" ? (

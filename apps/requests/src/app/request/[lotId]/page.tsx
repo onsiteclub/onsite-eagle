@@ -305,7 +305,7 @@ export default function LotRequestPage() {
             </p>
           </div>
         ) : (
-          filtered.map((req) => <RequestCard key={req.id} request={req} />)
+          filtered.map((req) => <RequestCard key={req.id} request={req} onUpdate={loadRequests} />)
         )}
       </div>
 
