@@ -68,9 +68,9 @@ export default function SiteOperatorPage() {
         // in_transit always on top
         if (a.status === "in_transit" && b.status !== "in_transit") return -1;
         if (b.status === "in_transit" && a.status !== "in_transit") return 1;
-        // problem at bottom (but still visible)
-        if (a.status === "problem" && b.status !== "problem") return 1;
-        if (b.status === "problem" && a.status !== "problem") return -1;
+        // problem right after in_transit (needs attention)
+        if (a.status === "problem" && b.status !== "problem") return -1;
+        if (b.status === "problem" && a.status !== "problem") return 1;
         // then by urgency
         const urgencyOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
         const ua = urgencyOrder[a.urgency_level] ?? 2;

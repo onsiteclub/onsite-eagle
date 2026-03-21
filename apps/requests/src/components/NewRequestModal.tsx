@@ -79,8 +79,8 @@ export function NewRequestModal(props: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         material_name: materialName,
-        quantity: parseInt(quantity),
-        unit: isBundle ? "bundle" : "pcs",
+        quantity: isBundle && !showCustom ? 1 : parseInt(quantity),
+        unit: isBundle && !showCustom ? "bundle" : "pcs",
         lot_id: effectiveLotId,
         urgency_level: urgency,
         notes: notes.trim() || null,
@@ -196,19 +196,22 @@ export function NewRequestModal(props: Props) {
           )}
 
           {/* Quantity + Urgency row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-text mb-1">Quantity</label>
-              <input
-                type="number"
-                required
-                min={1}
-                inputMode="numeric"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-              />
-            </div>
+          <div className={`grid gap-3 ${isBundle && !showCustom ? "grid-cols-1" : "grid-cols-2"}`}>
+            {/* Quantity — hidden for phase bundles (always 1) */}
+            {(!isBundle || showCustom) && (
+              <div>
+                <label className="block text-sm font-medium text-text mb-1">Quantity</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  inputMode="numeric"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-text mb-1">Urgency</label>
               <select

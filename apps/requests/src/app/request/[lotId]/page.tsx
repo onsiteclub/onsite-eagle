@@ -33,6 +33,8 @@ interface MaterialRequest {
   lot: { lot_number: string } | null;
 }
 
+type Filter = "all" | "pending" | "delivered" | "problem";
+
 const POLL_INTERVAL = 5000;
 
 export default function LotRequestPage() {
@@ -44,6 +46,7 @@ export default function LotRequestPage() {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
 
   // Load lot details
   const loadLot = useCallback(async () => {
@@ -163,6 +166,33 @@ export default function LotRequestPage() {
     );
   }
 
+  // Filter: only show this worker's requests
+  const myRequests = requests.filter(
+    (r) => r.requested_by_name === userName
+  );
+
+  // Apply status filter
+  const filtered = myRequests.filter((r) => {
+    if (filter === "pending") return ["requested", "acknowledged", "in_transit"].includes(r.status);
+    if (filter === "delivered") return r.status === "delivered";
+    if (filter === "problem") return r.status === "problem";
+    return true;
+  });
+
+  // Counts for tabs
+  const pendingCount = myRequests.filter((r) =>
+    ["requested", "acknowledged", "in_transit"].includes(r.status)
+  ).length;
+  const deliveredCount = myRequests.filter((r) => r.status === "delivered").length;
+  const problemCount = myRequests.filter((r) => r.status === "problem").length;
+
+  const TABS: { key: Filter; label: string; count: number }[] = [
+    { key: "all", label: "All", count: myRequests.length },
+    { key: "pending", label: "Pending", count: pendingCount },
+    { key: "delivered", label: "Delivered", count: deliveredCount },
+    { key: "problem", label: "Problem", count: problemCount },
+  ];
+
   // Logged in — show requests for this lot
   return (
     <main className="pb-24">
@@ -180,16 +210,39 @@ export default function LotRequestPage() {
         </div>
       </div>
 
+      {/* Filter tabs */}
+      <div className="flex gap-1 px-4 pt-2 pb-1 overflow-x-auto">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+              filter === tab.key
+                ? tab.key === "problem"
+                  ? "bg-red-100 text-red-700"
+                  : "bg-brand/10 text-brand"
+                : "bg-gray-100 text-text-muted hover:bg-gray-200"
+            }`}
+          >
+            {tab.label} ({tab.count})
+          </button>
+        ))}
+      </div>
+
       {/* Request list */}
       <div className="px-4 py-3 space-y-3">
-        {requests.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-text-muted">
             <Inbox size={48} className="mb-3" />
-            <p className="text-base font-medium">No requests for this lot</p>
-            <p className="text-sm mt-1">Tap + to request material</p>
+            <p className="text-base font-medium">
+              {myRequests.length === 0 ? "No requests yet" : "No matching requests"}
+            </p>
+            <p className="text-sm mt-1">
+              {myRequests.length === 0 ? "Tap + to request material" : "Try a different filter"}
+            </p>
           </div>
         ) : (
-          requests.map((req) => <RequestCard key={req.id} request={req} />)
+          filtered.map((req) => <RequestCard key={req.id} request={req} />)
         )}
       </div>
 
