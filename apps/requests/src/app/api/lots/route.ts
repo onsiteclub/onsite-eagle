@@ -8,7 +8,7 @@ export async function GET() {
 
     const { data: lots, error } = await supabase
       .from("frm_lots")
-      .select("id, lot_number, block, current_phase, jobsite_id, status, jobsite:frm_jobsites(name)")
+      .select("id, lot_number, block, current_phase, jobsite_id, status, registered_workers, jobsite:frm_jobsites(name)")
       .order("lot_number", { ascending: true })
       .limit(500);
 

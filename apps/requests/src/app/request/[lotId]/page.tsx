@@ -5,11 +5,20 @@ import { useParams } from "next/navigation";
 import { getCookie } from "@/lib/cookies";
 import { RequestCard } from "@/components/RequestCard";
 import { NewRequestModal } from "@/components/NewRequestModal";
-import { Plus, RefreshCw, Loader2, Inbox, AlertTriangle } from "lucide-react";
+import { Plus, RefreshCw, Loader2, Inbox, AlertTriangle, ChevronRight } from "lucide-react";
 
 interface LotInfo {
   id: string;
   lot_number: string;
+  status: string;
+  jobsite: { name: string } | null;
+}
+
+interface MyLot {
+  id: string;
+  lot_number: string;
+  block: string | null;
+  jobsite_id: string;
   status: string;
   jobsite: { name: string } | null;
 }
@@ -47,6 +56,7 @@ export default function LotRequestPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [myLots, setMyLots] = useState<MyLot[]>([]);
 
   // Load lot details
   const loadLot = useCallback(async () => {
@@ -69,6 +79,32 @@ export default function LotRequestPage() {
     }
   }, [lotId]);
 
+  // Register worker name on lot + get all their lots
+  const registerWorker = useCallback(async (name: string) => {
+    const res = await fetch(`/api/lots/${lotId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ worker_name: name }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setMyLots((data.my_lots ?? []).filter((l: MyLot) => l.id !== lotId));
+    }
+  }, [lotId]);
+
+  // Load my lots for existing user (already logged in)
+  const loadMyLots = useCallback(async (name: string) => {
+    const res = await fetch(`/api/lots/${lotId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ worker_name: name }),
+    });
+    if (res.ok) {
+      const data: MyLot[] = await res.json();
+      setMyLots(data.filter((l) => l.id !== lotId));
+    }
+  }, [lotId]);
+
   useEffect(() => {
     const name = getCookie("onsite-name");
     if (name) setUserName(name);
@@ -77,9 +113,13 @@ export default function LotRequestPage() {
       await loadLot();
       await loadRequests();
       setLoading(false);
+      // Register + load my lots if already logged in
+      if (name) {
+        registerWorker(name);
+      }
     }
     init();
-  }, [loadLot, loadRequests]);
+  }, [loadLot, loadRequests, registerWorker]);
 
   // Polling
   useEffect(() => {
@@ -97,13 +137,15 @@ export default function LotRequestPage() {
     }
   }, [lotInfo]);
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     const name = nameInput.trim();
     if (!name) return;
     document.cookie = `onsite-name=${encodeURIComponent(name)};path=/;max-age=${30 * 24 * 60 * 60}`;
     document.cookie = `onsite-role=worker;path=/;max-age=${30 * 24 * 60 * 60}`;
     setUserName(name);
+    // Register on this lot + get all my lots
+    registerWorker(name);
   }
 
   if (loading) {
@@ -209,6 +251,27 @@ export default function LotRequestPage() {
           <span className="text-xs text-text-muted">5s</span>
         </div>
       </div>
+
+      {/* My Lots bar — other lots this worker is registered on */}
+      {myLots.length > 0 && (
+        <div className="px-4 pt-2">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {myLots.map((ml) => (
+              <a
+                key={ml.id}
+                href={`/request/${ml.id}`}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-text-secondary whitespace-nowrap transition shrink-0"
+              >
+                Lot {ml.lot_number}
+                {ml.jobsite?.name && (
+                  <span className="text-text-muted">({ml.jobsite.name})</span>
+                )}
+                <ChevronRight size={10} className="text-text-muted" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="flex gap-1 px-4 pt-2 pb-1 overflow-x-auto">

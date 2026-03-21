@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Plus, MapPin, Loader2, Check, Copy, Link2,
-  Truck, Trash2, AlertTriangle, Package, Users, X,
+  Truck, Trash2, AlertTriangle, X,
   Home, Building2, Archive, ArchiveRestore, Settings, Save,
 } from "lucide-react";
 
@@ -21,13 +21,7 @@ interface Lot {
   block: string | null;
   status: string;
   jobsite_id?: string;
-}
-
-interface Bundle {
-  id: string;
-  jobsite_id: string;
-  label: string | null;
-  lot_ids: string[];
+  registered_workers?: string[];
 }
 
 export default function SetupPage() {
@@ -57,13 +51,6 @@ export default function SetupPage() {
   const [blockNumber, setBlockNumber] = useState("");
   const [blockUnits, setBlockUnits] = useState("3");
   const [addingLots, setAddingLots] = useState(false);
-
-  // Bundles
-  const [bundles, setBundles] = useState<Bundle[]>([]);
-  const [selectedLots, setSelectedLots] = useState<Set<string>>(new Set());
-  const [bundleLabel, setBundleLabel] = useState("");
-  const [creatingBundle, setCreatingBundle] = useState(false);
-  const [copiedBundleId, setCopiedBundleId] = useState<string | null>(null);
 
   // Edit site
   const [editName, setEditName] = useState("");
@@ -104,14 +91,6 @@ export default function SetupPage() {
     }
   }
 
-  async function loadBundles(siteId: string) {
-    const res = await fetch(`/api/bundles?site_id=${siteId}`);
-    if (res.ok) {
-      const data = await res.json();
-      setBundles(data);
-    }
-  }
-
   async function updateLotStatus(lotIds: string[], status: "archived" | "pending") {
     if (lotIds.length === 0) return;
     setArchiving(true);
@@ -133,8 +112,6 @@ export default function SetupPage() {
   useEffect(() => {
     if (selectedSite) {
       loadLots(selectedSite);
-      loadBundles(selectedSite);
-      setSelectedLots(new Set());
       setArchiveSelection(new Set());
       // Populate edit fields
       const site = sites.find((s) => s.id === selectedSite);
@@ -222,42 +199,6 @@ export default function SetupPage() {
     setAddingLots(false);
   }
 
-  function toggleLot(lotId: string) {
-    setSelectedLots((prev) => {
-      const next = new Set(prev);
-      if (next.has(lotId)) next.delete(lotId);
-      else next.add(lotId);
-      return next;
-    });
-  }
-
-  async function createBundle() {
-    if (!selectedSite || selectedLots.size === 0) return;
-    setCreatingBundle(true);
-
-    const res = await fetch("/api/bundles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jobsite_id: selectedSite,
-        label: bundleLabel.trim() || null,
-        lot_ids: Array.from(selectedLots),
-      }),
-    });
-
-    if (res.ok) {
-      setSelectedLots(new Set());
-      setBundleLabel("");
-      await loadBundles(selectedSite);
-    }
-    setCreatingBundle(false);
-  }
-
-  async function deleteBundle(bundleId: string) {
-    await fetch(`/api/bundles/${bundleId}`, { method: "DELETE" });
-    if (selectedSite) await loadBundles(selectedSite);
-  }
-
   async function saveSite() {
     if (!selectedSite || !editName.trim()) return;
     setSavingSite(true);
@@ -291,32 +232,12 @@ export default function SetupPage() {
       if (selectedSite === deleteTarget.id) {
         setSelectedSite(null);
         setAllLots([]);
-        setBundles([]);
       }
       setDeleteTarget(null);
       setDeleteConfirm("");
       await loadSites();
     }
     setDeleting(false);
-  }
-
-  // Helper: get lot numbers for a bundle
-  function bundleLotNumbers(bundle: Bundle): string {
-    return bundle.lot_ids
-      .map((id) => allLots.find((l) => l.id === id)?.lot_number)
-      .filter(Boolean)
-      .sort((a, b) => {
-        // Natural sort: "1" < "2" < "4-1" < "4-2" < "10"
-        const na = a!.split("-").map(Number);
-        const nb = b!.split("-").map(Number);
-        for (let i = 0; i < Math.max(na.length, nb.length); i++) {
-          const va = na[i] ?? 0;
-          const vb = nb[i] ?? 0;
-          if (va !== vb) return va - vb;
-        }
-        return 0;
-      })
-      .join(", ");
   }
 
   // Group lots by status filter, then singles vs blocks
@@ -539,39 +460,8 @@ export default function SetupPage() {
 
             {lotView === "active" && (
               <p className="text-xs text-text-muted">
-                Select lots to create a worker bundle, or copy individual links.
+                Copy individual lot links and send to workers.
               </p>
-            )}
-
-            {/* Bundle creation bar — only in active view */}
-            {lotView === "active" && selectedLots.size > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-brand/5 border border-brand/20 rounded-lg">
-                <input
-                  type="text"
-                  value={bundleLabel}
-                  onChange={(e) => setBundleLabel(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-text text-sm outline-none focus:ring-2 focus:ring-brand/30"
-                  placeholder="Worker name (optional)"
-                />
-                <button
-                  onClick={createBundle}
-                  disabled={creatingBundle}
-                  className="flex items-center gap-1.5 bg-brand text-white text-sm font-medium py-2 px-3 rounded-lg hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50 whitespace-nowrap"
-                >
-                  {creatingBundle ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Users size={14} />
-                  )}
-                  Bundle {selectedLots.size} lots
-                </button>
-                <button
-                  onClick={() => setSelectedLots(new Set())}
-                  className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-white transition"
-                >
-                  <X size={14} />
-                </button>
-              </div>
             )}
 
             {/* Archive action bar */}
@@ -653,10 +543,8 @@ export default function SetupPage() {
                 <LotRow
                   key={lot.id}
                   lot={lot}
-                  selected={lotView === "active" ? selectedLots.has(lot.id) : false}
                   archiveSelected={archiveSelection.has(lot.id)}
                   copiedId={copiedId}
-                  onToggle={lotView === "active" ? () => toggleLot(lot.id) : undefined}
                   onArchiveToggle={() => {
                     setArchiveSelection((prev) => {
                       const next = new Set(prev);
@@ -688,10 +576,8 @@ export default function SetupPage() {
                       <LotRow
                         key={lot.id}
                         lot={lot}
-                        selected={lotView === "active" ? selectedLots.has(lot.id) : false}
                         archiveSelected={archiveSelection.has(lot.id)}
                         copiedId={copiedId}
-                        onToggle={lotView === "active" ? () => toggleLot(lot.id) : undefined}
                         onArchiveToggle={() => {
                           setArchiveSelection((prev) => {
                             const next = new Set(prev);
@@ -717,69 +603,7 @@ export default function SetupPage() {
           </section>
         )}
 
-        {/* Section 3: Existing bundles */}
-        {selectedSite && bundles.length > 0 && (
-          <section className="bg-card rounded-xl border border-border p-4 space-y-3">
-            <h2 className="font-semibold text-text flex items-center gap-2">
-              <Package size={18} className="text-brand" />
-              Worker Bundles
-            </h2>
-            <div className="space-y-2">
-              {bundles.map((bundle) => (
-                <div
-                  key={bundle.id}
-                  className="p-3 rounded-lg border border-border"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-text">
-                        {bundle.label || "Unnamed worker"}
-                      </div>
-                      <div className="text-xs text-text-muted">
-                        Lots: {bundleLotNumbers(bundle) || `${bundle.lot_ids.length} lots`}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => {
-                          const url = `${window.location.origin}/bundle/${bundle.id}`;
-                          navigator.clipboard.writeText(url);
-                          setCopiedBundleId(bundle.id);
-                          setTimeout(() => setCopiedBundleId(null), 2000);
-                        }}
-                        className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition ${
-                          copiedBundleId === bundle.id
-                            ? "bg-green-50 text-green-600"
-                            : "bg-brand/10 text-brand hover:bg-brand/20"
-                        }`}
-                      >
-                        {copiedBundleId === bundle.id ? (
-                          <>
-                            <Check size={12} />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={12} />
-                            Copy Link
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => deleteBundle(bundle.id)}
-                        className="p-1.5 text-text-muted hover:text-red-500 rounded-lg hover:bg-red-50 transition"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Section 4: Site Settings — edit + add lots */}
+        {/* Section 3: Site Settings — edit + add lots */}
         {selectedSite && (
           <section className="bg-card rounded-xl border border-border p-4 space-y-4">
             <h2 className="font-semibold text-text flex items-center gap-2">
@@ -966,7 +790,7 @@ export default function SetupPage() {
           </section>
         )}
 
-        {/* Section 5: Danger Zone */}
+        {/* Section 4: Danger Zone */}
         {selectedSite && (
           <section className="bg-card rounded-xl border border-red-200 p-4 space-y-4">
             <h2 className="font-semibold text-red-600 flex items-center gap-2">
@@ -1047,58 +871,59 @@ export default function SetupPage() {
 
 function LotRow({
   lot,
-  selected,
   archiveSelected,
   copiedId,
-  onToggle,
   onArchiveToggle,
   onCopy,
   compact,
   isArchived,
 }: {
   lot: Lot;
-  selected: boolean;
   archiveSelected: boolean;
   copiedId: string | null;
-  onToggle?: () => void;
   onArchiveToggle: () => void;
   onCopy: () => void;
   compact?: boolean;
   isArchived?: boolean;
 }) {
-  const isSelected = archiveSelected || selected;
+  const workers = lot.registered_workers ?? [];
 
   return (
     <div
       className={`flex items-center gap-3 ${compact ? "p-2" : "p-2.5"} rounded-lg border transition cursor-pointer ${
         archiveSelected
           ? "border-amber-400 bg-amber-50"
-          : selected
-            ? "border-brand bg-brand/5"
-            : isArchived
-              ? "border-border/50 bg-gray-50/50"
-              : "border-border hover:bg-gray-50"
+          : isArchived
+            ? "border-border/50 bg-gray-50/50"
+            : "border-border hover:bg-gray-50"
       }`}
       onClick={onArchiveToggle}
     >
       <input
         type="checkbox"
-        checked={isSelected}
+        checked={archiveSelected}
         onChange={onArchiveToggle}
         className={`w-4 h-4 rounded border-border focus:ring-brand/30 ${
           archiveSelected ? "accent-amber-600" : "accent-[var(--color-brand,#0F766E)]"
         }`}
       />
-      <span className={`${compact ? "text-xs" : "text-sm"} font-medium flex-1 ${isArchived ? "text-text-muted" : "text-text"}`}>
-        Lot {lot.lot_number}
-      </span>
+      <div className="flex-1 min-w-0">
+        <span className={`${compact ? "text-xs" : "text-sm"} font-medium ${isArchived ? "text-text-muted" : "text-text"}`}>
+          Lot {lot.lot_number}
+        </span>
+        {workers.length > 0 && (
+          <div className="text-[11px] text-text-muted truncate">
+            {workers.join(", ")}
+          </div>
+        )}
+      </div>
       {!isArchived && (
         <button
           onClick={(e) => {
             e.stopPropagation();
             onCopy();
           }}
-          className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition ${
+          className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition shrink-0 ${
             copiedId === lot.id
               ? "bg-green-50 text-green-600"
               : "bg-brand/10 text-brand hover:bg-brand/20"
