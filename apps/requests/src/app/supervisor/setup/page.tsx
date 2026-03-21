@@ -309,54 +309,215 @@ export default function SetupPage() {
                 Create Site
               </h2>
 
-              <form onSubmit={createSite} className="space-y-3">
-                <input
-                  type="text"
-                  required
-                  value={siteName}
-                  onChange={(e) => setSiteName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                  placeholder="Site name *"
-                />
-                <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-text-muted font-medium mb-1">Site Name</label>
                   <input
                     type="text"
-                    value={siteAddress}
-                    onChange={(e) => setSiteAddress(e.target.value)}
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                    placeholder="Address"
-                  />
-                  <input
-                    type="text"
-                    value={siteCity}
-                    onChange={(e) => setSiteCity(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                    placeholder="City"
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    max={500}
-                    inputMode="numeric"
-                    value={lotCount}
-                    onChange={(e) => setLotCount(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                    placeholder="Lots"
+                    placeholder="Site name *"
                   />
                 </div>
-                <button
-                  type="submit"
-                  disabled={creatingSite || !siteName.trim() || !lotCount || parseInt(lotCount) < 1}
-                  className="flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
-                >
-                  {creatingSite ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Plus size={16} />
-                  )}
-                  Create Site + {lotCount || 0} lots
-                </button>
-              </form>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">Address</label>
+                    <input
+                      type="text"
+                      value={siteAddress}
+                      onChange={(e) => setSiteAddress(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                      placeholder="Address"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">City</label>
+                    <input
+                      type="text"
+                      value={siteCity}
+                      onChange={(e) => setSiteCity(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                      placeholder="City"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-border" />
+
+              {/* Add Lots — same as Site Settings */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-text">Add Lots</h3>
+
+                {/* Mode tabs */}
+                <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setAddMode("singles")}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
+                      addMode === "singles"
+                        ? "bg-white text-brand shadow-sm"
+                        : "text-text-muted hover:text-text"
+                    }`}
+                  >
+                    <Home size={14} />
+                    Singles
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddMode("block")}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
+                      addMode === "block"
+                        ? "bg-white text-brand shadow-sm"
+                        : "text-text-muted hover:text-text"
+                    }`}
+                  >
+                    <Building2 size={14} />
+                    Block
+                  </button>
+                </div>
+
+                {addMode === "singles" ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-text-muted font-medium mb-1">From</label>
+                        <input
+                          type="number"
+                          min={1}
+                          inputMode="numeric"
+                          value={singlesFrom || "1"}
+                          onChange={(e) => setSinglesFrom(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-text-muted font-medium mb-1">To</label>
+                        <input
+                          type="number"
+                          min={1}
+                          inputMode="numeric"
+                          value={singlesTo || "10"}
+                          onChange={(e) => setSinglesTo(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                        />
+                      </div>
+                    </div>
+                    {(() => {
+                      const f = parseInt(singlesFrom || "1");
+                      const t = parseInt(singlesTo || "10");
+                      const cnt = !isNaN(f) && !isNaN(t) && t >= f ? t - f + 1 : 0;
+                      return cnt > 0 ? (
+                        <p className="text-xs text-text-muted">
+                          Will create <strong>{cnt}</strong> lots: {f} to {t}
+                        </p>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-text-muted font-medium mb-1">Block #</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={blockNumber}
+                          onChange={(e) => setBlockNumber(e.target.value)}
+                          placeholder="e.g. 4"
+                          className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-text-muted font-medium mb-1">Units</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={50}
+                          inputMode="numeric"
+                          value={blockUnits}
+                          onChange={(e) => setBlockUnits(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                        />
+                      </div>
+                    </div>
+                    {blockNumber.trim() && parseInt(blockUnits) > 0 && (
+                      <p className="text-xs text-text-muted">
+                        Will create <strong>{blockUnits}</strong> lots:{" "}
+                        {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${i + 1}`).join(", ")}
+                        {(parseInt(blockUnits) || 0) > 8 && ", ..."}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Create button */}
+              <button
+                type="button"
+                onClick={async (e) => {
+                  // Create site first, then add lots
+                  e.preventDefault();
+                  if (!siteName.trim()) return;
+                  setCreatingSite(true);
+
+                  const res = await fetch("/api/sites", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      name: siteName.trim(),
+                      address: siteAddress.trim() || null,
+                      city: siteCity.trim() || null,
+                    }),
+                  });
+
+                  if (res.ok) {
+                    const site = await res.json();
+
+                    // Add lots based on selected mode
+                    if (addMode === "singles") {
+                      const from = parseInt(singlesFrom || "1");
+                      const to = parseInt(singlesTo || "10");
+                      if (!isNaN(from) && !isNaN(to) && to >= from) {
+                        await fetch("/api/lots", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ jobsite_id: site.id, count: to - from + 1, from }),
+                        });
+                      }
+                    } else {
+                      const bn = blockNumber.trim();
+                      const units = parseInt(blockUnits);
+                      if (bn && !isNaN(units) && units > 0) {
+                        await fetch("/api/lots", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ jobsite_id: site.id, block_number: bn, unit_count: units }),
+                        });
+                      }
+                    }
+
+                    setSiteName("");
+                    setSiteAddress("");
+                    setSiteCity("");
+                    setSelectedSite(site.id);
+                    await loadSites();
+                    await loadLots(site.id);
+                  }
+                  setCreatingSite(false);
+                }}
+                disabled={creatingSite || !siteName.trim()}
+                className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+              >
+                {creatingSite ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Plus size={16} />
+                )}
+                Create Site
+              </button>
             </>
           )}
 

@@ -39,10 +39,8 @@ const URGENCY_COLORS: Record<string, string> = {
 
 const PROBLEM_REASONS = [
   { value: "not_in_stock", label: "Not in stock" },
-  { value: "road_blocked", label: "Road blocked" },
-  { value: "wrong_material", label: "Wrong material requested" },
-  { value: "truck_full", label: "Truck full" },
   { value: "site_closed", label: "Site closed" },
+  { value: "machine_down", label: "Machine down" },
   { value: "other", label: "Other" },
 ];
 

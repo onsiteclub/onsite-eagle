@@ -13,7 +13,7 @@ const STATUS_TO_STEP: Record<string, number> = {
   acknowledged: 0,
   in_transit: 1,
   delivered: 2,
-  problem: -1,
+  problem: 0, // problem can happen at any stage; stepper shows last known stage
 };
 
 /** Format timestamp as "HH:MM" */
@@ -72,15 +72,9 @@ export function StatusStepper({
           interactive && isNext && !disabled &&
           !(step.key === "in_transit" && transitDisabled);
 
-        // Line color between steps
+        // Line color: colored when active, gray otherwise
         const lineActive = isCompleted || isCurrent;
-        const prevStep = i > 0 ? STEPS[i - 1] : null;
-        // Use the color of the step the line leads TO if active
-        const lineColor = lineActive
-          ? step.line
-          : isProblem
-          ? "bg-red-200"
-          : "bg-gray-200";
+        const lineColor = lineActive ? step.line : "bg-gray-200";
 
         return (
           <div key={step.key} className="flex items-start flex-1 last:flex-none">
@@ -110,8 +104,6 @@ export function StatusStepper({
                     ? `${step.bg} text-white`
                     : isCurrent
                     ? `${step.bg} text-white ring-2 ${step.ring} ring-offset-1`
-                    : isProblem && i <= (STATUS_TO_STEP[status] ?? 0)
-                    ? "bg-red-500 text-white"
                     : canClick
                     ? `bg-white border-2 ${step.border} ${step.text} ${step.hoverBg} group-hover:text-white group-active:scale-90`
                     : "bg-gray-100 border border-gray-200 text-gray-400"
@@ -147,17 +139,14 @@ export function StatusStepper({
         );
       })}
 
-      {/* Problem indicator */}
+      {/* Problem badge (no extra node, just a small indicator) */}
       {isProblem && (
-        <>
-          <div className="h-[2px] w-3 mx-0.5 bg-red-300 rounded-full mt-4" />
-          <div className="flex flex-col items-center gap-0.5 shrink-0">
-            <div className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center ring-2 ring-red-200 ring-offset-1">
-              <AlertTriangle size={14} />
-            </div>
-            <span className="text-[10px] font-medium text-red-600 leading-none">Problem</span>
+        <div className="ml-2 flex flex-col items-center gap-0.5 shrink-0">
+          <div className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center">
+            <AlertTriangle size={14} />
           </div>
-        </>
+          <span className="text-[10px] font-medium text-red-600 leading-none">Problem</span>
+        </div>
       )}
 
       {/* Problem button for operator */}
