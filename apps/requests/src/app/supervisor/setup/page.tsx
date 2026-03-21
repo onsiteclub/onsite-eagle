@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Plus, MapPin, Loader2, Check, Copy, Link2,
   Truck, Trash2, AlertTriangle, Package, Users, X,
-  Home, Building2,
+  Home, Building2, Archive, ArchiveRestore,
 } from "lucide-react";
 
 interface Site {
@@ -19,6 +19,7 @@ interface Lot {
   id: string;
   lot_number: string;
   block: string | null;
+  status: string;
   jobsite_id?: string;
 }
 
@@ -43,6 +44,9 @@ export default function SetupPage() {
   // Lots
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
   const [allLots, setAllLots] = useState<Lot[]>([]);
+  const [lotView, setLotView] = useState<"active" | "archived">("active");
+  const [archiveSelection, setArchiveSelection] = useState<Set<string>>(new Set());
+  const [archiving, setArchiving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedSiteId, setCopiedSiteId] = useState<string | null>(null);
 
@@ -101,6 +105,19 @@ export default function SetupPage() {
     }
   }
 
+  async function updateLotStatus(lotIds: string[], status: "archived" | "pending") {
+    if (lotIds.length === 0) return;
+    setArchiving(true);
+    await fetch("/api/lots", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lot_ids: lotIds, status }),
+    });
+    setArchiveSelection(new Set());
+    if (selectedSite) await loadLots(selectedSite);
+    setArchiving(false);
+  }
+
   useEffect(() => {
     loadSites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,6 +128,7 @@ export default function SetupPage() {
       loadLots(selectedSite);
       loadBundles(selectedSite);
       setSelectedLots(new Set());
+      setArchiveSelection(new Set());
     }
   }, [selectedSite]);
 
@@ -267,12 +285,17 @@ export default function SetupPage() {
       .join(", ");
   }
 
-  // Group lots: singles first, then blocks
-  function groupedLots() {
+  // Group lots by status filter, then singles vs blocks
+  function groupedLots(statusFilter: "active" | "archived") {
+    const isArchived = statusFilter === "archived";
+    const filtered = allLots.filter((l) =>
+      isArchived ? l.status === "archived" : l.status !== "archived"
+    );
+
     const singles: Lot[] = [];
     const blocks = new Map<string, Lot[]>();
 
-    for (const lot of allLots) {
+    for (const lot of filtered) {
       if (lot.block) {
         const group = blocks.get(lot.block) || [];
         group.push(lot);
@@ -282,10 +305,8 @@ export default function SetupPage() {
       }
     }
 
-    // Sort singles by lot_number numerically
     singles.sort((a, b) => (parseInt(a.lot_number) || 0) - (parseInt(b.lot_number) || 0));
 
-    // Sort block groups by block number, lots within block by unit number
     const sortedBlocks = Array.from(blocks.entries()).sort(
       (a, b) => (parseInt(a[0]) || 0) - (parseInt(b[0]) || 0)
     );
@@ -297,7 +318,7 @@ export default function SetupPage() {
       });
     }
 
-    return { singles, blocks: sortedBlocks };
+    return { singles, blocks: sortedBlocks, total: filtered.length };
   }
 
   // Singles preview
@@ -316,7 +337,9 @@ export default function SetupPage() {
     );
   }
 
-  const { singles, blocks } = groupedLots();
+  const { singles, blocks, total } = groupedLots(lotView);
+  const activeCount = allLots.filter((l) => l.status !== "archived").length;
+  const archivedCount = allLots.filter((l) => l.status === "archived").length;
 
   return (
     <main className="pb-8">
@@ -575,16 +598,48 @@ export default function SetupPage() {
         {/* Section 2: Lots + Bundle creation */}
         {selectedSite && allLots.length > 0 && (
           <section className="bg-card rounded-xl border border-border p-4 space-y-3">
-            <h2 className="font-semibold text-text flex items-center gap-2">
-              <Link2 size={18} className="text-brand" />
-              Lot Links
-            </h2>
-            <p className="text-xs text-text-muted">
-              Select lots to create a worker bundle, or copy individual links.
-            </p>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-text flex items-center gap-2">
+                <Link2 size={18} className="text-brand" />
+                Lot Links
+              </h2>
+            </div>
 
-            {/* Bundle creation bar */}
-            {selectedLots.size > 0 && (
+            {/* Active / Archived tabs */}
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => { setLotView("active"); setArchiveSelection(new Set()); }}
+                className={`flex-1 py-1.5 rounded-md text-xs font-medium transition ${
+                  lotView === "active"
+                    ? "bg-white text-brand shadow-sm"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                Active ({activeCount})
+              </button>
+              <button
+                onClick={() => { setLotView("archived"); setArchiveSelection(new Set()); }}
+                className={`flex-1 py-1.5 rounded-md text-xs font-medium transition ${
+                  lotView === "archived"
+                    ? "bg-white text-amber-600 shadow-sm"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                <span className="flex items-center justify-center gap-1">
+                  <Archive size={12} />
+                  Archived ({archivedCount})
+                </span>
+              </button>
+            </div>
+
+            {lotView === "active" && (
+              <p className="text-xs text-text-muted">
+                Select lots to create a worker bundle, or copy individual links.
+              </p>
+            )}
+
+            {/* Bundle creation bar — only in active view */}
+            {lotView === "active" && selectedLots.size > 0 && (
               <div className="flex items-center gap-2 p-3 bg-brand/5 border border-brand/20 rounded-lg">
                 <input
                   type="text"
@@ -614,41 +669,132 @@ export default function SetupPage() {
               </div>
             )}
 
-            {/* Lot list with checkboxes — grouped */}
+            {/* Archive action bar */}
+            {archiveSelection.size > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <span className="text-sm text-amber-700 font-medium flex-1">
+                  {archiveSelection.size} lot{archiveSelection.size > 1 ? "s" : ""} selected
+                </span>
+                <button
+                  onClick={() => updateLotStatus(Array.from(archiveSelection), lotView === "active" ? "archived" : "pending")}
+                  disabled={archiving}
+                  className={`flex items-center gap-1.5 text-sm font-medium py-2 px-3 rounded-lg active:scale-[0.98] transition disabled:opacity-50 whitespace-nowrap ${
+                    lotView === "active"
+                      ? "bg-amber-600 text-white hover:bg-amber-700"
+                      : "bg-brand text-white hover:bg-brand-dark"
+                  }`}
+                >
+                  {archiving ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : lotView === "active" ? (
+                    <Archive size={14} />
+                  ) : (
+                    <ArchiveRestore size={14} />
+                  )}
+                  {lotView === "active" ? "Archive" : "Unarchive"}
+                </button>
+                <button
+                  onClick={() => setArchiveSelection(new Set())}
+                  className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-white transition"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Select all / none for archive */}
+            {total > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const allIds = new Set([
+                      ...singles.map((l) => l.id),
+                      ...blocks.flatMap(([, lots]) => lots.map((l) => l.id)),
+                    ]);
+                    setArchiveSelection(allIds);
+                  }}
+                  className="text-xs text-brand hover:underline"
+                >
+                  Select all ({total})
+                </button>
+                {archiveSelection.size > 0 && (
+                  <button
+                    onClick={() => setArchiveSelection(new Set())}
+                    className="text-xs text-text-muted hover:underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Lot list — grouped */}
             <div className="space-y-1.5 max-h-80 overflow-y-auto">
+              {total === 0 && (
+                <div className="flex flex-col items-center py-8 text-text-muted">
+                  {lotView === "archived" ? (
+                    <>
+                      <Archive size={32} className="mb-2 opacity-40" />
+                      <p className="text-sm">No archived lots</p>
+                    </>
+                  ) : (
+                    <p className="text-sm">No active lots</p>
+                  )}
+                </div>
+              )}
+
               {/* Singles */}
               {singles.map((lot) => (
                 <LotRow
                   key={lot.id}
                   lot={lot}
-                  selected={selectedLots.has(lot.id)}
+                  selected={lotView === "active" ? selectedLots.has(lot.id) : false}
+                  archiveSelected={archiveSelection.has(lot.id)}
                   copiedId={copiedId}
-                  onToggle={() => toggleLot(lot.id)}
+                  onToggle={lotView === "active" ? () => toggleLot(lot.id) : undefined}
+                  onArchiveToggle={() => {
+                    setArchiveSelection((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(lot.id)) next.delete(lot.id);
+                      else next.add(lot.id);
+                      return next;
+                    });
+                  }}
                   onCopy={() => {
                     const url = `${window.location.origin}/request/${lot.id}`;
                     navigator.clipboard.writeText(url);
                     setCopiedId(lot.id);
                     setTimeout(() => setCopiedId(null), 2000);
                   }}
+                  isArchived={lotView === "archived"}
                 />
               ))}
 
               {/* Blocks */}
               {blocks.map(([blockId, blockLots]) => (
-                <div key={`block-${blockId}`} className="border border-blue-200 rounded-lg overflow-hidden">
-                  <div className="bg-blue-50 px-3 py-1.5 flex items-center gap-1.5">
-                    <Building2 size={12} className="text-blue-600" />
-                    <span className="text-xs font-medium text-blue-700">Block {blockId}</span>
-                    <span className="text-xs text-blue-500">{blockLots.length} units</span>
+                <div key={`block-${blockId}`} className={`border rounded-lg overflow-hidden ${lotView === "archived" ? "border-amber-200" : "border-blue-200"}`}>
+                  <div className={`px-3 py-1.5 flex items-center gap-1.5 ${lotView === "archived" ? "bg-amber-50" : "bg-blue-50"}`}>
+                    <Building2 size={12} className={lotView === "archived" ? "text-amber-600" : "text-blue-600"} />
+                    <span className={`text-xs font-medium ${lotView === "archived" ? "text-amber-700" : "text-blue-700"}`}>Block {blockId}</span>
+                    <span className={`text-xs ${lotView === "archived" ? "text-amber-500" : "text-blue-500"}`}>{blockLots.length} units</span>
                   </div>
                   <div className="space-y-0.5 p-1">
                     {blockLots.map((lot) => (
                       <LotRow
                         key={lot.id}
                         lot={lot}
-                        selected={selectedLots.has(lot.id)}
+                        selected={lotView === "active" ? selectedLots.has(lot.id) : false}
+                        archiveSelected={archiveSelection.has(lot.id)}
                         copiedId={copiedId}
-                        onToggle={() => toggleLot(lot.id)}
+                        onToggle={lotView === "active" ? () => toggleLot(lot.id) : undefined}
+                        onArchiveToggle={() => {
+                          setArchiveSelection((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(lot.id)) next.delete(lot.id);
+                            else next.add(lot.id);
+                            return next;
+                          });
+                        }}
                         onCopy={() => {
                           const url = `${window.location.origin}/request/${lot.id}`;
                           navigator.clipboard.writeText(url);
@@ -656,6 +802,7 @@ export default function SetupPage() {
                           setTimeout(() => setCopiedId(null), 2000);
                         }}
                         compact
+                        isArchived={lotView === "archived"}
                       />
                     ))}
                   </div>
@@ -809,59 +956,75 @@ export default function SetupPage() {
 function LotRow({
   lot,
   selected,
+  archiveSelected,
   copiedId,
   onToggle,
+  onArchiveToggle,
   onCopy,
   compact,
+  isArchived,
 }: {
   lot: Lot;
   selected: boolean;
+  archiveSelected: boolean;
   copiedId: string | null;
-  onToggle: () => void;
+  onToggle?: () => void;
+  onArchiveToggle: () => void;
   onCopy: () => void;
   compact?: boolean;
+  isArchived?: boolean;
 }) {
+  const isSelected = archiveSelected || selected;
+
   return (
     <div
       className={`flex items-center gap-3 ${compact ? "p-2" : "p-2.5"} rounded-lg border transition cursor-pointer ${
-        selected
-          ? "border-brand bg-brand/5"
-          : "border-border hover:bg-gray-50"
+        archiveSelected
+          ? "border-amber-400 bg-amber-50"
+          : selected
+            ? "border-brand bg-brand/5"
+            : isArchived
+              ? "border-border/50 bg-gray-50/50"
+              : "border-border hover:bg-gray-50"
       }`}
-      onClick={onToggle}
+      onClick={onArchiveToggle}
     >
       <input
         type="checkbox"
-        checked={selected}
-        onChange={onToggle}
-        className="w-4 h-4 rounded border-border text-brand focus:ring-brand/30 accent-[var(--color-brand,#0F766E)]"
+        checked={isSelected}
+        onChange={onArchiveToggle}
+        className={`w-4 h-4 rounded border-border focus:ring-brand/30 ${
+          archiveSelected ? "accent-amber-600" : "accent-[var(--color-brand,#0F766E)]"
+        }`}
       />
-      <span className={`${compact ? "text-xs" : "text-sm"} font-medium text-text flex-1`}>
+      <span className={`${compact ? "text-xs" : "text-sm"} font-medium flex-1 ${isArchived ? "text-text-muted" : "text-text"}`}>
         Lot {lot.lot_number}
       </span>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onCopy();
-        }}
-        className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition ${
-          copiedId === lot.id
-            ? "bg-green-50 text-green-600"
-            : "bg-brand/10 text-brand hover:bg-brand/20"
-        }`}
-      >
-        {copiedId === lot.id ? (
-          <>
-            <Check size={10} />
-            Copied
-          </>
-        ) : (
-          <>
-            <Copy size={10} />
-            Link
-          </>
-        )}
-      </button>
+      {!isArchived && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onCopy();
+          }}
+          className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition ${
+            copiedId === lot.id
+              ? "bg-green-50 text-green-600"
+              : "bg-brand/10 text-brand hover:bg-brand/20"
+          }`}
+        >
+          {copiedId === lot.id ? (
+            <>
+              <Check size={10} />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy size={10} />
+              Link
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }

@@ -111,3 +111,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
+
+// PATCH — bulk update lot status (archive/unarchive)
+export async function PATCH(req: NextRequest) {
+  try {
+    const supabase = createAdminClient();
+    const body = await req.json();
+
+    const { lot_ids, status } = body;
+
+    if (!lot_ids || !Array.isArray(lot_ids) || lot_ids.length === 0) {
+      return NextResponse.json({ error: "lot_ids array required" }, { status: 400 });
+    }
+
+    if (!["pending", "archived"].includes(status)) {
+      return NextResponse.json({ error: "status must be 'pending' or 'archived'" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("frm_lots")
+      .update({ status })
+      .in("id", lot_ids)
+      .select("id, lot_number, status");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data ?? []);
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
