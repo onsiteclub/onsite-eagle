@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Package, Layers } from "lucide-react";
+import { X, Package, Pencil, Check } from "lucide-react";
 
 interface Lot {
   id: string;
@@ -9,31 +9,30 @@ interface Lot {
   jobsite?: { name: string } | null;
 }
 
-// Phase bundles — arrive as closed packages
+// 7 pre-defined bundles (factory packages)
 const PHASE_BUNDLES = [
-  { value: "1st Floor Material", label: "1st Floor Material", icon: "📦" },
-  { value: "1st Floor Walls Material", label: "1st Floor Walls", icon: "🧱" },
-  { value: "2nd Floor Material", label: "2nd Floor Material", icon: "📦" },
-  { value: "2nd Floor Walls Material", label: "2nd Floor Walls", icon: "🧱" },
+  { value: "First Floor System", label: "First Floor System", icon: "📦" },
+  { value: "Main Floor Walls", label: "Main Floor Walls", icon: "🧱" },
+  { value: "Second Floor System", label: "Second Floor System", icon: "📦" },
+  { value: "Second Floor Walls", label: "Second Floor Walls", icon: "🧱" },
   { value: "Roof Material", label: "Roof Material", icon: "🏠" },
-  { value: "Backing Material", label: "Backing Material", icon: "📐" },
-  { value: "Finish Basement Material", label: "Finish Basement", icon: "🏗️" },
+  { value: "Backframing", label: "Backframing", icon: "📐" },
   { value: "Strapping", label: "Strapping", icon: "🔗" },
 ];
 
-// Common loose items
-const LOOSE_ITEMS = [
-  { value: "2x10 Scaffold", label: "2x10 (Scaffold)" },
-  { value: "2x6 Long", label: "2x6 (Long)" },
-  { value: "2x4 Long", label: "2x4 (Long)" },
-];
+// Sub-items per bundle
+const BUNDLE_SUB_ITEMS: Record<string, string[]> = {
+  "First Floor System": ["Plywood Sheets", "Joists", "LVLs", "Posts (Metal)", "Hangers"],
+  "Main Floor Walls": ["Lumber", "Plywood Sheets", "Tyvek", "Hangers"],
+  "Second Floor System": ["Plywood Sheets", "Joists", "LVLs", "Hangers"],
+  "Second Floor Walls": ["Lumber", "Plywood Sheets", "Tyvek"],
+  "Roof Material": ["Trusses", "Lumber", "Plywood"],
+  "Backframing": ["Lumber", "Garage Jam"],
+  "Strapping": ["Lumber"],
+};
 
-const URGENCY = [
-  { value: "low", label: "Low — 24h+" },
-  { value: "medium", label: "Normal — Today" },
-  { value: "high", label: "High — Within hours" },
-  { value: "critical", label: "Urgent — Blocking work" },
-];
+// Sentinel for 8th card — loose item (single piece from lumberyard)
+const LOOSE = "__loose__";
 
 type Props = {
   userName: string;
@@ -51,21 +50,66 @@ export function NewRequestModal(props: Props) {
   const lots = "lots" in props ? props.lots : undefined;
 
   const [selected, setSelected] = useState<string | null>(null);
-  const [customMaterial, setCustomMaterial] = useState("");
-  const [quantity, setQuantity] = useState("1");
+  const [looseText, setLooseText] = useState("");
   const [selectedLotId, setSelectedLotId] = useState(
     fixedLotId ?? (lots?.length === 1 ? lots[0].id : "")
   );
-  const [urgency, setUrgency] = useState("medium");
-  const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showCustom, setShowCustom] = useState(false);
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [otherItem, setOtherItem] = useState("");
 
   const effectiveLotId = fixedLotId ?? selectedLotId;
-  const materialName = showCustom ? customMaterial.trim() : selected;
   const isBundle = PHASE_BUNDLES.some((b) => b.value === selected);
-  const canSubmit = !!materialName && !!quantity && !!effectiveLotId;
+  const isLoose = selected === LOOSE;
+  const subItems = isBundle && selected ? BUNDLE_SUB_ITEMS[selected] ?? [] : [];
+  const hasSubItems = subItems.length > 0;
+
+  // What gets saved as material_name
+  const materialName = isBundle
+    ? selected
+    : isLoose
+    ? looseText.trim() || null
+    : null;
+
+  const canSubmit = !!effectiveLotId && (
+    isBundle
+      ? !!selected && (checkedItems.size > 0 || otherItem.trim().length > 0)
+      : isLoose
+      ? !!looseText.trim()
+      : false
+  );
+
+  function selectBundle(value: string) {
+    setSelected(value);
+    setLooseText("");
+    const items = BUNDLE_SUB_ITEMS[value] ?? [];
+    setCheckedItems(new Set(items));
+    setOtherItem("");
+  }
+
+  function selectLoose() {
+    setSelected(LOOSE);
+    setCheckedItems(new Set());
+    setOtherItem("");
+  }
+
+  function toggleItem(item: string) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(item)) next.delete(item);
+      else next.add(item);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (checkedItems.size === subItems.length) {
+      setCheckedItems(new Set());
+    } else {
+      setCheckedItems(new Set(subItems));
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,17 +118,32 @@ export function NewRequestModal(props: Props) {
     setLoading(true);
     setError("");
 
+    // Build sub_items array for bundles
+    let subItemsPayload: { name: string; status: string }[] | null = null;
+    if (isBundle && hasSubItems) {
+      subItemsPayload = [];
+      for (const item of subItems) {
+        if (checkedItems.has(item)) {
+          subItemsPayload.push({ name: item, status: "pending" });
+        }
+      }
+      if (otherItem.trim()) {
+        subItemsPayload.push({ name: otherItem.trim(), status: "pending" });
+      }
+    }
+
     const res = await fetch("/api/requests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         material_name: materialName,
-        quantity: isBundle && !showCustom ? 1 : parseInt(quantity),
-        unit: isBundle && !showCustom ? "bundle" : "pcs",
+        quantity: 1,
+        unit: isBundle ? "bundle" : "pcs",
         lot_id: effectiveLotId,
-        urgency_level: urgency,
-        notes: notes.trim() || null,
+        urgency_level: "medium",
+        notes: null,
         requested_by_name: userName,
+        sub_items: subItemsPayload,
       }),
     });
 
@@ -96,11 +155,6 @@ export function NewRequestModal(props: Props) {
 
     onCreated();
     onClose();
-  }
-
-  function selectItem(value: string) {
-    setSelected(value);
-    setShowCustom(false);
   }
 
   return (
@@ -122,20 +176,20 @@ export function NewRequestModal(props: Props) {
             </div>
           )}
 
-          {/* Phase Bundles */}
+          {/* ─── 8 CARDS: 7 bundles + Loose Items ─── */}
           <div>
             <label className="flex items-center gap-1.5 text-sm font-medium text-text mb-2">
               <Package size={14} />
-              Phase Bundle
+              What do you need?
             </label>
             <div className="grid grid-cols-2 gap-2">
               {PHASE_BUNDLES.map((b) => (
                 <button
                   key={b.value}
                   type="button"
-                  onClick={() => selectItem(b.value)}
+                  onClick={() => selectBundle(b.value)}
                   className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-sm font-medium transition active:scale-[0.97] ${
-                    selected === b.value && !showCustom
+                    selected === b.value
                       ? "border-brand bg-brand/5 text-brand"
                       : "border-border bg-bg text-text hover:border-brand/40"
                   }`}
@@ -144,87 +198,104 @@ export function NewRequestModal(props: Props) {
                   <span className="truncate">{b.label}</span>
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Loose Items */}
-          <div>
-            <label className="flex items-center gap-1.5 text-sm font-medium text-text mb-2">
-              <Layers size={14} />
-              Loose Items
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {LOOSE_ITEMS.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => selectItem(item.value)}
-                  className={`px-3 py-2 rounded-xl border text-sm font-medium transition active:scale-[0.97] ${
-                    selected === item.value && !showCustom
-                      ? "border-brand bg-brand/5 text-brand"
-                      : "border-border bg-bg text-text hover:border-brand/40"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+              {/* 8th card — Loose Items */}
               <button
                 type="button"
-                onClick={() => { setShowCustom(true); setSelected(null); }}
-                className={`px-3 py-2 rounded-xl border text-sm font-medium transition active:scale-[0.97] ${
-                  showCustom
+                onClick={selectLoose}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-sm font-medium transition active:scale-[0.97] ${
+                  isLoose
                     ? "border-brand bg-brand/5 text-brand"
-                    : "border-border bg-bg text-text-secondary hover:border-brand/40"
+                    : "border-border bg-bg text-text hover:border-brand/40"
                 }`}
               >
-                Other...
+                <span className="text-base">📋</span>
+                <span className="truncate">Loose Items</span>
               </button>
             </div>
           </div>
 
-          {/* Custom material input */}
-          {showCustom && (
-            <input
-              type="text"
-              autoFocus
-              autoCapitalize="words"
-              value={customMaterial}
-              onChange={(e) => setCustomMaterial(e.target.value)}
-              className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-              placeholder="Material name..."
-            />
+          {/* ─── SUB-ITEMS CHECKLIST (bundles) ─── */}
+          {isBundle && hasSubItems && (
+            <div className="bg-gray-50 border border-border rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-text">Items needed</span>
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="text-xs text-brand font-medium hover:underline"
+                >
+                  {checkedItems.size === subItems.length ? "Unselect all" : "Select all"}
+                </button>
+              </div>
+              <div className="space-y-1">
+                {subItems.map((item) => (
+                  <label
+                    key={item}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition ${
+                      checkedItems.has(item)
+                        ? "bg-brand/10 border border-brand/20"
+                        : "bg-white border border-border hover:border-brand/30"
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition ${
+                        checkedItems.has(item)
+                          ? "bg-brand text-white"
+                          : "border-2 border-gray-300"
+                      }`}
+                    >
+                      {checkedItems.has(item) && <Check size={12} strokeWidth={3} />}
+                    </div>
+                    <span className="text-sm text-text">{item}</span>
+                    <input
+                      type="checkbox"
+                      checked={checkedItems.has(item)}
+                      onChange={() => toggleItem(item)}
+                      className="sr-only"
+                    />
+                  </label>
+                ))}
+                {/* Other sub-item — free text */}
+                <div className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition ${
+                  otherItem.trim() ? "bg-brand/10 border-brand/20" : "bg-white border-border"
+                }`}>
+                  <div
+                    className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition ${
+                      otherItem.trim() ? "bg-brand text-white" : "border-2 border-gray-300"
+                    }`}
+                  >
+                    {otherItem.trim() && <Check size={12} strokeWidth={3} />}
+                  </div>
+                  <input
+                    type="text"
+                    value={otherItem}
+                    onChange={(e) => setOtherItem(e.target.value)}
+                    placeholder="Other (specify)..."
+                    className="flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
+                  />
+                </div>
+              </div>
+            </div>
           )}
 
-          {/* Quantity + Urgency row */}
-          <div className={`grid gap-3 ${isBundle && !showCustom ? "grid-cols-1" : "grid-cols-2"}`}>
-            {/* Quantity — hidden for phase bundles (always 1) */}
-            {(!isBundle || showCustom) && (
-              <div>
-                <label className="block text-sm font-medium text-text mb-1">Quantity</label>
-                <input
-                  type="number"
-                  required
-                  min={1}
-                  inputMode="numeric"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                />
-              </div>
-            )}
+          {/* ─── LOOSE ITEM TEXT INPUT ─── */}
+          {isLoose && (
             <div>
-              <label className="block text-sm font-medium text-text mb-1">Urgency</label>
-              <select
-                value={urgency}
-                onChange={(e) => setUrgency(e.target.value)}
+              <label className="flex items-center gap-1.5 text-sm font-medium text-text mb-2">
+                <Pencil size={14} />
+                What do you need?
+              </label>
+              <input
+                type="text"
+                autoFocus
+                autoCapitalize="words"
+                value={looseText}
+                onChange={(e) => setLooseText(e.target.value)}
                 className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-              >
-                {URGENCY.map((u) => (
-                  <option key={u.value} value={u.value}>{u.label}</option>
-                ))}
-              </select>
+                placeholder="e.g. 1 plywood sheet, 3 studs 2x4..."
+              />
             </div>
-          </div>
+          )}
 
           {/* Lot picker — only for legacy mode */}
           {lots && !fixedLotId && (
@@ -245,18 +316,6 @@ export function NewRequestModal(props: Props) {
               </select>
             </div>
           )}
-
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand resize-none"
-              placeholder="Additional details..."
-            />
-          </div>
 
           {error && (
             <div className="text-sm text-error bg-red-50 px-3 py-2 rounded-lg">{error}</div>

@@ -39,6 +39,7 @@ interface MaterialRequest {
   photo_url: string | null;
   notes: string | null;
   urgency_reason: string | null;
+  sub_items?: { name: string; status: string }[] | null;
   lot: { lot_number: string } | null;
 }
 

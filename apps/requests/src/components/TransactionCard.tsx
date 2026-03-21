@@ -22,6 +22,7 @@ interface MaterialRequest {
   delivered_at: string | null;
   notes: string | null;
   urgency_reason: string | null;
+  sub_items?: { name: string; status: string }[] | null;
   lot: { lot_number: string } | null;
   jobsite: { name: string } | null;
 }

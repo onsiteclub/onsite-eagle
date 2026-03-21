@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, AlertCircle, ChevronDown, RotateCcw } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
 
@@ -28,6 +28,7 @@ interface MaterialRequest {
   delivered_by_name?: string | null;
   delivery_notes?: string | null;
   photo_url?: string | null;
+  sub_items?: { name: string; status: string }[] | null;
   lot?: { lot_number: string } | null;
 }
 
@@ -56,6 +57,12 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
   const [contestReason, setContestReason] = useState<string | null>(null);
   const [contestNote, setContestNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [itemsOpen, setItemsOpen] = useState(false);
+  const [missingMode, setMissingMode] = useState(false);
+  const [selectedMissing, setSelectedMissing] = useState<Set<number>>(new Set());
+
+  const hasSubItems = request.sub_items && request.sub_items.length > 0;
+  const missingCount = request.sub_items?.filter((i) => i.status === "missing").length ?? 0;
 
   async function submitContest() {
     if (!contestReason) return;
@@ -82,13 +89,51 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
     onUpdate?.();
   }
 
+  function toggleMissingItem(idx: number) {
+    setSelectedMissing((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
+
+  async function submitMissingItems() {
+    if (!request.sub_items || selectedMissing.size === 0) return;
+    setSubmitting(true);
+
+    // Mark selected items as missing, rest stay as-is
+    const updated = request.sub_items.map((item, i) =>
+      selectedMissing.has(i)
+        ? { ...item, status: "missing" }
+        : item
+    );
+
+    // Send back to queue with missing items marked
+    await fetch("/api/requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: request.id,
+        status: "requested",
+        sub_items: updated,
+        delivery_notes: `Worker: ${selectedMissing.size} item(s) missing`,
+      }),
+    });
+
+    setSubmitting(false);
+    setMissingMode(false);
+    setSelectedMissing(new Set());
+    onUpdate?.();
+  }
+
   return (
     <div
       className="bg-card rounded-xl border border-border overflow-hidden shadow-sm"
       style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
     >
       <div className="p-3.5">
-        {/* Row 1: Lot number (prominent) */}
+        {/* Row 1: Lot number */}
         <div className="flex items-center gap-2 mb-0.5">
           <span
             className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -97,15 +142,6 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
           <span className="font-bold text-text text-[17px] truncate flex-1">
             {lotNumber ? `Lot ${lotNumber}` : "—"}
           </span>
-        </div>
-
-        {/* Row 2: material + requester + deadline */}
-        <div className="flex items-center gap-2 ml-[18px] mt-0.5">
-          <span className="text-[13px] text-text-secondary truncate">
-            {request.material_name}
-            {request.quantity ? ` x${request.quantity}` : ""}
-            {request.requested_by_name ? ` \u00b7 ${request.requested_by_name}` : ""}
-          </span>
           <DeadlineBadge
             requestedAt={request.requested_at}
             urgency={request.urgency_level}
@@ -113,6 +149,62 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
             compact
           />
         </div>
+
+        {/* Row 2: Material name — expandable if has sub-items */}
+        <div className="ml-[18px] mt-0.5">
+          {hasSubItems ? (
+            <button
+              type="button"
+              onClick={() => setItemsOpen(!itemsOpen)}
+              className="flex items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text transition w-full text-left"
+            >
+              <span className="truncate">{request.material_name}</span>
+              {missingCount > 0 && (
+                <span className="shrink-0 text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                  {missingCount} missing
+                </span>
+              )}
+              <ChevronDown
+                size={12}
+                className={`shrink-0 text-text-muted transition-transform ${itemsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          ) : (
+            <span className="text-[13px] text-text-secondary">
+              {request.material_name}
+              {request.requested_by_name ? ` · ${request.requested_by_name}` : ""}
+            </span>
+          )}
+        </div>
+
+        {/* Sub-items dropdown */}
+        {hasSubItems && itemsOpen && (
+          <div className="ml-[18px] mt-2 space-y-1">
+            {request.sub_items!.map((item, idx) => {
+              const isMissing = item.status === "missing";
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] ${
+                    isMissing
+                      ? "bg-amber-50 border border-amber-200"
+                      : "bg-gray-50 border border-transparent"
+                  }`}
+                >
+                  <span className={`flex-1 ${isMissing ? "text-amber-700 font-medium" : "text-text-secondary"}`}>
+                    {item.name}
+                  </span>
+                  {isMissing && (
+                    <span className="text-[11px] text-amber-600 font-medium flex items-center gap-0.5">
+                      <AlertCircle size={10} />
+                      Missing
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Notes */}
         {(request.notes || request.urgency_reason) && (
@@ -150,18 +242,80 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
           </div>
         )}
 
-        {/* Contest delivery — worker can report issue */}
-        {request.status === "delivered" && !contesting && (
-          <div className="ml-[18px] mt-2">
+        {/* ─── AFTER DELIVERY: worker actions ─── */}
+        {request.status === "delivered" && !contesting && !missingMode && (
+          <div className="ml-[18px] mt-2 flex items-center gap-3">
             <button
               onClick={() => setContesting(true)}
               className="text-xs text-text-muted hover:text-amber-600 transition"
             >
               Something wrong?
             </button>
+            {hasSubItems && (
+              <button
+                onClick={() => { setMissingMode(true); setItemsOpen(true); }}
+                className="text-xs text-text-muted hover:text-amber-600 transition"
+              >
+                Items missing?
+              </button>
+            )}
           </div>
         )}
 
+        {/* ─── MISSING ITEMS MODE: worker selects which items are missing ─── */}
+        {request.status === "delivered" && missingMode && hasSubItems && (
+          <div className="ml-[18px] mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2.5">
+            <p className="text-sm font-medium text-amber-800">Which items are missing?</p>
+            <div className="space-y-1">
+              {request.sub_items!.map((item, idx) => {
+                const isSelected = selectedMissing.has(idx);
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => toggleMissingItem(idx)}
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[13px] text-left transition active:scale-[0.98] ${
+                      isSelected
+                        ? "bg-amber-200/60 border border-amber-300 text-amber-800 font-medium"
+                        : "bg-white border border-border text-text-secondary hover:border-amber-300"
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
+                      isSelected ? "bg-amber-600 text-white" : "border-2 border-gray-300"
+                    }`}>
+                      {isSelected && <AlertCircle size={10} />}
+                    </div>
+                    {item.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setMissingMode(false); setSelectedMissing(new Set()); }}
+                className="px-3 py-2 text-xs text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitMissingItems}
+                disabled={selectedMissing.size === 0 || submitting}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-amber-600 text-white font-medium py-2 px-3 rounded-lg text-xs hover:bg-amber-700 active:scale-[0.98] transition disabled:opacity-50"
+              >
+                {submitting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <>
+                    <RotateCcw size={14} />
+                    Send Back to Queue
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── CONTEST DELIVERY (general issues) ─── */}
         {request.status === "delivered" && contesting && (
           <div className="ml-[18px] mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2.5">
             <p className="text-sm font-medium text-amber-800">What happened?</p>

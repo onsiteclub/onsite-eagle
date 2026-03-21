@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { CheckCircle, Camera, AlertTriangle, RotateCcw } from "lucide-react";
+import { CheckCircle, Camera, AlertTriangle, RotateCcw, AlertCircle, ChevronDown } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
-import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
+import { DeadlineBar } from "./DeadlineBadge";
 
 interface MaterialRequest {
   id: string;
@@ -18,6 +18,7 @@ interface MaterialRequest {
   requested_by_name: string | null;
   notes: string | null;
   urgency_reason: string | null;
+  sub_items: { name: string; status: string }[] | null;
   lot: { lot_number: string; address: string | null } | null;
   jobsite: { name: string } | null;
 }
@@ -92,6 +93,7 @@ export function QueueCard({
   const [uploading, setUploading] = useState(false);
   const [selectedProblem, setSelectedProblem] = useState<string | null>(null);
   const [problemNotes, setProblemNotes] = useState("");
+  const [itemsOpen, setItemsOpen] = useState(false);
 
   const cameraRef = useRef<HTMLInputElement>(null);
 
@@ -102,6 +104,9 @@ export function QueueCard({
 
   const isActive = mode !== "idle";
   const dimmed = disabled && !isActive;
+
+  const hasSubItems = request.sub_items && request.sub_items.length > 0;
+  const missingCount = request.sub_items?.filter((i) => i.status === "missing").length ?? 0;
 
   useEffect(() => {
     onActiveChange?.(isActive);
@@ -223,6 +228,21 @@ export function QueueCard({
     onUpdate();
   }
 
+  async function toggleSubItemMissing(idx: number) {
+    if (!request.sub_items) return;
+    const updated = request.sub_items.map((item, i) =>
+      i === idx
+        ? { ...item, status: item.status === "missing" ? "pending" : "missing" }
+        : item
+    );
+    await fetch("/api/requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: request.id, sub_items: updated }),
+    });
+    onUpdate();
+  }
+
   return (
     <div
       className={`bg-card rounded-xl border border-border overflow-hidden shadow-sm transition ${
@@ -230,8 +250,9 @@ export function QueueCard({
       }`}
       style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
     >
-      {/* Card content */}
+      {/* Card header */}
       <div className="p-3.5 pb-2">
+        {/* Row 1: Lot number + site name */}
         <div className="flex items-center gap-2 mb-0.5">
           <span
             className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -245,20 +266,85 @@ export function QueueCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2 ml-[18px] mt-0.5">
-          <span className="text-[13px] text-text-secondary truncate">
-            {request.material_name}
-            {request.quantity ? ` x${request.quantity}` : ""}
-            {request.requested_by_name ? ` \u00b7 ${request.requested_by_name}` : ""}
-          </span>
-          <DeadlineBadge
-            requestedAt={request.requested_at}
-            urgency={request.urgency_level}
-            status={request.status}
-            compact
-          />
+        {/* Row 2: Requester name */}
+        {request.requested_by_name && (
+          <p className="text-[12px] text-text-muted ml-[18px]">
+            Requested by {request.requested_by_name}
+          </p>
+        )}
+
+        {/* Row 3: Material name — clickable dropdown if has sub-items */}
+        <div className="ml-[18px] mt-1.5">
+          {hasSubItems ? (
+            <button
+              type="button"
+              onClick={() => setItemsOpen(!itemsOpen)}
+              className="flex items-center gap-1.5 text-[14px] font-medium text-text hover:text-brand transition w-full text-left"
+            >
+              <span className="truncate">{request.material_name}</span>
+              {missingCount > 0 && (
+                <span className="shrink-0 text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                  {missingCount} missing
+                </span>
+              )}
+              <ChevronDown
+                size={14}
+                className={`shrink-0 text-text-muted transition-transform ${itemsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          ) : (
+            <span className="text-[14px] font-medium text-text">
+              {request.material_name}
+            </span>
+          )}
         </div>
 
+        {/* Sub-items dropdown */}
+        {hasSubItems && itemsOpen && (
+          <div className="ml-[18px] mt-2 space-y-1">
+            {request.sub_items!.map((item, idx) => {
+              const isMissing = item.status === "missing";
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition ${
+                    isMissing
+                      ? "bg-amber-50 border border-amber-200"
+                      : "bg-gray-50 border border-transparent"
+                  }`}
+                >
+                  <span className={`flex-1 ${isMissing ? "text-amber-700 font-medium" : "text-text-secondary"}`}>
+                    {item.name}
+                  </span>
+                  {isMissing && (
+                    <span className="text-[11px] text-amber-600 font-medium flex items-center gap-0.5">
+                      <AlertCircle size={10} />
+                      Missing
+                    </span>
+                  )}
+                  {mode === "idle" && request.status !== "delivered" && request.status !== "problem" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSubItemMissing(idx);
+                      }}
+                      className={`text-[11px] font-medium px-1.5 py-0.5 rounded transition ${
+                        isMissing
+                          ? "text-brand hover:bg-brand/10"
+                          : "text-amber-600 hover:bg-amber-50"
+                      }`}
+                    >
+                      {isMissing ? "Available" : "Missing"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Notes */}
         {(request.notes || request.urgency_reason) && (
           <p className="text-[13px] text-text-secondary italic ml-[18px] mt-1 line-clamp-2">
             {request.notes || request.urgency_reason}
@@ -271,7 +357,7 @@ export function QueueCard({
         <DeadlineBar requestedAt={request.requested_at} urgency={request.urgency_level} status={request.status} />
       </div>
 
-      {/* ─── STEPPER (replaces old buttons) ─── */}
+      {/* ─── STEPPER ─── */}
       {mode === "idle" && (
         <div className="px-3.5 pb-3.5 pt-1">
           <StatusStepper

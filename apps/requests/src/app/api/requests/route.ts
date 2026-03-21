@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     let query = supabase
       .from("frm_material_requests")
       .select(
-        "id, material_name, quantity, unit, status, urgency_level, urgency_score, requested_at, requested_by_name, delivered_by_name, delivery_notes, photo_url, in_transit_at, delivered_at, notes, urgency_reason, lot:frm_lots(lot_number), jobsite:frm_jobsites(name)"
+        "id, material_name, quantity, unit, status, urgency_level, urgency_score, requested_at, requested_by_name, delivered_by_name, delivery_notes, photo_url, in_transit_at, delivered_at, notes, urgency_reason, sub_items, lot:frm_lots(lot_number), jobsite:frm_jobsites(name)"
       )
       .is("deleted_at", null)
       .order("requested_at", { ascending: false })
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
     const body = await req.json();
 
-    const { material_name, quantity, unit, lot_id, urgency_level, notes, requested_by_name } = body;
+    const { material_name, quantity, unit, lot_id, urgency_level, notes, requested_by_name, sub_items } = body;
 
     if (!material_name || !quantity || !lot_id) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
         requested_by: ANON_USER_ID,
         requested_by_name: requested_by_name || "Unknown",
         status: "requested",
+        sub_items: sub_items || null,
       })
       .select("id")
       .single();
@@ -99,7 +100,7 @@ export async function PATCH(req: NextRequest) {
     const supabase = createAdminClient();
     const body = await req.json();
 
-    const { id, status, delivered_by_name, delivery_notes, photo_url } = body;
+    const { id, status, delivered_by_name, delivery_notes, photo_url, sub_items } = body;
 
     if (!id || !status) {
       return NextResponse.json({ error: "Missing id or status" }, { status: 400 });
@@ -123,6 +124,11 @@ export async function PATCH(req: NextRequest) {
       updates.delivered_by_name = null;
       updates.delivery_notes = null;
       updates.in_transit_at = null;
+    }
+
+    // Allow sub_items update (operator marking items as missing/delivered)
+    if (sub_items !== undefined) {
+      updates.sub_items = sub_items;
     }
 
     const { error } = await supabase
