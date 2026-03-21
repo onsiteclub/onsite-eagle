@@ -1,14 +1,14 @@
 import { createAdminClient } from "@/lib/supabase-admin";
 import { NextRequest, NextResponse } from "next/server";
 
-// GET — list all lots
+// GET — list all lots (includes block field)
 export async function GET() {
   try {
     const supabase = createAdminClient();
 
     const { data: lots, error } = await supabase
       .from("frm_lots")
-      .select("id, lot_number, current_phase, jobsite_id, status, jobsite:frm_jobsites(name)")
+      .select("id, lot_number, block, current_phase, jobsite_id, status, jobsite:frm_jobsites(name)")
       .order("lot_number", { ascending: true })
       .limit(500);
 
@@ -22,41 +22,74 @@ export async function GET() {
   }
 }
 
-// POST — bulk create lots for a jobsite
+// POST — create lots for a jobsite
+// Mode 1 (singles): { jobsite_id, count, from? }
+// Mode 2 (block):   { jobsite_id, block_number, unit_count }
 export async function POST(req: NextRequest) {
   try {
     const supabase = createAdminClient();
     const body = await req.json();
 
-    const { jobsite_id, count } = body;
+    const { jobsite_id, block_number, unit_count, count, from } = body;
 
-    if (!jobsite_id || !count || count < 1 || count > 500) {
-      return NextResponse.json({ error: "jobsite_id and count (1-500) required" }, { status: 400 });
+    if (!jobsite_id) {
+      return NextResponse.json({ error: "jobsite_id required" }, { status: 400 });
     }
 
-    // Check existing lots to find next number
-    const { data: existing } = await supabase
-      .from("frm_lots")
-      .select("lot_number")
-      .eq("jobsite_id", jobsite_id)
-      .order("lot_number", { ascending: false })
-      .limit(1);
+    let lots: { jobsite_id: string; lot_number: string; block?: string; status: string }[];
 
-    const startFrom = existing?.length
-      ? parseInt(existing[0].lot_number || "0") + 1
-      : 1;
+    if (block_number && unit_count) {
+      // --- Block mode ---
+      if (unit_count < 1 || unit_count > 50) {
+        return NextResponse.json({ error: "unit_count must be 1-50" }, { status: 400 });
+      }
 
-    // Create lots in batch
-    const lots = Array.from({ length: count }, (_, i) => ({
-      jobsite_id,
-      lot_number: String(startFrom + i),
-      status: "pending",
-    }));
+      lots = Array.from({ length: unit_count }, (_, i) => ({
+        jobsite_id,
+        lot_number: `${block_number}-${i + 1}`,
+        block: String(block_number),
+        status: "pending",
+      }));
+    } else if (count) {
+      // --- Singles mode ---
+      if (count < 1 || count > 500) {
+        return NextResponse.json({ error: "count must be 1-500" }, { status: 400 });
+      }
+
+      let startFrom: number;
+      if (from !== undefined && from !== null) {
+        startFrom = parseInt(String(from));
+        if (isNaN(startFrom) || startFrom < 1) {
+          return NextResponse.json({ error: "from must be a positive number" }, { status: 400 });
+        }
+      } else {
+        // Auto-detect next number
+        const { data: existing } = await supabase
+          .from("frm_lots")
+          .select("lot_number")
+          .eq("jobsite_id", jobsite_id)
+          .is("block", null)
+          .order("lot_number", { ascending: false })
+          .limit(1);
+
+        startFrom = existing?.length
+          ? parseInt(existing[0].lot_number || "0") + 1
+          : 1;
+      }
+
+      lots = Array.from({ length: count }, (_, i) => ({
+        jobsite_id,
+        lot_number: String(startFrom + i),
+        status: "pending",
+      }));
+    } else {
+      return NextResponse.json({ error: "Provide count (singles) or block_number+unit_count (block)" }, { status: 400 });
+    }
 
     const { data, error } = await supabase
       .from("frm_lots")
       .insert(lots)
-      .select("id, lot_number");
+      .select("id, lot_number, block");
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -70,7 +103,7 @@ export async function POST(req: NextRequest) {
 
     await supabase
       .from("frm_jobsites")
-      .update({ total_lots: totalLots ?? count })
+      .update({ total_lots: totalLots ?? 0 })
       .eq("id", jobsite_id);
 
     return NextResponse.json(data ?? [], { status: 201 });

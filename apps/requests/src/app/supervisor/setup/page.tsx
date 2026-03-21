@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Plus, MapPin, Loader2, Check, Copy, Link2,
   Truck, Trash2, AlertTriangle, Package, Users, X,
+  Home, Building2,
 } from "lucide-react";
 
 interface Site {
@@ -17,6 +18,7 @@ interface Site {
 interface Lot {
   id: string;
   lot_number: string;
+  block: string | null;
   jobsite_id?: string;
 }
 
@@ -35,14 +37,22 @@ export default function SetupPage() {
   const [siteName, setSiteName] = useState("");
   const [siteAddress, setSiteAddress] = useState("");
   const [siteCity, setSiteCity] = useState("");
+  const [lotCount, setLotCount] = useState("10");
   const [creatingSite, setCreatingSite] = useState(false);
 
   // Lots
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
-  const [lotCount, setLotCount] = useState("10");
   const [allLots, setAllLots] = useState<Lot[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedSiteId, setCopiedSiteId] = useState<string | null>(null);
+
+  // Add lots
+  const [addMode, setAddMode] = useState<"singles" | "block">("singles");
+  const [singlesFrom, setSinglesFrom] = useState("");
+  const [singlesTo, setSinglesTo] = useState("");
+  const [blockNumber, setBlockNumber] = useState("");
+  const [blockUnits, setBlockUnits] = useState("3");
+  const [addingLots, setAddingLots] = useState(false);
 
   // Bundles
   const [bundles, setBundles] = useState<Bundle[]>([]);
@@ -72,7 +82,14 @@ export default function SetupPage() {
     const res = await fetch("/api/lots");
     if (res.ok) {
       const data: Lot[] = await res.json();
-      setAllLots(data.filter((l) => l.jobsite_id === siteId));
+      const siteLots = data.filter((l) => l.jobsite_id === siteId);
+      setAllLots(siteLots);
+      // Auto-set singles "from" to next available number
+      const maxNum = siteLots
+        .filter((l) => !l.block)
+        .reduce((max, l) => Math.max(max, parseInt(l.lot_number) || 0), 0);
+      setSinglesFrom(String(maxNum + 1));
+      setSinglesTo(String(maxNum + 10));
     }
   }
 
@@ -132,6 +149,44 @@ export default function SetupPage() {
       await loadLots(site.id);
     }
     setCreatingSite(false);
+  }
+
+  async function addLots() {
+    if (!selectedSite) return;
+    setAddingLots(true);
+
+    if (addMode === "singles") {
+      const from = parseInt(singlesFrom);
+      const to = parseInt(singlesTo);
+      if (isNaN(from) || isNaN(to) || to < from) {
+        setAddingLots(false);
+        return;
+      }
+      const count = to - from + 1;
+      await fetch("/api/lots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobsite_id: selectedSite, count, from }),
+      });
+    } else {
+      const bn = blockNumber.trim();
+      const units = parseInt(blockUnits);
+      if (!bn || isNaN(units) || units < 1) {
+        setAddingLots(false);
+        return;
+      }
+      await fetch("/api/lots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobsite_id: selectedSite, block_number: bn, unit_count: units }),
+      });
+    }
+
+    await loadLots(selectedSite);
+    await loadSites();
+    setBlockNumber("");
+    setBlockUnits("3");
+    setAddingLots(false);
   }
 
   function toggleLot(lotId: string) {
@@ -198,9 +253,60 @@ export default function SetupPage() {
     return bundle.lot_ids
       .map((id) => allLots.find((l) => l.id === id)?.lot_number)
       .filter(Boolean)
-      .sort((a, b) => parseInt(a!) - parseInt(b!))
+      .sort((a, b) => {
+        // Natural sort: "1" < "2" < "4-1" < "4-2" < "10"
+        const na = a!.split("-").map(Number);
+        const nb = b!.split("-").map(Number);
+        for (let i = 0; i < Math.max(na.length, nb.length); i++) {
+          const va = na[i] ?? 0;
+          const vb = nb[i] ?? 0;
+          if (va !== vb) return va - vb;
+        }
+        return 0;
+      })
       .join(", ");
   }
+
+  // Group lots: singles first, then blocks
+  function groupedLots() {
+    const singles: Lot[] = [];
+    const blocks = new Map<string, Lot[]>();
+
+    for (const lot of allLots) {
+      if (lot.block) {
+        const group = blocks.get(lot.block) || [];
+        group.push(lot);
+        blocks.set(lot.block, group);
+      } else {
+        singles.push(lot);
+      }
+    }
+
+    // Sort singles by lot_number numerically
+    singles.sort((a, b) => (parseInt(a.lot_number) || 0) - (parseInt(b.lot_number) || 0));
+
+    // Sort block groups by block number, lots within block by unit number
+    const sortedBlocks = Array.from(blocks.entries()).sort(
+      (a, b) => (parseInt(a[0]) || 0) - (parseInt(b[0]) || 0)
+    );
+    for (const [, lots] of sortedBlocks) {
+      lots.sort((a, b) => {
+        const ua = parseInt(a.lot_number.split("-")[1] || "0");
+        const ub = parseInt(b.lot_number.split("-")[1] || "0");
+        return ua - ub;
+      });
+    }
+
+    return { singles, blocks: sortedBlocks };
+  }
+
+  // Singles preview
+  const singlesPreviewCount = (() => {
+    const from = parseInt(singlesFrom);
+    const to = parseInt(singlesTo);
+    if (isNaN(from) || isNaN(to) || to < from) return 0;
+    return to - from + 1;
+  })();
 
   if (loading) {
     return (
@@ -209,6 +315,8 @@ export default function SetupPage() {
       </div>
     );
   }
+
+  const { singles, blocks } = groupedLots();
 
   return (
     <main className="pb-8">
@@ -335,6 +443,135 @@ export default function SetupPage() {
           )}
         </section>
 
+        {/* Section 1.5: Add Lots */}
+        {selectedSite && (
+          <section className="bg-card rounded-xl border border-border p-4 space-y-3">
+            <h2 className="font-semibold text-text flex items-center gap-2">
+              <Plus size={18} className="text-brand" />
+              Add Lots
+            </h2>
+
+            {/* Mode tabs */}
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setAddMode("singles")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
+                  addMode === "singles"
+                    ? "bg-white text-brand shadow-sm"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                <Home size={14} />
+                Singles
+              </button>
+              <button
+                onClick={() => setAddMode("block")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
+                  addMode === "block"
+                    ? "bg-white text-brand shadow-sm"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                <Building2 size={14} />
+                Block
+              </button>
+            </div>
+
+            {addMode === "singles" ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">From</label>
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={singlesFrom}
+                      onChange={(e) => setSinglesFrom(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">To</label>
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={singlesTo}
+                      onChange={(e) => setSinglesTo(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                  </div>
+                </div>
+                {singlesPreviewCount > 0 && (
+                  <p className="text-xs text-text-muted">
+                    Will create <strong>{singlesPreviewCount}</strong> lots: {singlesFrom} to {singlesTo}
+                  </p>
+                )}
+                <button
+                  onClick={addLots}
+                  disabled={addingLots || singlesPreviewCount < 1}
+                  className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                >
+                  {addingLots ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Plus size={16} />
+                  )}
+                  Add {singlesPreviewCount} Singles
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">Block #</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={blockNumber}
+                      onChange={(e) => setBlockNumber(e.target.value)}
+                      placeholder="e.g. 4"
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">Units</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      inputMode="numeric"
+                      value={blockUnits}
+                      onChange={(e) => setBlockUnits(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                  </div>
+                </div>
+                {blockNumber.trim() && parseInt(blockUnits) > 0 && (
+                  <p className="text-xs text-text-muted">
+                    Will create <strong>{blockUnits}</strong> lots:{" "}
+                    {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${i + 1}`).join(", ")}
+                    {(parseInt(blockUnits) || 0) > 8 && ", ..."}
+                  </p>
+                )}
+                <button
+                  onClick={addLots}
+                  disabled={addingLots || !blockNumber.trim() || !parseInt(blockUnits)}
+                  className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                >
+                  {addingLots ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Building2 size={16} />
+                  )}
+                  Add Block {blockNumber || "..."}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Section 2: Lots + Bundle creation */}
         {selectedSite && allLots.length > 0 && (
           <section className="bg-card rounded-xl border border-border p-4 space-y-3">
@@ -377,53 +614,51 @@ export default function SetupPage() {
               </div>
             )}
 
-            {/* Lot list with checkboxes */}
-            <div className="space-y-1.5 max-h-64 overflow-y-auto">
-              {allLots.map((lot) => (
-                <div
+            {/* Lot list with checkboxes — grouped */}
+            <div className="space-y-1.5 max-h-80 overflow-y-auto">
+              {/* Singles */}
+              {singles.map((lot) => (
+                <LotRow
                   key={lot.id}
-                  className={`flex items-center gap-3 p-2.5 rounded-lg border transition cursor-pointer ${
-                    selectedLots.has(lot.id)
-                      ? "border-brand bg-brand/5"
-                      : "border-border hover:bg-gray-50"
-                  }`}
-                  onClick={() => toggleLot(lot.id)}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedLots.has(lot.id)}
-                    onChange={() => toggleLot(lot.id)}
-                    className="w-4 h-4 rounded border-border text-brand focus:ring-brand/30 accent-[var(--color-brand,#0F766E)]"
-                  />
-                  <span className="text-sm font-medium text-text flex-1">
-                    Lot {lot.lot_number}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const url = `${window.location.origin}/request/${lot.id}`;
-                      navigator.clipboard.writeText(url);
-                      setCopiedId(lot.id);
-                      setTimeout(() => setCopiedId(null), 2000);
-                    }}
-                    className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition ${
-                      copiedId === lot.id
-                        ? "bg-green-50 text-green-600"
-                        : "bg-brand/10 text-brand hover:bg-brand/20"
-                    }`}
-                  >
-                    {copiedId === lot.id ? (
-                      <>
-                        <Check size={10} />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={10} />
-                        Link
-                      </>
-                    )}
-                  </button>
+                  lot={lot}
+                  selected={selectedLots.has(lot.id)}
+                  copiedId={copiedId}
+                  onToggle={() => toggleLot(lot.id)}
+                  onCopy={() => {
+                    const url = `${window.location.origin}/request/${lot.id}`;
+                    navigator.clipboard.writeText(url);
+                    setCopiedId(lot.id);
+                    setTimeout(() => setCopiedId(null), 2000);
+                  }}
+                />
+              ))}
+
+              {/* Blocks */}
+              {blocks.map(([blockId, blockLots]) => (
+                <div key={`block-${blockId}`} className="border border-blue-200 rounded-lg overflow-hidden">
+                  <div className="bg-blue-50 px-3 py-1.5 flex items-center gap-1.5">
+                    <Building2 size={12} className="text-blue-600" />
+                    <span className="text-xs font-medium text-blue-700">Block {blockId}</span>
+                    <span className="text-xs text-blue-500">{blockLots.length} units</span>
+                  </div>
+                  <div className="space-y-0.5 p-1">
+                    {blockLots.map((lot) => (
+                      <LotRow
+                        key={lot.id}
+                        lot={lot}
+                        selected={selectedLots.has(lot.id)}
+                        copiedId={copiedId}
+                        onToggle={() => toggleLot(lot.id)}
+                        onCopy={() => {
+                          const url = `${window.location.origin}/request/${lot.id}`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedId(lot.id);
+                          setTimeout(() => setCopiedId(null), 2000);
+                        }}
+                        compact
+                      />
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -568,5 +803,65 @@ export default function SetupPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function LotRow({
+  lot,
+  selected,
+  copiedId,
+  onToggle,
+  onCopy,
+  compact,
+}: {
+  lot: Lot;
+  selected: boolean;
+  copiedId: string | null;
+  onToggle: () => void;
+  onCopy: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 ${compact ? "p-2" : "p-2.5"} rounded-lg border transition cursor-pointer ${
+        selected
+          ? "border-brand bg-brand/5"
+          : "border-border hover:bg-gray-50"
+      }`}
+      onClick={onToggle}
+    >
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onToggle}
+        className="w-4 h-4 rounded border-border text-brand focus:ring-brand/30 accent-[var(--color-brand,#0F766E)]"
+      />
+      <span className={`${compact ? "text-xs" : "text-sm"} font-medium text-text flex-1`}>
+        Lot {lot.lot_number}
+      </span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onCopy();
+        }}
+        className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition ${
+          copiedId === lot.id
+            ? "bg-green-50 text-green-600"
+            : "bg-brand/10 text-brand hover:bg-brand/20"
+        }`}
+      >
+        {copiedId === lot.id ? (
+          <>
+            <Check size={10} />
+            Copied
+          </>
+        ) : (
+          <>
+            <Copy size={10} />
+            Link
+          </>
+        )}
+      </button>
+    </div>
   );
 }
