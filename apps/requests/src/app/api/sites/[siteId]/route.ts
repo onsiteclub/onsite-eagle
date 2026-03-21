@@ -26,6 +26,46 @@ export async function GET(
   }
 }
 
+// PATCH — update site details
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ siteId: string }> }
+) {
+  try {
+    const { siteId } = await params;
+    const supabase = createAdminClient();
+    const body = await req.json();
+
+    const updates: Record<string, string | null> = {};
+    if ("name" in body) updates.name = body.name?.trim() || null;
+    if ("address" in body) updates.address = body.address?.trim() || null;
+    if ("city" in body) updates.city = body.city?.trim() || null;
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    if ("name" in updates && !updates.name) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("frm_jobsites")
+      .update(updates)
+      .eq("id", siteId)
+      .select("id, name, address, city, total_lots")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
 // DELETE — remove site + all related data (lots, requests, etc.)
 export async function DELETE(
   req: NextRequest,

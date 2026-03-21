@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Plus, MapPin, Loader2, Check, Copy, Link2,
   Truck, Trash2, AlertTriangle, Package, Users, X,
-  Home, Building2, Archive, ArchiveRestore,
+  Home, Building2, Archive, ArchiveRestore, Settings, Save,
 } from "lucide-react";
 
 interface Site {
@@ -64,6 +64,13 @@ export default function SetupPage() {
   const [bundleLabel, setBundleLabel] = useState("");
   const [creatingBundle, setCreatingBundle] = useState(false);
   const [copiedBundleId, setCopiedBundleId] = useState<string | null>(null);
+
+  // Edit site
+  const [editName, setEditName] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [savingSite, setSavingSite] = useState(false);
+  const [editDirty, setEditDirty] = useState(false);
 
   // Delete site
   const [deleteTarget, setDeleteTarget] = useState<Site | null>(null);
@@ -129,8 +136,16 @@ export default function SetupPage() {
       loadBundles(selectedSite);
       setSelectedLots(new Set());
       setArchiveSelection(new Set());
+      // Populate edit fields
+      const site = sites.find((s) => s.id === selectedSite);
+      if (site) {
+        setEditName(site.name);
+        setEditAddress(site.address ?? "");
+        setEditCity(site.city ?? "");
+        setEditDirty(false);
+      }
     }
-  }, [selectedSite]);
+  }, [selectedSite, sites]);
 
   async function createSite(e: React.FormEvent) {
     e.preventDefault();
@@ -241,6 +256,25 @@ export default function SetupPage() {
   async function deleteBundle(bundleId: string) {
     await fetch(`/api/bundles/${bundleId}`, { method: "DELETE" });
     if (selectedSite) await loadBundles(selectedSite);
+  }
+
+  async function saveSite() {
+    if (!selectedSite || !editName.trim()) return;
+    setSavingSite(true);
+    const res = await fetch(`/api/sites/${selectedSite}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editName.trim(),
+        address: editAddress.trim() || null,
+        city: editCity.trim() || null,
+      }),
+    });
+    if (res.ok) {
+      setEditDirty(false);
+      await loadSites();
+    }
+    setSavingSite(false);
   }
 
   async function deleteSite() {
@@ -465,135 +499,6 @@ export default function SetupPage() {
             </div>
           )}
         </section>
-
-        {/* Section 1.5: Add Lots */}
-        {selectedSite && (
-          <section className="bg-card rounded-xl border border-border p-4 space-y-3">
-            <h2 className="font-semibold text-text flex items-center gap-2">
-              <Plus size={18} className="text-brand" />
-              Add Lots
-            </h2>
-
-            {/* Mode tabs */}
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-              <button
-                onClick={() => setAddMode("singles")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
-                  addMode === "singles"
-                    ? "bg-white text-brand shadow-sm"
-                    : "text-text-muted hover:text-text"
-                }`}
-              >
-                <Home size={14} />
-                Singles
-              </button>
-              <button
-                onClick={() => setAddMode("block")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
-                  addMode === "block"
-                    ? "bg-white text-brand shadow-sm"
-                    : "text-text-muted hover:text-text"
-                }`}
-              >
-                <Building2 size={14} />
-                Block
-              </button>
-            </div>
-
-            {addMode === "singles" ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-text-muted font-medium mb-1">From</label>
-                    <input
-                      type="number"
-                      min={1}
-                      inputMode="numeric"
-                      value={singlesFrom}
-                      onChange={(e) => setSinglesFrom(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-text-muted font-medium mb-1">To</label>
-                    <input
-                      type="number"
-                      min={1}
-                      inputMode="numeric"
-                      value={singlesTo}
-                      onChange={(e) => setSinglesTo(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                    />
-                  </div>
-                </div>
-                {singlesPreviewCount > 0 && (
-                  <p className="text-xs text-text-muted">
-                    Will create <strong>{singlesPreviewCount}</strong> lots: {singlesFrom} to {singlesTo}
-                  </p>
-                )}
-                <button
-                  onClick={addLots}
-                  disabled={addingLots || singlesPreviewCount < 1}
-                  className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
-                >
-                  {addingLots ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Plus size={16} />
-                  )}
-                  Add {singlesPreviewCount} Singles
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-text-muted font-medium mb-1">Block #</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={blockNumber}
-                      onChange={(e) => setBlockNumber(e.target.value)}
-                      placeholder="e.g. 4"
-                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-text-muted font-medium mb-1">Units</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={50}
-                      inputMode="numeric"
-                      value={blockUnits}
-                      onChange={(e) => setBlockUnits(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                    />
-                  </div>
-                </div>
-                {blockNumber.trim() && parseInt(blockUnits) > 0 && (
-                  <p className="text-xs text-text-muted">
-                    Will create <strong>{blockUnits}</strong> lots:{" "}
-                    {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${i + 1}`).join(", ")}
-                    {(parseInt(blockUnits) || 0) > 8 && ", ..."}
-                  </p>
-                )}
-                <button
-                  onClick={addLots}
-                  disabled={addingLots || !blockNumber.trim() || !parseInt(blockUnits)}
-                  className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
-                >
-                  {addingLots ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Building2 size={16} />
-                  )}
-                  Add Block {blockNumber || "..."}
-                </button>
-              </div>
-            )}
-          </section>
-        )}
 
         {/* Section 2: Lots + Bundle creation */}
         {selectedSite && allLots.length > 0 && (
@@ -874,7 +779,194 @@ export default function SetupPage() {
           </section>
         )}
 
-        {/* Section 4: Danger Zone */}
+        {/* Section 4: Site Settings — edit + add lots */}
+        {selectedSite && (
+          <section className="bg-card rounded-xl border border-border p-4 space-y-4">
+            <h2 className="font-semibold text-text flex items-center gap-2">
+              <Settings size={18} className="text-text-muted" />
+              Site Settings
+            </h2>
+
+            {/* Edit site fields */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-text-muted font-medium mb-1">Site Name</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => { setEditName(e.target.value); setEditDirty(true); }}
+                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                  placeholder="Site name *"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-text-muted font-medium mb-1">Address</label>
+                  <input
+                    type="text"
+                    value={editAddress}
+                    onChange={(e) => { setEditAddress(e.target.value); setEditDirty(true); }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    placeholder="Address"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted font-medium mb-1">City</label>
+                  <input
+                    type="text"
+                    value={editCity}
+                    onChange={(e) => { setEditCity(e.target.value); setEditDirty(true); }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    placeholder="City"
+                  />
+                </div>
+              </div>
+              {editDirty && (
+                <button
+                  onClick={saveSite}
+                  disabled={savingSite || !editName.trim()}
+                  className="flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                >
+                  {savingSite ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  Save Changes
+                </button>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border" />
+
+            {/* Add Lots */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-text">Add Lots</h3>
+
+              {/* Mode tabs */}
+              <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+                <button
+                  onClick={() => setAddMode("singles")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
+                    addMode === "singles"
+                      ? "bg-white text-brand shadow-sm"
+                      : "text-text-muted hover:text-text"
+                  }`}
+                >
+                  <Home size={14} />
+                  Singles
+                </button>
+                <button
+                  onClick={() => setAddMode("block")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
+                    addMode === "block"
+                      ? "bg-white text-brand shadow-sm"
+                      : "text-text-muted hover:text-text"
+                  }`}
+                >
+                  <Building2 size={14} />
+                  Block
+                </button>
+              </div>
+
+              {addMode === "singles" ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-text-muted font-medium mb-1">From</label>
+                      <input
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        value={singlesFrom}
+                        onChange={(e) => setSinglesFrom(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-muted font-medium mb-1">To</label>
+                      <input
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        value={singlesTo}
+                        onChange={(e) => setSinglesTo(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                      />
+                    </div>
+                  </div>
+                  {singlesPreviewCount > 0 && (
+                    <p className="text-xs text-text-muted">
+                      Will create <strong>{singlesPreviewCount}</strong> lots: {singlesFrom} to {singlesTo}
+                    </p>
+                  )}
+                  <button
+                    onClick={addLots}
+                    disabled={addingLots || singlesPreviewCount < 1}
+                    className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                  >
+                    {addingLots ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Plus size={16} />
+                    )}
+                    Add {singlesPreviewCount} Singles
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-text-muted font-medium mb-1">Block #</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={blockNumber}
+                        onChange={(e) => setBlockNumber(e.target.value)}
+                        placeholder="e.g. 4"
+                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-muted font-medium mb-1">Units</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        inputMode="numeric"
+                        value={blockUnits}
+                        onChange={(e) => setBlockUnits(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                      />
+                    </div>
+                  </div>
+                  {blockNumber.trim() && parseInt(blockUnits) > 0 && (
+                    <p className="text-xs text-text-muted">
+                      Will create <strong>{blockUnits}</strong> lots:{" "}
+                      {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${i + 1}`).join(", ")}
+                      {(parseInt(blockUnits) || 0) > 8 && ", ..."}
+                    </p>
+                  )}
+                  <button
+                    onClick={addLots}
+                    disabled={addingLots || !blockNumber.trim() || !parseInt(blockUnits)}
+                    className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                  >
+                    {addingLots ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Building2 size={16} />
+                    )}
+                    Add Block {blockNumber || "..."}
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Section 5: Danger Zone */}
         {selectedSite && (
           <section className="bg-card rounded-xl border border-red-200 p-4 space-y-4">
             <h2 className="font-semibold text-red-600 flex items-center gap-2">
