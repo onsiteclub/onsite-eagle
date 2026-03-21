@@ -25,7 +25,7 @@ interface MaterialRequest {
   jobsite: { name: string } | null;
 }
 
-type Filter = "all" | "pending" | "delivered";
+type Filter = "all" | "pending" | "delivered" | "problem";
 
 const POLL_INTERVAL = 4000;
 
@@ -65,6 +65,7 @@ export default function SupervisorPage() {
   const filtered = requests.filter((r) => {
     if (filter === "pending") return ["requested", "acknowledged", "in_transit"].includes(r.status);
     if (filter === "delivered") return r.status === "delivered";
+    if (filter === "problem") return r.status === "problem";
     return true;
   });
 
@@ -72,6 +73,7 @@ export default function SupervisorPage() {
     ["requested", "acknowledged", "in_transit"].includes(r.status)
   ).length;
   const deliveredCount = requests.filter((r) => r.status === "delivered").length;
+  const problemCount = requests.filter((r) => r.status === "problem").length;
 
   if (loading) {
     return (
@@ -100,6 +102,12 @@ export default function SupervisorPage() {
             label={`Delivered (${deliveredCount})`}
             active={filter === "delivered"}
             onClick={() => setFilter("delivered")}
+          />
+          <FilterChip
+            label={`Problem (${problemCount})`}
+            active={filter === "problem"}
+            onClick={() => setFilter("problem")}
+            variant="problem"
           />
         </div>
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
@@ -135,17 +143,22 @@ function FilterChip({
   label,
   active,
   onClick,
+  variant,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
+  variant?: "problem";
 }) {
+  const activeClass =
+    variant === "problem" ? "bg-red-600 text-white" : "bg-brand text-white";
+
   return (
     <button
       onClick={onClick}
       className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${
         active
-          ? "bg-brand text-white"
+          ? activeClass
           : "bg-card text-text-secondary border border-border hover:bg-gray-50"
       }`}
     >
