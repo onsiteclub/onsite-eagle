@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { getCookie } from "@/lib/cookies";
 import { QueueCard } from "@/components/QueueCard";
-import { RefreshCw, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { RefreshCw, Loader2, CheckCircle, AlertTriangle, Clock, Package } from "lucide-react";
 
 interface SiteInfo {
   id: string;
@@ -42,8 +42,10 @@ export default function SiteOperatorPage() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [siteError, setSiteError] = useState(false);
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
+  const [delivered, setDelivered] = useState<MaterialRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"queue" | "delivered">("queue");
 
   // Load site details
   const loadSite = useCallback(async () => {
@@ -59,20 +61,19 @@ export default function SiteOperatorPage() {
 
   // Load requests for this site only
   const loadQueue = useCallback(async () => {
-    const res = await fetch(
-      `/api/requests?site_id=${siteId}&status=requested,acknowledged,in_transit,problem`
-    );
-    if (res.ok) {
-      const data = await res.json();
+    const [queueRes, deliveredRes] = await Promise.all([
+      fetch(`/api/requests?site_id=${siteId}&status=requested,acknowledged,in_transit,problem`),
+      fetch(`/api/requests?site_id=${siteId}&status=delivered`),
+    ]);
+
+    if (queueRes.ok) {
+      const data = await queueRes.json();
       // Sort: in_transit first, then urgency desc, then oldest first
       data.sort((a: MaterialRequest, b: MaterialRequest) => {
-        // in_transit always on top
         if (a.status === "in_transit" && b.status !== "in_transit") return -1;
         if (b.status === "in_transit" && a.status !== "in_transit") return 1;
-        // problem right after in_transit (needs attention)
         if (a.status === "problem" && b.status !== "problem") return -1;
         if (b.status === "problem" && a.status !== "problem") return 1;
-        // then by urgency
         const urgencyOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
         const ua = urgencyOrder[a.urgency_level] ?? 2;
         const ub = urgencyOrder[b.urgency_level] ?? 2;
@@ -80,6 +81,15 @@ export default function SiteOperatorPage() {
         return new Date(a.requested_at).getTime() - new Date(b.requested_at).getTime();
       });
       setRequests(data);
+    }
+
+    if (deliveredRes.ok) {
+      const data = await deliveredRes.json();
+      // Most recent deliveries first
+      data.sort((a: MaterialRequest, b: MaterialRequest) =>
+        new Date(b.delivered_at ?? b.requested_at).getTime() - new Date(a.delivered_at ?? a.requested_at).getTime()
+      );
+      setDelivered(data);
     }
   }, [siteId]);
 
@@ -199,55 +209,130 @@ export default function SiteOperatorPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="flex items-center justify-end px-4 pt-1">
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-text-secondary">
-            <span className="font-semibold text-red-600">{pendingCount}</span> pending
-          </span>
-          {transitCount > 0 && (
-            <>
-              <span className="text-text-muted">&middot;</span>
-              <span className="text-text-secondary">
-                <span className="font-semibold text-teal-600">{transitCount}</span> in transit
-              </span>
-            </>
-          )}
-          {problemCount > 0 && (
-            <>
-              <span className="text-text-muted">&middot;</span>
-              <span className="text-text-secondary">
-                <span className="font-semibold text-red-500">{problemCount}</span> problems
-              </span>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Tabs: Queue / Delivered */}
+      <div className="flex items-center gap-2 px-4 pt-2 pb-1">
+        <button
+          onClick={() => setTab("queue")}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+            tab === "queue"
+              ? "bg-brand text-white"
+              : "bg-card text-text-secondary border border-border hover:bg-gray-50"
+          }`}
+        >
+          Queue ({requests.length})
+        </button>
+        <button
+          onClick={() => setTab("delivered")}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+            tab === "delivered"
+              ? "bg-green-600 text-white"
+              : "bg-card text-text-secondary border border-border hover:bg-gray-50"
+          }`}
+        >
+          Delivered ({delivered.length})
+        </button>
 
-      {/* Queue */}
-      <div className="px-4 py-3 space-y-3">
-        {requests.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-            <CheckCircle size={48} className="mb-3 text-success" />
-            <p className="text-base font-medium text-text">All delivered!</p>
-            <p className="text-sm mt-1">No pending requests at the moment</p>
+        {/* Stats on the right */}
+        {tab === "queue" && (
+          <div className="flex items-center gap-3 text-sm ml-auto">
+            {transitCount > 0 && (
+              <span className="text-text-secondary">
+                <span className="font-semibold text-teal-600">{transitCount}</span> active
+              </span>
+            )}
+            {problemCount > 0 && (
+              <span className="text-text-secondary">
+                <span className="font-semibold text-red-500">{problemCount}</span> issues
+              </span>
+            )}
           </div>
-        ) : (
-          requests.map((req) => (
-            <QueueCard
-              key={req.id}
-              request={req}
-              operatorName={userName}
-              onUpdate={loadQueue}
-              disabled={activeCardId !== null && activeCardId !== req.id}
-              hasActiveTransit={transitCount > 0 && req.status !== "in_transit"}
-              onActiveChange={(active) =>
-                setActiveCardId(active ? req.id : null)
-              }
-            />
-          ))
         )}
       </div>
+
+      {/* Queue tab */}
+      {tab === "queue" && (
+        <div className="px-4 py-2 space-y-3">
+          {requests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+              <CheckCircle size={48} className="mb-3 text-success" />
+              <p className="text-base font-medium text-text">All delivered!</p>
+              <p className="text-sm mt-1">No pending requests at the moment</p>
+            </div>
+          ) : (
+            requests.map((req) => (
+              <QueueCard
+                key={req.id}
+                request={req}
+                operatorName={userName}
+                onUpdate={loadQueue}
+                disabled={activeCardId !== null && activeCardId !== req.id}
+                hasActiveTransit={transitCount > 0 && req.status !== "in_transit"}
+                onActiveChange={(active) =>
+                  setActiveCardId(active ? req.id : null)
+                }
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Delivered tab */}
+      {tab === "delivered" && (
+        <div className="px-4 py-2 space-y-2">
+          {delivered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+              <Package size={48} className="mb-3" />
+              <p className="text-base font-medium text-text">No deliveries yet</p>
+            </div>
+          ) : (
+            delivered.map((req) => (
+              <DeliveredCard key={req.id} request={req} />
+            ))
+          )}
+        </div>
+      )}
     </main>
+  );
+}
+
+/** Compact read-only card for delivered items */
+function DeliveredCard({ request }: { request: MaterialRequest }) {
+  const lotNumber = request.lot?.lot_number ?? "—";
+  const deliveredTime = request.delivered_at
+    ? new Date(request.delivered_at)
+    : null;
+
+  const fmtTime = deliveredTime
+    ? `${String(deliveredTime.getHours()).padStart(2, "0")}:${String(deliveredTime.getMinutes()).padStart(2, "0")}`
+    : null;
+
+  const missingCount = request.sub_items?.filter((i) => i.status === "missing").length ?? 0;
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-3 flex items-center gap-3"
+      style={{ borderLeftWidth: 4, borderLeftColor: "#D1D5DB" }}
+    >
+      <CheckCircle size={18} className="text-green-500 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-text text-[15px]">Lot {lotNumber}</span>
+          {missingCount > 0 && (
+            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+              {missingCount} missing
+            </span>
+          )}
+        </div>
+        <p className="text-[13px] text-text-secondary truncate">
+          {request.material_name}
+          {request.requested_by_name ? ` · ${request.requested_by_name}` : ""}
+        </p>
+      </div>
+      {fmtTime && (
+        <div className="flex items-center gap-1 text-[12px] text-text-muted shrink-0">
+          <Clock size={11} />
+          {fmtTime}
+        </div>
+      )}
+    </div>
   );
 }

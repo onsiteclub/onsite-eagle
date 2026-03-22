@@ -159,9 +159,8 @@ export function QueueCard({
       setActionLoading(null);
       onUpdate();
     } else if (step === "delivered") {
-      // Enter delivery mode + auto-open camera
+      // Enter delivery mode (photo is optional)
       setMode("deliver");
-      setTimeout(() => cameraRef.current?.click(), 100);
     }
   }
 
