@@ -186,12 +186,11 @@ export default function SiteOperatorPage() {
     );
   }
 
-  // Logged in — show delivery queue for this site
-  const pendingCount = requests.filter(
-    (r) => r.status === "requested" || r.status === "acknowledged"
-  ).length;
-  const problemCount = requests.filter((r) => r.status === "problem").length;
-  const transitCount = requests.filter((r) => r.status === "in_transit").length;
+  // Logged in — separate active (in_transit) from queue
+  const activeRequest = requests.find((r) => r.status === "in_transit") ?? null;
+  const queueRequests = requests.filter((r) => r.status !== "in_transit");
+  const problemCount = queueRequests.filter((r) => r.status === "problem").length;
+  const totalQueue = queueRequests.length;
 
   return (
     <main className="pb-8">
@@ -235,11 +234,6 @@ export default function SiteOperatorPage() {
         {/* Stats on the right */}
         {tab === "queue" && (
           <div className="flex items-center gap-3 text-sm ml-auto">
-            {transitCount > 0 && (
-              <span className="text-text-secondary">
-                <span className="font-semibold text-teal-600">{transitCount}</span> active
-              </span>
-            )}
             {problemCount > 0 && (
               <span className="text-text-secondary">
                 <span className="font-semibold text-red-500">{problemCount}</span> issues
@@ -251,7 +245,7 @@ export default function SiteOperatorPage() {
 
       {/* Queue tab */}
       {tab === "queue" && (
-        <div className="px-4 py-2 space-y-3">
+        <div className="px-4 py-2">
           {requests.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-text-muted">
               <CheckCircle size={48} className="mb-3 text-success" />
@@ -259,19 +253,55 @@ export default function SiteOperatorPage() {
               <p className="text-sm mt-1">No pending requests at the moment</p>
             </div>
           ) : (
-            requests.map((req) => (
-              <QueueCard
-                key={req.id}
-                request={req}
-                operatorName={userName}
-                onUpdate={loadQueue}
-                disabled={activeCardId !== null && activeCardId !== req.id}
-                hasActiveTransit={transitCount > 0 && req.status !== "in_transit"}
-                onActiveChange={(active) =>
-                  setActiveCardId(active ? req.id : null)
-                }
-              />
-            ))
+            <>
+              {/* ─── ACTIVE CARD: big, detailed, at the top ─── */}
+              {activeRequest && (
+                <div className="mb-4">
+                  <QueueCard
+                    key={activeRequest.id}
+                    request={activeRequest}
+                    operatorName={userName}
+                    onUpdate={loadQueue}
+                    disabled={false}
+                    hasActiveTransit={false}
+                    onActiveChange={(active) =>
+                      setActiveCardId(active ? activeRequest.id : null)
+                    }
+                  />
+                </div>
+              )}
+
+              {/* ─── QUEUE: compact uniform cards ─── */}
+              {totalQueue > 0 && (
+                <>
+                  {activeRequest && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider">
+                        Queue ({totalQueue})
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {queueRequests.map((req) => (
+                      <QueueCard
+                        key={req.id}
+                        request={req}
+                        operatorName={userName}
+                        onUpdate={loadQueue}
+                        disabled={activeCardId !== null && activeCardId !== req.id}
+                        hasActiveTransit={activeRequest !== null}
+                        onActiveChange={(active) =>
+                          setActiveCardId(active ? req.id : null)
+                        }
+                        compact
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       )}

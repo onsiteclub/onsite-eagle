@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     let query = supabase
       .from("frm_material_requests")
       .select(
-        "id, material_name, quantity, unit, status, urgency_level, urgency_score, requested_at, requested_by_name, delivered_by_name, delivery_notes, photo_url, in_transit_at, delivered_at, notes, urgency_reason, sub_items, lot:frm_lots(lot_number), jobsite:frm_jobsites(name)"
+        "id, lot_id, material_name, quantity, unit, status, urgency_level, urgency_score, requested_at, requested_by_name, delivered_by_name, delivery_notes, photo_url, in_transit_at, delivered_at, notes, urgency_reason, sub_items, lot:frm_lots(lot_number), jobsite:frm_jobsites(name)"
       )
       .is("deleted_at", null)
       .order("requested_at", { ascending: false })

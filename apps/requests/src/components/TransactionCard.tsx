@@ -5,10 +5,11 @@ import { UrgencyBadge } from "./StatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
 import { formatRequestTime, getDeadlineInfo } from "@/lib/deadline";
-import { Package, User, Truck, AlertTriangle, Loader2 } from "lucide-react";
+import { Package, User, Truck, AlertTriangle, Loader2, Plus } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
+  lot_id?: string;
   material_name: string;
   quantity: number;
   unit: string;
@@ -28,7 +29,11 @@ interface MaterialRequest {
   jobsite: { name: string } | null;
 }
 
-export function TransactionCard({ request, onUpdate }: { request: MaterialRequest; onUpdate?: () => void }) {
+export function TransactionCard({ request, onUpdate, onNewRequest }: {
+  request: MaterialRequest;
+  onUpdate?: () => void;
+  onNewRequest?: (lotId: string, lotLabel: string) => void;
+}) {
   const [urgencyLoading, setUrgencyLoading] = useState(false);
   const lotNumber = request.lot?.lot_number ?? "—";
   const siteName = request.jobsite?.name ?? "";
@@ -60,11 +65,21 @@ export function TransactionCard({ request, onUpdate }: { request: MaterialReques
     <div className={`rounded-xl border border-border p-4 space-y-2.5 ${urgencyBorder} ${
       isUrgentDeadline ? "bg-amber-50/80 border-amber-300" : "bg-card"
     }`}>
-      {/* Header: Lot (prominent) + site */}
+      {/* Header: Lot (prominent) + [+] + site */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Package size={16} className="text-brand shrink-0" />
           <span className="font-bold text-text text-[17px]">Lot {lotNumber}</span>
+          {onNewRequest && request.lot_id && (
+            <button
+              type="button"
+              onClick={() => onNewRequest(request.lot_id!, `Lot ${lotNumber}${siteName ? ` — ${siteName}` : ""}`)}
+              className="w-6 h-6 rounded-full flex items-center justify-center bg-brand/10 text-brand hover:bg-brand/20 active:scale-90 transition shrink-0"
+              title="New request for this lot"
+            >
+              <Plus size={14} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
         {siteName && <span className="text-xs text-text-muted shrink-0">{siteName}</span>}
       </div>

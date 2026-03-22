@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { getCookie } from "@/lib/cookies";
 import { TransactionCard } from "@/components/TransactionCard";
+import { NewRequestModal } from "@/components/NewRequestModal";
 import { RefreshCw, Loader2, Inbox } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
+  lot_id?: string;
   material_name: string;
   quantity: number;
   unit: string;
@@ -36,6 +39,8 @@ export default function SupervisorPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
   const [siteCount, setSiteCount] = useState(0);
+  const [userName, setUserName] = useState("Supervisor");
+  const [modalLot, setModalLot] = useState<{ id: string; label: string } | null>(null);
 
   const loadData = useCallback(async () => {
     const [reqRes, siteRes] = await Promise.all([
@@ -54,6 +59,7 @@ export default function SupervisorPage() {
   }, []);
 
   useEffect(() => {
+    setUserName(getCookie("onsite-name") ?? "Supervisor");
     loadData().then(() => setLoading(false));
   }, [loadData]);
 
@@ -133,9 +139,27 @@ export default function SupervisorPage() {
             )}
           </div>
         ) : (
-          filtered.map((req) => <TransactionCard key={req.id} request={req} onUpdate={loadData} />)
+          filtered.map((req) => (
+            <TransactionCard
+              key={req.id}
+              request={req}
+              onUpdate={loadData}
+              onNewRequest={(lotId, lotLabel) => setModalLot({ id: lotId, label: lotLabel })}
+            />
+          ))
         )}
       </div>
+
+      {/* New request modal */}
+      {modalLot && (
+        <NewRequestModal
+          lotId={modalLot.id}
+          lotLabel={modalLot.label}
+          userName={userName}
+          onClose={() => setModalLot(null)}
+          onCreated={loadData}
+        />
+      )}
     </main>
   );
 }

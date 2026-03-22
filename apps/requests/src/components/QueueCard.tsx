@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { CheckCircle, Camera, AlertTriangle, RotateCcw, AlertCircle, ChevronDown } from "lucide-react";
+import { CheckCircle, Camera, AlertTriangle, RotateCcw, AlertCircle, ChevronDown, Truck } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBar } from "./DeadlineBadge";
 import { getDeadlineInfo } from "@/lib/deadline";
@@ -78,6 +78,7 @@ export function QueueCard({
   disabled,
   hasActiveTransit,
   onActiveChange,
+  compact,
 }: {
   request: MaterialRequest;
   operatorName: string;
@@ -85,6 +86,8 @@ export function QueueCard({
   disabled?: boolean;
   hasActiveTransit?: boolean;
   onActiveChange?: (active: boolean) => void;
+  /** Compact mode: small uniform card for queue list. No stepper, no sub-items, no deadline bar. */
+  compact?: boolean;
 }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [mode, setMode] = useState<"idle" | "deliver" | "problem">("idle");
@@ -280,6 +283,81 @@ export function QueueCard({
       body: JSON.stringify({ id: request.id, sub_items: updated }),
     });
     onUpdate();
+  }
+
+  // ─── COMPACT MODE: uniform small card for queue ───
+  if (compact) {
+    const canStartTransit = !hasActiveTransit && request.status !== "in_transit" && request.status !== "problem";
+    return (
+      <div
+        className={`rounded-xl overflow-hidden transition-all ${
+          isUrgentDeadline
+            ? "bg-amber-50/80 border border-amber-300"
+            : request.status === "problem"
+            ? "bg-red-50/60 border border-red-200"
+            : "bg-card border border-border"
+        }`}
+        style={{ borderLeftWidth: 4, borderLeftColor: isUrgentDeadline ? "#F59E0B" : borderColor }}
+      >
+        <div className="p-3 flex items-center gap-3">
+          {/* Urgency dot */}
+          <span
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: urgencyColor }}
+          />
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-text text-[15px]">
+                {lotNumber ? `Lot ${lotNumber}` : "—"}
+              </span>
+              {missingCount > 0 && (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                  {missingCount} missing
+                </span>
+              )}
+              {request.status === "problem" && (
+                <span className="text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">
+                  Problem
+                </span>
+              )}
+            </div>
+            <p className="text-[13px] text-text-secondary truncate">
+              {request.material_name}
+              {request.requested_by_name ? ` · ${request.requested_by_name}` : ""}
+            </p>
+          </div>
+
+          {/* Action: Start Transit button or Problem Resolve */}
+          {request.status === "problem" ? (
+            <button
+              onClick={handleResolve}
+              disabled={actionLoading !== null}
+              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-brand text-white hover:bg-brand-dark active:scale-[0.97] transition disabled:opacity-50"
+            >
+              <RotateCcw size={12} />
+              Resolve
+            </button>
+          ) : canStartTransit ? (
+            <button
+              onClick={() => handleStepClick("in_transit")}
+              disabled={actionLoading !== null}
+              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.97] transition disabled:opacity-50"
+            >
+              {actionLoading === "transit" ? (
+                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Truck size={12} />
+                  Go
+                </>
+              )}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   return (
