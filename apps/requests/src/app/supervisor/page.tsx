@@ -133,7 +133,7 @@ export default function SupervisorPage() {
             )}
           </div>
         ) : (
-          filtered.map((req) => <TransactionCard key={req.id} request={req} />)
+          filtered.map((req) => <TransactionCard key={req.id} request={req} onUpdate={loadData} />)
         )}
       </div>
     </main>

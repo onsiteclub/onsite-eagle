@@ -100,35 +100,48 @@ export async function PATCH(req: NextRequest) {
     const supabase = createAdminClient();
     const body = await req.json();
 
-    const { id, status, delivered_by_name, delivery_notes, photo_url, sub_items } = body;
+    const { id, status, delivered_by_name, delivery_notes, photo_url, sub_items, urgency_level } = body;
 
-    if (!id || !status) {
-      return NextResponse.json({ error: "Missing id or status" }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const updates: Record<string, unknown> = { status };
+    const updates: Record<string, unknown> = {};
 
-    if (status === "in_transit") {
-      updates.in_transit_at = new Date().toISOString();
-      updates.delivered_by_name = delivered_by_name || null;
-    } else if (status === "delivered") {
-      updates.delivered_at = new Date().toISOString();
-      updates.delivered_by_name = delivered_by_name || null;
-      updates.delivery_notes = delivery_notes || null;
-      if (photo_url) updates.photo_url = photo_url;
-    } else if (status === "problem") {
-      updates.delivered_by_name = delivered_by_name || null;
-      updates.delivery_notes = delivery_notes || null;
-    } else if (status === "requested") {
-      // Problem resolved — reset delivery fields
-      updates.delivered_by_name = null;
-      updates.delivery_notes = null;
-      updates.in_transit_at = null;
+    if (status) {
+      updates.status = status;
+
+      if (status === "in_transit") {
+        updates.in_transit_at = new Date().toISOString();
+        updates.delivered_by_name = delivered_by_name || null;
+      } else if (status === "delivered") {
+        updates.delivered_at = new Date().toISOString();
+        updates.delivered_by_name = delivered_by_name || null;
+        updates.delivery_notes = delivery_notes || null;
+        if (photo_url) updates.photo_url = photo_url;
+      } else if (status === "problem") {
+        updates.delivered_by_name = delivered_by_name || null;
+        updates.delivery_notes = delivery_notes || null;
+      } else if (status === "requested") {
+        // Problem resolved or partial delivery — reset delivery fields
+        if (delivered_by_name !== undefined) updates.delivered_by_name = delivered_by_name;
+        if (delivery_notes !== undefined) updates.delivery_notes = delivery_notes;
+        updates.in_transit_at = null;
+      }
     }
 
     // Allow sub_items update (operator marking items as missing/delivered)
     if (sub_items !== undefined) {
       updates.sub_items = sub_items;
+    }
+
+    // Allow urgency level change (supervisor marking as urgent)
+    if (urgency_level !== undefined) {
+      updates.urgency_level = urgency_level;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No updates provided" }, { status: 400 });
     }
 
     const { error } = await supabase

@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { UrgencyBadge } from "./StatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
-import { formatRequestTime } from "@/lib/deadline";
-import { Package, User, Truck } from "lucide-react";
+import { formatRequestTime, getDeadlineInfo } from "@/lib/deadline";
+import { Package, User, Truck, AlertTriangle, Loader2 } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
@@ -27,9 +28,26 @@ interface MaterialRequest {
   jobsite: { name: string } | null;
 }
 
-export function TransactionCard({ request }: { request: MaterialRequest }) {
+export function TransactionCard({ request, onUpdate }: { request: MaterialRequest; onUpdate?: () => void }) {
+  const [urgencyLoading, setUrgencyLoading] = useState(false);
   const lotNumber = request.lot?.lot_number ?? "—";
   const siteName = request.jobsite?.name ?? "";
+
+  const isActiveStatus = !["delivered", "cancelled"].includes(request.status);
+  const deadlineInfo = isActiveStatus ? getDeadlineInfo(request.requested_at, request.urgency_level) : null;
+  const isUrgentDeadline = deadlineInfo && (deadlineInfo.status === "warning" || deadlineInfo.status === "urgent" || deadlineInfo.status === "overdue");
+  const canMarkUrgent = isActiveStatus && request.urgency_level !== "critical";
+
+  async function handleMarkUrgent() {
+    setUrgencyLoading(true);
+    await fetch("/api/requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: request.id, urgency_level: "critical" }),
+    });
+    setUrgencyLoading(false);
+    onUpdate?.();
+  }
 
   const urgencyBorder =
     request.urgency_level === "critical"
@@ -39,7 +57,9 @@ export function TransactionCard({ request }: { request: MaterialRequest }) {
         : "";
 
   return (
-    <div className={`bg-card rounded-xl border border-border p-4 space-y-2.5 ${urgencyBorder}`}>
+    <div className={`rounded-xl border border-border p-4 space-y-2.5 ${urgencyBorder} ${
+      isUrgentDeadline ? "bg-amber-50/80 border-amber-300" : "bg-card"
+    }`}>
       {/* Header: Lot (prominent) + site */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -108,6 +128,22 @@ export function TransactionCard({ request }: { request: MaterialRequest }) {
             className="w-20 h-20 object-cover rounded-lg border border-border hover:opacity-80 transition"
           />
         </a>
+      )}
+
+      {/* Supervisor: Mark as Urgent */}
+      {canMarkUrgent && (
+        <button
+          onClick={handleMarkUrgent}
+          disabled={urgencyLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-amber-700 bg-amber-100 border border-amber-200 hover:bg-amber-200 active:scale-[0.97] transition disabled:opacity-50"
+        >
+          {urgencyLoading ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <AlertTriangle size={12} />
+          )}
+          Mark Urgent
+        </button>
       )}
     </div>
   );

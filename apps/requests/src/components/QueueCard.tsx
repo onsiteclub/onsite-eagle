@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { CheckCircle, Camera, AlertTriangle, RotateCcw, AlertCircle, ChevronDown } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBar } from "./DeadlineBadge";
+import { getDeadlineInfo } from "@/lib/deadline";
 
 interface MaterialRequest {
   id: string;
@@ -20,7 +21,7 @@ interface MaterialRequest {
   urgency_reason: string | null;
   sub_items: { name: string; status: string }[] | null;
   lot: { lot_number: string; address: string | null } | null;
-  jobsite: { name: string } | null;
+  jobsite?: { name: string } | null;
 }
 
 const STATUS_BORDER: Record<string, string> = {
@@ -98,7 +99,6 @@ export function QueueCard({
   const cameraRef = useRef<HTMLInputElement>(null);
 
   const lotNumber = request.lot?.lot_number ?? null;
-  const siteName = request.jobsite?.name ?? "";
   const borderColor = STATUS_BORDER[request.status] || "#D1D5DB";
   const urgencyColor = URGENCY_COLORS[request.urgency_level] || "#9CA3AF";
 
@@ -107,10 +107,23 @@ export function QueueCard({
 
   const hasSubItems = request.sub_items && request.sub_items.length > 0;
   const missingCount = request.sub_items?.filter((i) => i.status === "missing").length ?? 0;
+  const isInTransit = request.status === "in_transit";
+
+  // Deadline-based amber glow when time is running out
+  const isActiveStatus = !["delivered", "cancelled"].includes(request.status);
+  const deadlineInfo = isActiveStatus ? getDeadlineInfo(request.requested_at, request.urgency_level) : null;
+  const isUrgentDeadline = deadlineInfo && (deadlineInfo.status === "warning" || deadlineInfo.status === "urgent" || deadlineInfo.status === "overdue");
 
   useEffect(() => {
     onActiveChange?.(isActive);
   }, [isActive, onActiveChange]);
+
+  // Auto-expand sub-items when in_transit so operator sees them
+  useEffect(() => {
+    if (isInTransit && hasSubItems) {
+      setItemsOpen(true);
+    }
+  }, [isInTransit, hasSubItems]);
 
   function resetMode() {
     setMode("idle");
@@ -170,17 +183,44 @@ export function QueueCard({
       setUploading(false);
     }
 
-    await fetch("/api/requests", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: request.id,
-        status: "delivered",
-        delivered_by_name: operatorName,
-        delivery_notes: deliveryNotes.trim() || null,
-        photo_url: photoUrl || null,
-      }),
-    });
+    // Check if any sub-items are marked missing → partial delivery
+    const hasMissingItems = request.sub_items?.some((i) => i.status === "missing");
+
+    if (hasMissingItems) {
+      // Mark non-missing items as delivered, keep missing as-is
+      const updatedItems = request.sub_items!.map((item) =>
+        item.status !== "missing" ? { ...item, status: "delivered" } : item
+      );
+      const missingNames = request.sub_items!.filter((i) => i.status === "missing").map((i) => i.name);
+      const notePrefix = `[Partial] Missing: ${missingNames.join(", ")}`;
+      const fullNote = deliveryNotes.trim() ? `${notePrefix}. ${deliveryNotes.trim()}` : notePrefix;
+
+      await fetch("/api/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: request.id,
+          status: "requested",
+          delivered_by_name: operatorName,
+          delivery_notes: fullNote,
+          photo_url: photoUrl || null,
+          sub_items: updatedItems,
+        }),
+      });
+    } else {
+      // Full delivery
+      await fetch("/api/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: request.id,
+          status: "delivered",
+          delivered_by_name: operatorName,
+          delivery_notes: deliveryNotes.trim() || null,
+          photo_url: photoUrl || null,
+        }),
+      });
+    }
 
     setActionLoading(null);
     resetMode();
@@ -245,14 +285,36 @@ export function QueueCard({
 
   return (
     <div
-      className={`bg-card rounded-xl border border-border overflow-hidden shadow-sm transition ${
-        dimmed ? "opacity-40 pointer-events-none" : ""
+      className={`rounded-xl overflow-hidden transition-all ${
+        isInTransit
+          ? "bg-brand/5 border-2 border-brand/40 ring-2 ring-brand/15 shadow-lg"
+          : dimmed
+          ? "bg-card border border-border opacity-40 pointer-events-none shadow-sm"
+          : isUrgentDeadline
+          ? "bg-amber-50/80 border border-amber-300 shadow-sm"
+          : "bg-card border border-border shadow-sm"
       }`}
-      style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
+      style={!isInTransit ? { borderLeftWidth: 4, borderLeftColor: isUrgentDeadline ? "#F59E0B" : borderColor } : undefined}
     >
+      {/* Active task banner */}
+      {isInTransit && mode === "idle" && (
+        <div className="bg-brand/10 border-b border-brand/20 px-3.5 py-2 flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+          <span className="text-xs font-bold text-brand uppercase tracking-wide">Active Task</span>
+        </div>
+      )}
+
+      {/* Issue banner — card returned to queue with missing items */}
+      {missingCount > 0 && !isInTransit && request.status !== "delivered" && request.status !== "problem" && (
+        <div className="bg-amber-500 text-white px-3.5 py-1.5 flex items-center gap-1.5 text-xs font-bold">
+          <AlertCircle size={12} />
+          ISSUE — {missingCount} item(s) missing
+        </div>
+      )}
+
       {/* Card header */}
       <div className="p-3.5 pb-2">
-        {/* Row 1: Lot number + site name */}
+        {/* Row 1: Lot number + requester name */}
         <div className="flex items-center gap-2 mb-0.5">
           <span
             className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -261,19 +323,12 @@ export function QueueCard({
           <span className="font-bold text-text text-[17px] truncate flex-1">
             {lotNumber ? `Lot ${lotNumber}` : "—"}
           </span>
-          {siteName && (
-            <span className="text-xs text-text-muted shrink-0">{siteName}</span>
+          {request.requested_by_name && (
+            <span className="text-[13px] text-text-muted shrink-0">{request.requested_by_name}</span>
           )}
         </div>
 
-        {/* Row 2: Requester name */}
-        {request.requested_by_name && (
-          <p className="text-[12px] text-text-muted ml-[18px]">
-            Requested by {request.requested_by_name}
-          </p>
-        )}
-
-        {/* Row 3: Material name — clickable dropdown if has sub-items */}
+        {/* Row 2: Material name — clickable dropdown if has sub-items */}
         <div className="ml-[18px] mt-1.5">
           {hasSubItems ? (
             <button
@@ -301,44 +356,45 @@ export function QueueCard({
 
         {/* Sub-items dropdown */}
         {hasSubItems && itemsOpen && (
-          <div className="ml-[18px] mt-2 space-y-1">
+          <div className={`ml-[18px] mt-2 space-y-1 ${isInTransit ? "p-2 bg-white/60 rounded-lg border border-brand/10" : ""}`}>
+            {isInTransit && (
+              <p className="text-[11px] text-text-muted font-medium mb-1 px-1">Tap to mark missing items:</p>
+            )}
             {request.sub_items!.map((item, idx) => {
               const isMissing = item.status === "missing";
+              const canToggle = mode === "idle" && request.status !== "delivered" && request.status !== "problem";
               return (
-                <div
+                <button
                   key={idx}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition ${
+                  type="button"
+                  disabled={!canToggle}
+                  onClick={() => canToggle && toggleSubItemMissing(idx)}
+                  className={`w-full flex items-center gap-2 rounded-lg text-[13px] transition text-left ${
+                    canToggle ? "active:scale-[0.98] cursor-pointer" : "cursor-default"
+                  } ${
                     isMissing
-                      ? "bg-amber-50 border border-amber-200"
-                      : "bg-gray-50 border border-transparent"
+                      ? isInTransit
+                        ? "bg-amber-100 border border-amber-300 px-2.5 py-2"
+                        : "bg-amber-50 border border-amber-200 px-2.5 py-1.5"
+                      : isInTransit
+                        ? "bg-white border border-border hover:border-brand/30 px-2.5 py-2"
+                        : "bg-gray-50 border border-transparent px-2.5 py-1.5"
                   }`}
                 >
                   <span className={`flex-1 ${isMissing ? "text-amber-700 font-medium" : "text-text-secondary"}`}>
                     {item.name}
                   </span>
-                  {isMissing && (
-                    <span className="text-[11px] text-amber-600 font-medium flex items-center gap-0.5">
+                  {isMissing ? (
+                    <span className="text-[11px] text-amber-600 font-medium flex items-center gap-0.5 bg-amber-200/60 px-1.5 py-0.5 rounded-full">
                       <AlertCircle size={10} />
                       Missing
                     </span>
-                  )}
-                  {mode === "idle" && request.status !== "delivered" && request.status !== "problem" && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSubItemMissing(idx);
-                      }}
-                      className={`text-[11px] font-medium px-1.5 py-0.5 rounded transition ${
-                        isMissing
-                          ? "text-brand hover:bg-brand/10"
-                          : "text-amber-600 hover:bg-amber-50"
-                      }`}
-                    >
-                      {isMissing ? "Available" : "Missing"}
-                    </button>
-                  )}
-                </div>
+                  ) : canToggle ? (
+                    <span className="text-[11px] text-text-muted">
+                      {isInTransit ? "✓ OK" : ""}
+                    </span>
+                  ) : null}
+                </button>
               );
             })}
           </div>
