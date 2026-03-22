@@ -134,6 +134,26 @@ export function TransactionCard({ request, onUpdate, onNewRequest }: {
         )}
       </div>
 
+      {/* Missing sub-items alert */}
+      {request.sub_items && request.sub_items.some((i) => i.status === "missing") && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 space-y-1">
+          <span className="text-xs font-semibold text-amber-700">Missing items:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {request.sub_items
+              .filter((i) => i.status === "missing")
+              .map((i) => (
+                <span
+                  key={i.name}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-medium"
+                >
+                  <AlertTriangle size={10} />
+                  {i.name}
+                </span>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Delivery photo */}
       {request.photo_url && (
         <a href={request.photo_url} target="_blank" rel="noopener noreferrer">

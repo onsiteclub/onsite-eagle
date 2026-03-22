@@ -29,7 +29,7 @@ interface MaterialRequest {
   jobsite: { name: string } | null;
 }
 
-type Filter = "all" | "pending" | "delivered" | "problem";
+type Filter = "all" | "pending" | "delivered" | "problem" | "missing";
 
 const POLL_INTERVAL = 4000;
 
@@ -69,18 +69,28 @@ export default function SupervisorPage() {
     return () => clearInterval(interval);
   }, [loadData]);
 
+  const hasMissing = (r: MaterialRequest) =>
+    r.sub_items?.some((i) => i.status === "missing") ?? false;
+
+  // "Active" = everything that needs attention (excludes clean delivered)
+  const isActive = (r: MaterialRequest) => r.status !== "delivered";
+
   const filtered = requests.filter((r) => {
     if (filter === "pending") return ["requested", "acknowledged", "in_transit"].includes(r.status);
     if (filter === "delivered") return r.status === "delivered";
     if (filter === "problem") return r.status === "problem";
-    return true;
+    if (filter === "missing") return hasMissing(r);
+    // "all" = active only (no clean delivered)
+    return isActive(r);
   });
 
+  const activeCount = requests.filter(isActive).length;
   const pendingCount = requests.filter((r) =>
     ["requested", "acknowledged", "in_transit"].includes(r.status)
   ).length;
   const deliveredCount = requests.filter((r) => r.status === "delivered").length;
   const problemCount = requests.filter((r) => r.status === "problem").length;
+  const missingCount = requests.filter(hasMissing).length;
 
   if (loading) {
     return (
@@ -96,7 +106,7 @@ export default function SupervisorPage() {
       <div className="flex items-center px-4 pt-3 pb-2">
         <div className="flex items-center gap-2 flex-1 overflow-x-auto">
           <FilterChip
-            label={`All (${requests.length})`}
+            label={`Active (${activeCount})`}
             active={filter === "all"}
             onClick={() => setFilter("all")}
           />
@@ -109,6 +119,12 @@ export default function SupervisorPage() {
             label={`Delivered (${deliveredCount})`}
             active={filter === "delivered"}
             onClick={() => setFilter("delivered")}
+          />
+          <FilterChip
+            label={`Missing (${missingCount})`}
+            active={filter === "missing"}
+            onClick={() => setFilter("missing")}
+            variant="missing"
           />
           <FilterChip
             label={`Problem (${problemCount})`}
@@ -173,10 +189,14 @@ function FilterChip({
   label: string;
   active: boolean;
   onClick: () => void;
-  variant?: "problem";
+  variant?: "problem" | "missing";
 }) {
   const activeClass =
-    variant === "problem" ? "bg-red-600 text-white" : "bg-brand text-white";
+    variant === "problem"
+      ? "bg-red-600 text-white"
+      : variant === "missing"
+        ? "bg-amber-500 text-white"
+        : "bg-brand text-white";
 
   return (
     <button

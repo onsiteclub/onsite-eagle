@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { getCookie } from "@/lib/cookies";
 import { RequestCard } from "@/components/RequestCard";
 import { NewRequestModal } from "@/components/NewRequestModal";
-import { Plus, RefreshCw, Loader2, Inbox, AlertTriangle, ChevronRight } from "lucide-react";
+import { Plus, RefreshCw, Loader2, Inbox, AlertTriangle, ChevronRight, Home } from "lucide-react";
 
 interface LotInfo {
   id: string;
@@ -253,21 +253,27 @@ export default function LotRequestPage() {
         </div>
       </div>
 
-      {/* My Lots bar — other lots this worker is registered on */}
+      {/* My Lots — other lots this worker is registered on */}
       {myLots.length > 0 && (
-        <div className="px-4 pt-2">
+        <div className="px-4 pt-3">
+          <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-1.5">My Lots</p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {myLots.map((ml) => (
               <a
                 key={ml.id}
                 href={`/request/${ml.id}`}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-text-secondary whitespace-nowrap transition shrink-0"
+                className="flex items-center gap-2.5 px-3 py-2.5 bg-white border border-border hover:border-brand/40 hover:bg-brand/5 rounded-xl text-sm font-medium text-text whitespace-nowrap transition shrink-0 active:scale-[0.97] shadow-sm"
               >
-                Lot {ml.lot_number}
-                {ml.jobsite?.name && (
-                  <span className="text-text-muted">({ml.jobsite.name})</span>
-                )}
-                <ChevronRight size={10} className="text-text-muted" />
+                <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
+                  <Home size={14} className="text-brand" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-semibold text-[13px] text-text">Lot {ml.lot_number}</span>
+                  {ml.jobsite?.name && (
+                    <span className="text-[11px] text-text-muted leading-tight">{ml.jobsite.name}</span>
+                  )}
+                </div>
+                <ChevronRight size={14} className="text-text-muted ml-1" />
               </a>
             ))}
           </div>
