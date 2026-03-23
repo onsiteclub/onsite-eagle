@@ -41,6 +41,7 @@ export default function SelfChecklistPage() {
   const [state, setState] = useState<Record<string, ItemState>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState('')
 
   // Persist state to sessionStorage on every change (survives mobile camera tab kill)
   const stateRef = useRef(state)
@@ -148,52 +149,120 @@ export default function SelfChecklistPage() {
 
   const canSubmit = allChecked && !cleanupPhotosMissing
 
+  /** Upload a single base64 photo via /api/upload, returns public URL */
+  async function uploadPhoto(base64: string, folder: string, itemCode: string): Promise<string | null> {
+    try {
+      // Convert base64 data URL to Blob
+      const match = base64.match(/^data:image\/\w+;base64,(.+)$/)
+      if (!match) return null
+      const binary = atob(match[1])
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      const blob = new Blob([bytes], { type: 'image/jpeg' })
+
+      const formData = new FormData()
+      formData.append('file', blob, `${itemCode}.jpg`)
+      formData.append('folder', folder)
+      formData.append('itemCode', itemCode)
+
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (!res.ok) return null
+      const { url } = await res.json()
+      return url
+    } catch {
+      return null
+    }
+  }
+
   async function handleSubmit() {
     if (!info) return
     setSubmitting(true)
     setSubmitError(null)
+    setUploadProgress('')
 
+    // Generate a folder name for this submission
+    const folder = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+
+    // Collect all photos that need uploading
+    const photoTasks: Array<{ code: string; photoIndex: number; base64: string }> = []
+    for (const item of items) {
+      const s = state[item.code]
+      if (!s) continue
+      s.photos.forEach((base64, pi) => {
+        if (base64) photoTasks.push({ code: item.code, photoIndex: pi, base64 })
+      })
+    }
+
+    // Upload photos one by one (avoids body size limit)
+    const uploadedUrls: Record<string, string[]> = {}
+    if (photoTasks.length > 0) {
+      for (let i = 0; i < photoTasks.length; i++) {
+        const task = photoTasks[i]
+        setUploadProgress(`Uploading photo ${i + 1}/${photoTasks.length}...`)
+        const url = await uploadPhoto(task.base64, folder, `${task.code}_${task.photoIndex}`)
+        if (url) {
+          if (!uploadedUrls[task.code]) uploadedUrls[task.code] = []
+          uploadedUrls[task.code].push(url)
+        }
+      }
+    }
+
+    setUploadProgress('Saving report...')
+
+    // Build payload with URLs instead of base64
     const payload = {
       info,
       transition,
       transitionLabel: TRANSITION_LABELS[transition],
-      items: items.map((item) => ({
-        code: item.code,
-        label: item.label,
-        isBlocking: item.isBlocking,
-        ...state[item.code],
-      })),
+      items: items.map((item) => {
+        const s = state[item.code]
+        return {
+          code: item.code,
+          label: item.label,
+          isBlocking: item.isBlocking,
+          result: s?.result ?? 'pending',
+          notes: s?.notes ?? '',
+          photos: s?.photos ?? [], // base64 kept for local PDF fallback
+          photoUrls: uploadedUrls[item.code] || [], // server URLs
+        }
+      }),
       completedAt: new Date().toISOString(),
       passed: !hasBlockingFail,
       startedAt: info.startedAt,
+    }
+
+    // For the API, send only URLs (no base64 — small payload)
+    const apiPayload = {
+      ...payload,
+      items: payload.items.map(({ photos: _photos, ...rest }) => rest),
     }
 
     try {
       const res = await fetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(apiPayload),
       })
 
       if (!res.ok) throw new Error('Failed to save report')
 
       const { token, reference } = await res.json()
 
-      // Also store in sessionStorage for PDF fallback on complete page
+      // Store with base64 photos for local PDF generation
       sessionStorage.setItem('selfCheckResults', JSON.stringify(payload))
       sessionStorage.removeItem(DRAFT_KEY)
 
       router.push(`/self/check/${transition}/complete?token=${token}&ref=${encodeURIComponent(reference)}`)
     } catch (err) {
       console.error('Submit error:', err)
-      setSubmitError('Failed to upload. You can still download a PDF.')
+      setSubmitError('Failed to save report. You can still download a PDF.')
 
-      // Fallback: save to sessionStorage and navigate without token
       sessionStorage.setItem('selfCheckResults', JSON.stringify(payload))
       sessionStorage.removeItem(DRAFT_KEY)
       router.push(`/self/check/${transition}/complete`)
     } finally {
       setSubmitting(false)
+      setUploadProgress('')
     }
   }
 
@@ -409,7 +478,7 @@ export default function SelfChecklistPage() {
             `}
           >
             {submitting
-              ? 'Uploading photos...'
+              ? (uploadProgress || 'Uploading photos...')
               : !allChecked
                 ? `Check all items (${totalCount - checkedCount} remaining)`
                 : cleanupPhotosMissing

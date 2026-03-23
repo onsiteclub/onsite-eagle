@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@onsite/supabase'
 import { generateToken, generateReference } from '@/lib/tokens'
-import { STORAGE_BUCKET } from '@/lib/constants'
 
 export const maxDuration = 60
 
@@ -11,7 +10,7 @@ interface ReportItemPayload {
   isBlocking: boolean
   result: 'pass' | 'fail' | 'na'
   notes: string
-  photos: string[] // base64 data URLs
+  photoUrls?: string[] // pre-uploaded URLs (new flow)
 }
 
 interface ReportPayload {
@@ -42,65 +41,18 @@ export async function POST(request: Request) {
     const token = generateToken()
     const reference = generateReference()
 
-    // Upload photos to Supabase Storage and collect URLs
-    const itemsWithUrls: Array<{
-      item_code: string
-      item_label: string
-      sort_order: number
-      is_blocking: boolean
-      result: string
-      notes: string | null
-      photo_urls: string[]
-    }> = []
+    // Build items — photos are already uploaded via /api/upload
+    const itemsWithUrls = items.map((item, idx) => ({
+      item_code: item.code,
+      item_label: item.label,
+      sort_order: idx,
+      is_blocking: item.isBlocking,
+      result: item.result,
+      notes: item.notes || null,
+      photo_urls: item.photoUrls || [],
+    }))
 
-    let totalPhotos = 0
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const item = items[idx]
-      const photoUrls: string[] = []
-
-      for (let pi = 0; pi < item.photos.length; pi++) {
-        const base64 = item.photos[pi]
-        if (!base64) continue
-
-        // Strip data URL prefix: "data:image/jpeg;base64,..."
-        const match = base64.match(/^data:image\/\w+;base64,(.+)$/)
-        if (!match) continue
-
-        const buffer = Buffer.from(match[1], 'base64')
-        const path = `shared-reports/${token}/${item.code}_${pi}.jpg`
-
-        const { error: uploadErr } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(path, buffer, {
-            contentType: 'image/jpeg',
-            upsert: true,
-          })
-
-        if (uploadErr) {
-          console.error(`Upload failed for ${path}:`, uploadErr.message)
-          continue
-        }
-
-        const { data: urlData } = supabase.storage
-          .from(STORAGE_BUCKET)
-          .getPublicUrl(path)
-
-        photoUrls.push(urlData.publicUrl)
-        totalPhotos++
-      }
-
-      itemsWithUrls.push({
-        item_code: item.code,
-        item_label: item.label,
-        sort_order: idx,
-        is_blocking: item.isBlocking,
-        result: item.result,
-        notes: item.notes || null,
-        photo_urls: photoUrls,
-      })
-    }
-
+    const totalPhotos = itemsWithUrls.reduce((sum, i) => sum + i.photo_urls.length, 0)
     const passCount = items.filter((i) => i.result === 'pass').length
     const failCount = items.filter((i) => i.result === 'fail').length
     const naCount = items.filter((i) => i.result === 'na').length
