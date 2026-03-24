@@ -5,6 +5,7 @@ import {
   Plus, MapPin, Loader2, Check, Copy, Link2,
   Truck, Trash2, AlertTriangle, X,
   Home, Building2, Archive, ArchiveRestore, Settings, Save,
+  Pencil,
 } from "lucide-react";
 
 interface Site {
@@ -58,6 +59,15 @@ export default function SetupPage() {
   const [editCity, setEditCity] = useState("");
   const [savingSite, setSavingSite] = useState(false);
   const [editDirty, setEditDirty] = useState(false);
+
+  // Edit lot
+  const [editingLotId, setEditingLotId] = useState<string | null>(null);
+  const [editingLotValue, setEditingLotValue] = useState("");
+  const [savingLot, setSavingLot] = useState(false);
+
+  // Quick add single lot
+  const [quickLotNumber, setQuickLotNumber] = useState("");
+  const [quickAdding, setQuickAdding] = useState(false);
 
   // Delete site
   const [deleteTarget, setDeleteTarget] = useState<Site | null>(null);
@@ -238,6 +248,41 @@ export default function SetupPage() {
       await loadSites();
     }
     setDeleting(false);
+  }
+
+  async function renameLot(lotId: string, newName: string) {
+    if (!newName.trim()) return;
+    setSavingLot(true);
+    const res = await fetch(`/api/lots/${lotId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lot_number: newName.trim() }),
+    });
+    if (res.ok) {
+      setEditingLotId(null);
+      setEditingLotValue("");
+      if (selectedSite) await loadLots(selectedSite);
+    }
+    setSavingLot(false);
+  }
+
+  async function quickAddSingleLot() {
+    if (!selectedSite || !quickLotNumber.trim()) return;
+    setQuickAdding(true);
+    await fetch("/api/lots", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jobsite_id: selectedSite,
+        count: 1,
+        from: parseInt(quickLotNumber) || undefined,
+        custom_number: quickLotNumber.trim(),
+      }),
+    });
+    setQuickLotNumber("");
+    await loadLots(selectedSite);
+    await loadSites();
+    setQuickAdding(false);
   }
 
   // Group lots by status filter, then singles vs blocks
@@ -620,9 +665,34 @@ export default function SetupPage() {
             </div>
 
             {lotView === "active" && (
-              <p className="text-xs text-text-muted">
-                Copy individual lot links and send to workers.
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-text-muted">
+                  Copy individual lot links and send to workers.
+                </p>
+                {/* Quick add single lot */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={quickLotNumber}
+                    onChange={(e) => setQuickLotNumber(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && quickAddSingleLot()}
+                    placeholder="Lot # (e.g. 45, B-3)"
+                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                  />
+                  <button
+                    onClick={quickAddSingleLot}
+                    disabled={quickAdding || !quickLotNumber.trim()}
+                    className="flex items-center gap-1 px-3 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                  >
+                    {quickAdding ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Plus size={14} />
+                    )}
+                    Add
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Archive action bar */}
@@ -721,6 +791,13 @@ export default function SetupPage() {
                     setTimeout(() => setCopiedId(null), 2000);
                   }}
                   isArchived={lotView === "archived"}
+                  editing={editingLotId === lot.id}
+                  editValue={editingLotId === lot.id ? editingLotValue : undefined}
+                  saving={savingLot}
+                  onEditStart={() => { setEditingLotId(lot.id); setEditingLotValue(lot.lot_number); }}
+                  onEditChange={setEditingLotValue}
+                  onEditSave={() => renameLot(lot.id, editingLotValue)}
+                  onEditCancel={() => { setEditingLotId(null); setEditingLotValue(""); }}
                 />
               ))}
 
@@ -755,6 +832,13 @@ export default function SetupPage() {
                         }}
                         compact
                         isArchived={lotView === "archived"}
+                        editing={editingLotId === lot.id}
+                        editValue={editingLotId === lot.id ? editingLotValue : undefined}
+                        saving={savingLot}
+                        onEditStart={() => { setEditingLotId(lot.id); setEditingLotValue(lot.lot_number); }}
+                        onEditChange={setEditingLotValue}
+                        onEditSave={() => renameLot(lot.id, editingLotValue)}
+                        onEditCancel={() => { setEditingLotId(null); setEditingLotValue(""); }}
                       />
                     ))}
                   </div>
@@ -1038,6 +1122,13 @@ function LotRow({
   onCopy,
   compact,
   isArchived,
+  editing,
+  editValue,
+  saving,
+  onEditStart,
+  onEditChange,
+  onEditSave,
+  onEditCancel,
 }: {
   lot: Lot;
   archiveSelected: boolean;
@@ -1046,62 +1137,116 @@ function LotRow({
   onCopy: () => void;
   compact?: boolean;
   isArchived?: boolean;
+  editing?: boolean;
+  editValue?: string;
+  saving?: boolean;
+  onEditStart?: () => void;
+  onEditChange?: (v: string) => void;
+  onEditSave?: () => void;
+  onEditCancel?: () => void;
 }) {
   const workers = lot.registered_workers ?? [];
 
   return (
     <div
-      className={`flex items-center gap-3 ${compact ? "p-2" : "p-2.5"} rounded-lg border transition cursor-pointer ${
-        archiveSelected
-          ? "border-amber-400 bg-amber-50"
-          : isArchived
-            ? "border-border/50 bg-gray-50/50"
-            : "border-border hover:bg-gray-50"
+      className={`flex items-center gap-3 ${compact ? "p-2" : "p-2.5"} rounded-lg border transition ${
+        editing
+          ? "border-brand bg-brand/5"
+          : archiveSelected
+            ? "border-amber-400 bg-amber-50 cursor-pointer"
+            : isArchived
+              ? "border-border/50 bg-gray-50/50 cursor-pointer"
+              : "border-border hover:bg-gray-50 cursor-pointer"
       }`}
-      onClick={onArchiveToggle}
+      onClick={editing ? undefined : onArchiveToggle}
     >
-      <input
-        type="checkbox"
-        checked={archiveSelected}
-        onChange={onArchiveToggle}
-        className={`w-4 h-4 rounded border-border focus:ring-brand/30 ${
-          archiveSelected ? "accent-amber-600" : "accent-[var(--color-brand,#0F766E)]"
-        }`}
-      />
+      {!editing && (
+        <input
+          type="checkbox"
+          checked={archiveSelected}
+          onChange={onArchiveToggle}
+          className={`w-4 h-4 rounded border-border focus:ring-brand/30 ${
+            archiveSelected ? "accent-amber-600" : "accent-[var(--color-brand,#0F766E)]"
+          }`}
+        />
+      )}
       <div className="flex-1 min-w-0">
-        <span className={`${compact ? "text-xs" : "text-sm"} font-medium ${isArchived ? "text-text-muted" : "text-text"}`}>
-          Lot {lot.lot_number}
-        </span>
-        {workers.length > 0 && (
-          <div className="text-[11px] text-text-muted truncate">
-            {workers.join(", ")}
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={editValue ?? ""}
+              onChange={(e) => onEditChange?.(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onEditSave?.();
+                if (e.key === "Escape") onEditCancel?.();
+              }}
+              autoFocus
+              className="flex-1 px-2 py-1 rounded-md border border-brand/30 bg-white text-sm text-text outline-none focus:ring-2 focus:ring-brand/30"
+            />
+            <button
+              onClick={onEditSave}
+              disabled={saving}
+              className="p-1.5 bg-brand text-white rounded-md hover:bg-brand-dark transition disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+            </button>
+            <button
+              onClick={onEditCancel}
+              className="p-1.5 text-text-muted hover:text-text rounded-md hover:bg-gray-100 transition"
+            >
+              <X size={12} />
+            </button>
           </div>
+        ) : (
+          <>
+            <span className={`${compact ? "text-xs" : "text-sm"} font-medium ${isArchived ? "text-text-muted" : "text-text"}`}>
+              Lot {lot.lot_number}
+            </span>
+            {workers.length > 0 && (
+              <div className="text-[11px] text-text-muted truncate">
+                {workers.join(", ")}
+              </div>
+            )}
+          </>
         )}
       </div>
-      {!isArchived && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onCopy();
-          }}
-          className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition shrink-0 ${
-            copiedId === lot.id
-              ? "bg-green-50 text-green-600"
-              : "bg-brand/10 text-brand hover:bg-brand/20"
-          }`}
-        >
-          {copiedId === lot.id ? (
-            <>
-              <Check size={10} />
-              Copied
-            </>
-          ) : (
-            <>
-              <Copy size={10} />
-              Link
-            </>
-          )}
-        </button>
+      {!editing && !isArchived && (
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditStart?.();
+            }}
+            className="p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md transition"
+            title="Rename lot"
+          >
+            <Pencil size={12} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopy();
+            }}
+            className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition ${
+              copiedId === lot.id
+                ? "bg-green-50 text-green-600"
+                : "bg-brand/10 text-brand hover:bg-brand/20"
+            }`}
+          >
+            {copiedId === lot.id ? (
+              <>
+                <Check size={10} />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy size={10} />
+                Link
+              </>
+            )}
+          </button>
+        </div>
       )}
     </div>
   );

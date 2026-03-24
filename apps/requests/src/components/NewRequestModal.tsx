@@ -1,7 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import { X, Package, Pencil, Check } from "lucide-react";
+import {
+  X, Package, Pencil, Check, Box,
+  Bolt, ShieldCheck, Layers, Wrench, Footprints,
+  LayoutGrid, TriangleAlert, Hammer, DoorOpen, Fence,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const SUB_ITEM_ICONS: Record<string, LucideIcon> = {
+  "Steel Beams / Posts": Bolt,
+  "Steel Beams": Bolt,
+  "Gasket / Tyvek / Poly": ShieldCheck,
+  "Plating Lumber": Layers,
+  "Joists": LayoutGrid,
+  "Hangers / Brackets": Wrench,
+  "Hangers": Wrench,
+  "Temp Stair": Footprints,
+  "Floor Sheathing": Layers,
+  "Long Lumber": Hammer,
+  "Ext. Wall Studs": Fence,
+  "Wall Sheathing": Layers,
+  "Int. Wall Studs": Fence,
+  "Landings Package": Package,
+  "Porch Package": Package,
+  "Safety Package": ShieldCheck,
+  "Bracing 2x4s": Hammer,
+  "Trusses": TriangleAlert,
+  "Truss Lumber Package": Package,
+  "Truss Hangers": Wrench,
+  "Truss Sheathing": Layers,
+  "H-Clips": Wrench,
+  "Strapping": Hammer,
+  "Backing Package": Package,
+  "Garage Jambs": DoorOpen,
+  "Finished Basement Pack": Package,
+  "Porch P.T. 2x6s": Hammer,
+  "Porch Posts Brackets": Bolt,
+};
 
 interface Lot {
   id: string;
@@ -9,26 +45,66 @@ interface Lot {
   jobsite?: { name: string } | null;
 }
 
-// 7 pre-defined bundles (factory packages)
+// 6 phases from Shabba's material catalog
 const PHASE_BUNDLES = [
-  { value: "First Floor System", label: "First Floor System", icon: "📦" },
-  { value: "Main Floor Walls", label: "Main Floor Walls", icon: "🧱" },
-  { value: "Second Floor System", label: "Second Floor System", icon: "📦" },
-  { value: "Second Floor Walls", label: "Second Floor Walls", icon: "🧱" },
-  { value: "Roof Material", label: "Roof Material", icon: "🏠" },
-  { value: "Backframing", label: "Backframing", icon: "📐" },
-  { value: "Strapping", label: "Strapping", icon: "🔗" },
+  { value: "1st Sub-Floor", label: "1st Sub-Floor", icon: "📦" },
+  { value: "1st Walls", label: "1st Walls", icon: "🧱" },
+  { value: "2nd Sub-Floor", label: "2nd Sub-Floor", icon: "📦" },
+  { value: "2nd Walls", label: "2nd Walls", icon: "🧱" },
+  { value: "Roofing Load", label: "Roofing Load", icon: "🏠" },
+  { value: "Backing", label: "Backing", icon: "📐" },
 ];
 
-// Sub-items per bundle
+// Sub-items per phase (from Shabba)
 const BUNDLE_SUB_ITEMS: Record<string, string[]> = {
-  "First Floor System": ["Plywood Sheets", "Joists", "LVLs", "Posts (Metal)", "Hangers"],
-  "Main Floor Walls": ["Lumber", "Plywood Sheets", "Tyvek", "Hangers"],
-  "Second Floor System": ["Plywood Sheets", "Joists", "LVLs", "Hangers"],
-  "Second Floor Walls": ["Lumber", "Plywood Sheets", "Tyvek"],
-  "Roof Material": ["Trusses", "Lumber", "Plywood"],
-  "Backframing": ["Lumber", "Garage Jam"],
-  "Strapping": ["Lumber"],
+  "1st Sub-Floor": [
+    "Steel Beams / Posts",
+    "Gasket / Tyvek / Poly",
+    "Plating Lumber",
+    "Joists",
+    "Hangers / Brackets",
+    "Temp Stair",
+    "Floor Sheathing",
+  ],
+  "1st Walls": [
+    "Long Lumber",
+    "Ext. Wall Studs",
+    "Wall Sheathing",
+    "Int. Wall Studs",
+    "Landings Package",
+    "Porch Package",
+  ],
+  "2nd Sub-Floor": [
+    "Steel Beams",
+    "Safety Package",
+    "Joists",
+    "Hangers",
+    "Temp Stair",
+    "Floor Sheathing",
+  ],
+  "2nd Walls": [
+    "Long Lumber",
+    "Ext. Wall Studs",
+    "Wall Sheathing",
+    "Int. Wall Studs",
+    "Bracing 2x4s",
+  ],
+  "Roofing Load": [
+    "Safety Package",
+    "Trusses",
+    "Truss Lumber Package",
+    "Truss Hangers",
+    "Truss Sheathing",
+    "H-Clips",
+  ],
+  "Backing": [
+    "Strapping",
+    "Backing Package",
+    "Garage Jambs",
+    "Finished Basement Pack",
+    "Porch P.T. 2x6s",
+    "Porch Posts Brackets",
+  ],
 };
 
 // Sentinel for 8th card — loose item (single piece from lumberyard)
@@ -176,7 +252,7 @@ export function NewRequestModal(props: Props) {
             </div>
           )}
 
-          {/* ─── 8 CARDS: 7 bundles + Loose Items ─── */}
+          {/* ─── 6 phases + Loose Items ─── */}
           <div>
             <label className="flex items-center gap-1.5 text-sm font-medium text-text mb-2">
               <Package size={14} />
@@ -214,11 +290,11 @@ export function NewRequestModal(props: Props) {
             </div>
           </div>
 
-          {/* ─── SUB-ITEMS CHECKLIST (bundles) ─── */}
+          {/* ─── SUB-ITEMS: QuickBooks-style cards, 2 per row ─── */}
           {isBundle && hasSubItems && (
-            <div className="bg-gray-50 border border-border rounded-xl p-3 space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-text">Items needed</span>
+                <span className="text-sm font-medium text-text">Select items</span>
                 <button
                   type="button"
                   onClick={toggleAll}
@@ -227,53 +303,72 @@ export function NewRequestModal(props: Props) {
                   {checkedItems.size === subItems.length ? "Unselect all" : "Select all"}
                 </button>
               </div>
-              <div className="space-y-1">
-                {subItems.map((item) => (
-                  <label
-                    key={item}
-                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition ${
-                      checkedItems.has(item)
-                        ? "bg-brand/10 border border-brand/20"
-                        : "bg-white border border-border hover:border-brand/30"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition ${
-                        checkedItems.has(item)
-                          ? "bg-brand text-white"
-                          : "border-2 border-gray-300"
+              <div className="grid grid-cols-2 gap-3 bg-gray-100/60 rounded-2xl p-3">
+                {subItems.map((item) => {
+                  const Icon = SUB_ITEM_ICONS[item] ?? Box;
+                  const active = checkedItems.has(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => toggleItem(item)}
+                      className={`relative flex flex-col items-center justify-center gap-2.5 py-5 px-2 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.97] ${
+                        active
+                          ? "bg-white shadow-sm ring-2 ring-brand"
+                          : "bg-white shadow-sm hover:shadow-md"
                       }`}
                     >
-                      {checkedItems.has(item) && <Check size={12} strokeWidth={3} />}
+                      {active && (
+                        <div className="absolute top-2 right-2 w-4.5 h-4.5 rounded-full bg-brand flex items-center justify-center">
+                          <Check size={10} strokeWidth={3} className="text-white" />
+                        </div>
+                      )}
+                      <Icon
+                        size={24}
+                        strokeWidth={1.5}
+                        className={active ? "text-brand" : "text-brand/70"}
+                      />
+                      <span className={`text-xs font-medium leading-tight text-center transition-colors ${
+                        active ? "text-brand" : "text-text"
+                      }`}>
+                        {item}
+                      </span>
+                    </button>
+                  );
+                })}
+                {/* Other (specify) card */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById("other-item-input");
+                    if (el) el.focus();
+                  }}
+                  className={`relative flex flex-col items-center justify-center gap-2.5 py-5 px-2 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.97] border-2 border-dashed ${
+                    otherItem.trim()
+                      ? "bg-white shadow-sm ring-2 ring-brand border-transparent"
+                      : "bg-white/60 border-gray-300 hover:shadow-md hover:border-brand/40"
+                  }`}
+                >
+                  {otherItem.trim() && (
+                    <div className="absolute top-2 right-2 w-4.5 h-4.5 rounded-full bg-brand flex items-center justify-center">
+                      <Check size={10} strokeWidth={3} className="text-white" />
                     </div>
-                    <span className="text-sm text-text">{item}</span>
-                    <input
-                      type="checkbox"
-                      checked={checkedItems.has(item)}
-                      onChange={() => toggleItem(item)}
-                      className="sr-only"
-                    />
-                  </label>
-                ))}
-                {/* Other sub-item — free text */}
-                <div className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition ${
-                  otherItem.trim() ? "bg-brand/10 border-brand/20" : "bg-white border-border"
-                }`}>
-                  <div
-                    className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition ${
-                      otherItem.trim() ? "bg-brand text-white" : "border-2 border-gray-300"
-                    }`}
-                  >
-                    {otherItem.trim() && <Check size={12} strokeWidth={3} />}
-                  </div>
+                  )}
+                  <Pencil
+                    size={24}
+                    strokeWidth={1.5}
+                    className={otherItem.trim() ? "text-brand" : "text-brand/70"}
+                  />
                   <input
+                    id="other-item-input"
                     type="text"
                     value={otherItem}
                     onChange={(e) => setOtherItem(e.target.value)}
-                    placeholder="Other (specify)..."
-                    className="flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="Other..."
+                    className="w-full text-xs font-medium text-center bg-transparent outline-none placeholder:text-gray-400 text-text"
                   />
-                </div>
+                </button>
               </div>
             </div>
           )}

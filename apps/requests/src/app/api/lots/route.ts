@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
     const body = await req.json();
 
-    const { jobsite_id, block_number, unit_count, count, from } = body;
+    const { jobsite_id, block_number, unit_count, count, from, custom_number } = body;
 
     if (!jobsite_id) {
       return NextResponse.json({ error: "jobsite_id required" }, { status: 400 });
@@ -38,7 +38,14 @@ export async function POST(req: NextRequest) {
 
     let lots: { jobsite_id: string; lot_number: string; block?: string; status: string }[];
 
-    if (block_number && unit_count) {
+    if (custom_number && typeof custom_number === "string") {
+      // --- Single lot with custom number (quick add) ---
+      lots = [{
+        jobsite_id,
+        lot_number: custom_number.trim(),
+        status: "pending",
+      }];
+    } else if (block_number && unit_count) {
       // --- Block mode ---
       if (unit_count < 1 || unit_count > 50) {
         return NextResponse.json({ error: "unit_count must be 1-50" }, { status: 400 });

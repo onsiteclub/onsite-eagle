@@ -86,6 +86,38 @@ export async function POST(
   }
 }
 
+// PUT — rename a lot (supervisor)
+// Body: { lot_number: string }
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ lotId: string }> }
+) {
+  try {
+    const { lotId } = await params;
+    const supabase = createAdminClient();
+    const { lot_number } = await req.json();
+
+    if (!lot_number || typeof lot_number !== "string" || !lot_number.trim()) {
+      return NextResponse.json({ error: "lot_number required" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("frm_lots")
+      .update({ lot_number: lot_number.trim() })
+      .eq("id", lotId)
+      .select("id, lot_number, block, status")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
 // GET by worker name — find all lots where worker is registered
 // Query: ?worker_name=John
 export async function PATCH(
