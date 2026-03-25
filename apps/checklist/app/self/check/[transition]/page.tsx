@@ -210,16 +210,8 @@ export default function SelfChecklistPage() {
       }
     }
 
-    // Check that required photos actually uploaded
-    const requiredPhotosMissing = items.some((item) => {
-      if (!item.minPhotos) return false
-      const s = state[item.code]
-      if (!s || s.result === 'na' || s.result === 'pending') return false
-      const uploaded = uploadedUrls[item.code]?.length ?? 0
-      return uploaded < item.minPhotos
-    })
-
-    if (requiredPhotosMissing) {
+    // Block submission if ANY photo failed to upload
+    if (failedUploads > 0) {
       setSubmitError(
         `${failedUploads} photo${failedUploads > 1 ? 's' : ''} failed to upload. Check your connection and try again.`
       )
