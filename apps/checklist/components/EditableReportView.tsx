@@ -187,6 +187,12 @@ export default function EditableReportView({ report: initialReport }: EditableRe
           </p>
         )}
 
+        {/* Lot Number — H1 */}
+        <h1 className="text-3xl font-bold text-[#1A1A1A] text-center mb-1">
+          {report.lot_number}
+        </h1>
+        <p className="text-sm text-[#888884] text-center mb-4">{report.jobsite}</p>
+
         {/* Result Banner */}
         <div className={`
           rounded-[14px] p-6 text-center mb-6
@@ -195,13 +201,10 @@ export default function EditableReportView({ report: initialReport }: EditableRe
           <div className={`text-4xl mb-2 ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
             {report.passed ? '\u2713' : '\u2717'}
           </div>
-          <h1 className={`text-2xl font-bold ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+          <h2 className={`text-2xl font-bold ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
             {report.passed ? 'PASSED' : 'FAILED'}
-          </h1>
+          </h2>
           <p className="text-[15px] font-medium text-[#1A1A1A] mt-2">{report.transition_label}</p>
-          <p className="text-xs text-[#888884] mt-1">
-            {report.jobsite} &mdash; {report.lot_number}
-          </p>
         </div>
 
         {/* Summary */}
