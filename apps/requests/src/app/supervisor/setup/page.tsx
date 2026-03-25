@@ -51,6 +51,7 @@ export default function SetupPage() {
   const [singlesTo, setSinglesTo] = useState("");
   const [blockNumber, setBlockNumber] = useState("");
   const [blockUnits, setBlockUnits] = useState("3");
+  const [blockNaming, setBlockNaming] = useState<"letters" | "numbers">("letters");
   const [addingLots, setAddingLots] = useState(false);
 
   // Edit site
@@ -252,7 +253,7 @@ export default function SetupPage() {
       await fetch("/api/lots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobsite_id: selectedSite, block_number: bn, unit_count: units }),
+        body: JSON.stringify({ jobsite_id: selectedSite, block_number: bn, unit_count: units, unit_naming: blockNaming }),
       });
     }
 
@@ -373,6 +374,13 @@ export default function SetupPage() {
     }
 
     return { singles, blocks: sortedBlocks, total: filtered.length };
+  }
+
+  // Block unit name helper
+  function blockUnitName(i: number): string {
+    return blockNaming === "letters"
+      ? String.fromCharCode(65 + i)
+      : String(i + 1);
   }
 
   // Singles preview
@@ -522,10 +530,9 @@ export default function SetupPage() {
                         <label className="block text-xs text-text-muted font-medium mb-1">Block #</label>
                         <input
                           type="text"
-                          inputMode="numeric"
                           value={blockNumber}
                           onChange={(e) => setBlockNumber(e.target.value)}
-                          placeholder="e.g. 70"
+                          placeholder="e.g. 70, A, B"
                           className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                         />
                       </div>
@@ -534,7 +541,7 @@ export default function SetupPage() {
                         <input
                           type="number"
                           min={1}
-                          max={26}
+                          max={blockNaming === "letters" ? 26 : 99}
                           inputMode="numeric"
                           value={blockUnits}
                           onChange={(e) => setBlockUnits(e.target.value)}
@@ -542,10 +549,35 @@ export default function SetupPage() {
                         />
                       </div>
                     </div>
+                    {/* Naming toggle */}
+                    <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setBlockNaming("letters")}
+                        className={`flex-1 py-1.5 rounded-md text-sm font-medium transition ${
+                          blockNaming === "letters"
+                            ? "bg-white text-brand shadow-sm"
+                            : "text-text-muted hover:text-text"
+                        }`}
+                      >
+                        A, B, C...
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBlockNaming("numbers")}
+                        className={`flex-1 py-1.5 rounded-md text-sm font-medium transition ${
+                          blockNaming === "numbers"
+                            ? "bg-white text-brand shadow-sm"
+                            : "text-text-muted hover:text-text"
+                        }`}
+                      >
+                        1, 2, 3...
+                      </button>
+                    </div>
                     {blockNumber.trim() && parseInt(blockUnits) > 0 && (
                       <p className="text-xs text-text-muted">
                         Will create <strong>{blockUnits}</strong> lots:{" "}
-                        {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${String.fromCharCode(65 + i)}`).join(", ")}
+                        {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${blockUnitName(i)}`).join(", ")}
                         {(parseInt(blockUnits) || 0) > 8 && ", ..."}
                       </p>
                     )}
@@ -593,7 +625,7 @@ export default function SetupPage() {
                         await fetch("/api/lots", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ jobsite_id: site.id, block_number: bn, unit_count: units }),
+                          body: JSON.stringify({ jobsite_id: site.id, block_number: bn, unit_count: units, unit_naming: blockNaming }),
                         });
                       }
                     }
@@ -1098,10 +1130,9 @@ export default function SetupPage() {
                     <label className="block text-xs text-text-muted font-medium mb-1">Block #</label>
                     <input
                       type="text"
-                      inputMode="numeric"
                       value={blockNumber}
                       onChange={(e) => setBlockNumber(e.target.value)}
-                      placeholder="e.g. 70"
+                      placeholder="e.g. 70, A, B"
                       className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                     />
                   </div>
@@ -1110,7 +1141,7 @@ export default function SetupPage() {
                     <input
                       type="number"
                       min={1}
-                      max={26}
+                      max={blockNaming === "letters" ? 26 : 99}
                       inputMode="numeric"
                       value={blockUnits}
                       onChange={(e) => setBlockUnits(e.target.value)}
@@ -1118,10 +1149,35 @@ export default function SetupPage() {
                     />
                   </div>
                 </div>
+                {/* Naming toggle */}
+                <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setBlockNaming("letters")}
+                    className={`flex-1 py-1.5 rounded-md text-sm font-medium transition ${
+                      blockNaming === "letters"
+                        ? "bg-white text-brand shadow-sm"
+                        : "text-text-muted hover:text-text"
+                    }`}
+                  >
+                    A, B, C...
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBlockNaming("numbers")}
+                    className={`flex-1 py-1.5 rounded-md text-sm font-medium transition ${
+                      blockNaming === "numbers"
+                        ? "bg-white text-brand shadow-sm"
+                        : "text-text-muted hover:text-text"
+                    }`}
+                  >
+                    1, 2, 3...
+                  </button>
+                </div>
                 {blockNumber.trim() && parseInt(blockUnits) > 0 && (
                   <p className="text-xs text-text-muted">
                     Will create <strong>{blockUnits}</strong> lots:{" "}
-                    {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${String.fromCharCode(65 + i)}`).join(", ")}
+                    {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${blockUnitName(i)}`).join(", ")}
                     {(parseInt(blockUnits) || 0) > 8 && ", ..."}
                   </p>
                 )}

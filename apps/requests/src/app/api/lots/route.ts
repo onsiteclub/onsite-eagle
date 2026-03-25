@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminClient();
     const body = await req.json();
 
-    const { jobsite_id, block_number, unit_count, count, from, custom_number } = body;
+    const { jobsite_id, block_number, unit_count, unit_naming, count, from, custom_number } = body;
 
     if (!jobsite_id) {
       return NextResponse.json({ error: "jobsite_id required" }, { status: 400 });
@@ -47,13 +47,15 @@ export async function POST(req: NextRequest) {
       }];
     } else if (block_number && unit_count) {
       // --- Block mode ---
-      if (unit_count < 1 || unit_count > 26) {
-        return NextResponse.json({ error: "unit_count must be 1-26" }, { status: 400 });
+      const useNumbers = unit_naming === "numbers";
+      const maxUnits = useNumbers ? 99 : 26;
+      if (unit_count < 1 || unit_count > maxUnits) {
+        return NextResponse.json({ error: `unit_count must be 1-${maxUnits}` }, { status: 400 });
       }
 
       lots = Array.from({ length: unit_count }, (_, i) => ({
         jobsite_id,
-        lot_number: `${block_number}-${String.fromCharCode(65 + i)}`,
+        lot_number: `${block_number}-${useNumbers ? String(i + 1) : String.fromCharCode(65 + i)}`,
         block: String(block_number),
         status: "pending",
       }));
