@@ -171,7 +171,7 @@ export default function EditableReportView({ report: initialReport }: EditableRe
       <div className="w-full max-w-[520px] px-4">
         {/* Report Header */}
         <div className="text-center mb-6">
-          <p className="text-xs font-mono text-[#B0AFA9] mb-3">{report.reference}</p>
+          <p className="text-sm font-mono font-semibold text-[#C58B1B] mb-1">{report.reference}</p>
           <h1 className="text-4xl font-bold text-[#1A1A1A] mb-1">
             LOT: #{report.lot_number}
           </h1>
