@@ -86,26 +86,26 @@ export default function PhotoCaptureLocal({
           </div>
         ))}
 
-        {/* Add photo button */}
-        {canAdd && (
+        {/* Processing placeholder — shows while compressing */}
+        {processing && (
+          <div className="w-16 h-16 rounded-[10px] border-2 border-[#C58B1B] bg-[#FFF3D6] flex-shrink-0 flex flex-col items-center justify-center animate-pulse">
+            <svg className="w-5 h-5 text-[#C58B1B] animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-[8px] text-[#C58B1B] font-semibold mt-0.5">Loading</span>
+          </div>
+        )}
+
+        {/* Add photo button — hidden while processing */}
+        {canAdd && !processing && (
           <label
-            className={`
-              w-16 h-16 rounded-[10px] border-2 border-dashed border-[#D1D0CE] flex-shrink-0
-              flex flex-col items-center justify-center cursor-pointer
-              hover:border-[#C58B1B] transition-colors
-              ${processing ? 'opacity-50 pointer-events-none' : ''}
-            `}
+            className="w-16 h-16 rounded-[10px] border-2 border-dashed border-[#D1D0CE] flex-shrink-0 flex flex-col items-center justify-center cursor-pointer hover:border-[#C58B1B] transition-colors"
           >
-            {processing ? (
-              <span className="text-[9px] text-[#888884]">...</span>
-            ) : (
-              <>
-                <span className="text-lg text-[#B0AFA9] leading-none">+</span>
-                <span className="text-[9px] text-[#B0AFA9]">
-                  {photos.length}/{maxPhotos}
-                </span>
-              </>
-            )}
+            <span className="text-lg text-[#B0AFA9] leading-none">+</span>
+            <span className="text-[9px] text-[#B0AFA9]">
+              {photos.length}/{maxPhotos}
+            </span>
             <input
               ref={inputRef}
               type="file"
@@ -120,13 +120,19 @@ export default function PhotoCaptureLocal({
       </div>
 
       {/* Status text */}
-      {photos.length > 0 && photos.length < maxPhotos && (
+      {processing && (
+        <p className="text-[11px] text-[#C58B1B] font-medium">
+          Processing photo...
+        </p>
+      )}
+
+      {!processing && photos.length > 0 && photos.length < maxPhotos && (
         <p className="text-[10px] text-[#888884]">
           {photos.length} photo{photos.length > 1 ? 's' : ''} attached — up to {maxPhotos - photos.length} more
         </p>
       )}
 
-      {photos.length === maxPhotos && (
+      {!processing && photos.length === maxPhotos && (
         <p className="text-[10px] text-[#888884]">
           Maximum {maxPhotos} photos reached
         </p>
