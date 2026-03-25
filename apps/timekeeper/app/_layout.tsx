@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -34,12 +34,70 @@ import {
   onUserLogin,
   onUserLogout,
 } from '../src/lib/bootstrap';
+import { useActiveWarnings } from '@onsite/framing';
+import { supabase } from '../src/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initQueue } from '@onsite/offline';
 import type { GeofenceNotificationData } from '../src/lib/notifications';
 
 // Initialize offline queue for timeline messages
 initQueue(AsyncStorage);
+
+function WarningBanners() {
+  const user = useAuthStore((s) => s.user);
+  const [userId, setUserId] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (user) {
+      setUserId(user.id);
+    } else {
+      setUserId(undefined);
+    }
+  }, [user]);
+
+  const {
+    safetyWarnings,
+    complianceWarnings,
+    operationalWarnings,
+    dismissWarning,
+  } = useActiveWarnings({
+    supabase: supabase as never,
+    workerId: userId,
+  });
+
+  const hasWarnings =
+    safetyWarnings.length > 0 ||
+    complianceWarnings.length > 0 ||
+    operationalWarnings.length > 0;
+
+  if (!hasWarnings) return null;
+
+  return (
+    <View>
+      {safetyWarnings.map((w) => (
+        <View key={w.id} style={bannerStyles.safety}>
+          <Text style={bannerStyles.safetyIcon}>{'\u{1F6E1}'}</Text>
+          <Text style={bannerStyles.safetyText}>{w.title}</Text>
+        </View>
+      ))}
+      {complianceWarnings.map((w) => (
+        <View key={w.id} style={bannerStyles.compliance}>
+          <Text style={bannerStyles.complianceIcon}>{'\u26A0'}</Text>
+          <Text style={bannerStyles.complianceText}>{w.title}</Text>
+        </View>
+      ))}
+      {operationalWarnings.map((w) => (
+        <View key={w.id} style={bannerStyles.operational}>
+          <Text style={bannerStyles.operationalIcon}>{'\u2139'}</Text>
+          <Text style={bannerStyles.operationalText}>{w.title}</Text>
+          <TouchableOpacity onPress={() => dismissWarning(w.id)}>
+            <Text style={bannerStyles.dismissBtn}>{'\u2715'}</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -274,10 +332,13 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-      </Stack>
+      <View style={{ flex: 1 }}>
+        <WarningBanners />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </View>
     </ErrorBoundary>
   );
 }
@@ -288,5 +349,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background,
+  },
+});
+
+const bannerStyles = StyleSheet.create({
+  safety: {
+    backgroundColor: '#DC2626',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  safetyIcon: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  safetyText: {
+    color: '#FFFFFF',
+    flex: 1,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  compliance: {
+    backgroundColor: '#F59E0B',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  complianceIcon: {
+    color: '#1F2937',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  complianceText: {
+    color: '#1F2937',
+    flex: 1,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  operational: {
+    backgroundColor: '#3B82F6',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  operationalIcon: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  operationalText: {
+    color: '#FFFFFF',
+    flex: 1,
+    fontSize: 14,
+  },
+  dismissBtn: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    paddingLeft: 12,
+    fontSize: 16,
   },
 });

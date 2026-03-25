@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getCookie, clearSession } from "@/lib/cookies";
-import { LogOut, ClipboardList, MapPin } from "lucide-react";
+import { LogOut, ClipboardList } from "lucide-react";
 
 const TABS = [
   { key: "requests", label: "Requests", href: "/supervisor" },
-  { key: "sites", label: "Sites", href: "/supervisor/setup" },
+  { key: "links", label: "Links", href: "/supervisor/links" },
+  { key: "settings", label: "Settings", href: "/supervisor/settings" },
 ] as const;
 
 export default function SupervisorLayout({ children }: { children: React.ReactNode }) {
@@ -25,7 +26,8 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
     router.refresh();
   }
 
-  const activeTab = pathname === "/supervisor/setup" ? "sites" : "requests";
+  const activeTab = TABS.find((t) => pathname === t.href)?.key
+    ?? (pathname.startsWith("/supervisor/links") ? "links" : "requests");
 
   return (
     <div className="min-h-dvh bg-bg">
@@ -54,7 +56,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
             <button
               key={tab.key}
               onClick={() => router.push(tab.href)}
-              className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors relative ${
+              className={`flex-1 py-2.5 text-xs font-medium text-center transition-colors relative ${
                 activeTab === tab.key
                   ? "text-white"
                   : "text-white/50 hover:text-white/70"

@@ -40,10 +40,10 @@ const URGENCY_COLORS: Record<string, string> = {
 };
 
 const PROBLEM_REASONS = [
-  { value: "not_in_stock", label: "Not in stock" },
-  { value: "site_closed", label: "Site closed" },
-  { value: "machine_down", label: "Machine down" },
-  { value: "other", label: "Other" },
+  { value: "not_in_stock", label: "Not in Stock", requiresPhoto: false },
+  { value: "not_safe", label: "Not Safe", requiresPhoto: true },
+  { value: "not_ready", label: "Not Ready", requiresPhoto: true },
+  { value: "other", label: "Other", requiresPhoto: false },
 ];
 
 /** Compress image client-side to fit Vercel's 4.5MB body limit */
@@ -78,6 +78,8 @@ export function QueueCard({
   disabled,
   hasActiveTransit,
   onActiveChange,
+  onStartTransit,
+  onDisabledClick,
   compact,
 }: {
   request: MaterialRequest;
@@ -86,18 +88,24 @@ export function QueueCard({
   disabled?: boolean;
   hasActiveTransit?: boolean;
   onActiveChange?: (active: boolean) => void;
+  /** Called when operator wants to start transit on this card (compact mode). Parent handles task switching. */
+  onStartTransit?: () => void;
+  /** Called when user taps a disabled card (e.g. machine down). Parent shows alert. */
+  onDisabledClick?: () => void;
   /** Compact mode: small uniform card for queue list. No stepper, no sub-items, no deadline bar. */
   compact?: boolean;
 }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [mode, setMode] = useState<"idle" | "deliver" | "problem">("idle");
+  const [mode, setMode] = useState<"idle" | "deliver" | "problem" | "resolve">("idle");
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedProblem, setSelectedProblem] = useState<string | null>(null);
   const [problemNotes, setProblemNotes] = useState("");
+  const [resolveNotes, setResolveNotes] = useState("");
   const [itemsOpen, setItemsOpen] = useState(false);
+  const [compactExpanded, setCompactExpanded] = useState(false);
 
   const cameraRef = useRef<HTMLInputElement>(null);
 
@@ -135,6 +143,7 @@ export function QueueCard({
     setDeliveryNotes("");
     setSelectedProblem(null);
     setProblemNotes("");
+    setResolveNotes("");
   }
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -231,12 +240,30 @@ export function QueueCard({
 
   async function handleProblem() {
     if (!selectedProblem) return;
+    const reason = PROBLEM_REASONS.find((r) => r.value === selectedProblem);
+    if (!reason) return;
+    if (reason.requiresPhoto && !photoFile) return;
+
     setActionLoading("problem");
 
-    const reasonLabel = PROBLEM_REASONS.find((r) => r.value === selectedProblem)?.label ?? selectedProblem;
+    // Upload photo if provided
+    let photoUrl: string | undefined;
+    if (photoFile) {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("file", photoFile);
+      formData.append("request_id", request.id);
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      if (uploadRes.ok) {
+        const data = await uploadRes.json();
+        photoUrl = data.url;
+      }
+      setUploading(false);
+    }
+
     const fullNote = problemNotes.trim()
-      ? `${reasonLabel}: ${problemNotes.trim()}`
-      : reasonLabel;
+      ? `${reason.label}: ${problemNotes.trim()}`
+      : reason.label;
 
     await fetch("/api/requests", {
       method: "PATCH",
@@ -246,6 +273,7 @@ export function QueueCard({
         status: "problem",
         delivery_notes: fullNote,
         delivered_by_name: operatorName,
+        ...(photoUrl && { photo_url: photoUrl }),
       }),
     });
 
@@ -254,19 +282,43 @@ export function QueueCard({
     onUpdate();
   }
 
-  async function handleResolve() {
+  async function handleResolveBackToTransit() {
     setActionLoading("resolve");
+    const note = resolveNotes.trim()
+      ? `[Resolved] ${resolveNotes.trim()}`
+      : "[Resolved]";
     await fetch("/api/requests", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: request.id,
-        status: "requested",
-        delivered_by_name: null,
-        delivery_notes: null,
+        status: "in_transit",
+        delivered_by_name: operatorName,
+        delivery_notes: note,
       }),
     });
     setActionLoading(null);
+    resetMode();
+    onUpdate();
+  }
+
+  async function handleResolveDeliverNow() {
+    setActionLoading("resolve");
+    const note = resolveNotes.trim()
+      ? `[Resolved] ${resolveNotes.trim()}`
+      : "[Resolved]";
+    await fetch("/api/requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: request.id,
+        status: "delivered",
+        delivered_by_name: operatorName,
+        delivery_notes: note,
+      }),
+    });
+    setActionLoading(null);
+    resetMode();
     onUpdate();
   }
 
@@ -287,76 +339,311 @@ export function QueueCard({
 
   // ─── COMPACT MODE: uniform small card for queue ───
   if (compact) {
-    const canStartTransit = !hasActiveTransit && request.status !== "in_transit" && request.status !== "problem";
+    const expanded = compactExpanded;
+    const setExpanded = setCompactExpanded;
+    const canStartTransit = request.status !== "in_transit" && request.status !== "problem";
     return (
+      <>
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handlePhotoChange}
+      />
       <div
         className={`rounded-xl overflow-hidden transition-all ${
-          isUrgentDeadline
+          request.urgency_level === "critical"
+            ? "bg-red-50/50 border border-red-300"
+            : isUrgentDeadline
             ? "bg-amber-50/80 border border-amber-300"
             : request.status === "problem"
             ? "bg-red-50/60 border border-red-200"
             : "bg-card border border-border"
         }`}
-        style={{ borderLeftWidth: 4, borderLeftColor: isUrgentDeadline ? "#F59E0B" : borderColor }}
+        style={{ borderLeftWidth: 4, borderLeftColor: request.urgency_level === "critical" ? "#DC2626" : isUrgentDeadline ? "#F59E0B" : borderColor }}
       >
-        <div className="p-3 flex items-center gap-3">
-          {/* Urgency dot */}
-          <span
-            className="w-2.5 h-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: urgencyColor }}
-          />
+        {/* Urgent banner */}
+        {request.urgency_level === "critical" && (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-red-500 text-white">
+            <AlertTriangle size={11} />
+            <span className="text-xs font-bold uppercase tracking-wide">Urgent — Supervisor priority</span>
+          </div>
+        )}
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-text text-[15px]">
-                {lotNumber ? `Lot ${lotNumber}` : "—"}
-              </span>
-              {missingCount > 0 && (
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
-                  {missingCount} missing
+        {/* Clickable summary — tap to expand/collapse */}
+        <button
+          type="button"
+          onClick={() => { if (disabled && onDisabledClick) { onDisabledClick(); return; } setExpanded(!expanded); }}
+          className="w-full text-left p-3"
+        >
+          <div className="flex items-start gap-2.5">
+            {/* Urgency dot */}
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0 mt-1.5"
+              style={{ backgroundColor: urgencyColor }}
+            />
+
+            {/* 3-level hierarchy */}
+            <div className="flex-1 min-w-0">
+              {/* Level 1: Lot number — biggest */}
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-text text-lg">
+                  {lotNumber ? `Lot ${lotNumber}` : "—"}
                 </span>
-              )}
-              {request.status === "problem" && (
-                <span className="text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">
-                  Problem
-                </span>
+                {missingCount > 0 && (
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                    {missingCount} missing
+                  </span>
+                )}
+                {request.status === "problem" && (
+                  <span className="text-[11px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">
+                    Problem
+                  </span>
+                )}
+              </div>
+              {/* Level 2: Material — medium */}
+              <p className="text-sm font-medium text-text-secondary truncate mt-0.5">
+                {request.material_name}
+              </p>
+              {/* Level 3: Worker name — smallest */}
+              {request.requested_by_name && (
+                <p className="text-sm text-text-muted mt-0.5">
+                  {request.requested_by_name}
+                </p>
               )}
             </div>
-            <p className="text-[13px] text-text-secondary truncate">
-              {request.material_name}
-              {request.requested_by_name ? ` · ${request.requested_by_name}` : ""}
-            </p>
-          </div>
 
-          {/* Action: Start Transit button or Problem Resolve */}
-          {request.status === "problem" ? (
-            <button
-              onClick={handleResolve}
-              disabled={actionLoading !== null}
-              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-brand text-white hover:bg-brand-dark active:scale-[0.97] transition disabled:opacity-50"
-            >
-              <RotateCcw size={12} />
-              Resolve
-            </button>
-          ) : canStartTransit ? (
-            <button
-              onClick={() => handleStepClick("in_transit")}
-              disabled={actionLoading !== null}
-              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.97] transition disabled:opacity-50"
-            >
-              {actionLoading === "transit" ? (
-                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Truck size={12} />
-                  Go
-                </>
-              )}
-            </button>
-          ) : null}
-        </div>
+            {/* Expand chevron */}
+            <ChevronDown
+              size={16}
+              className={`shrink-0 text-text-muted mt-1 transition-transform ${expanded ? "rotate-180" : ""}`}
+            />
+          </div>
+        </button>
+
+        {/* Expanded detail (read-only view) */}
+        {expanded && (
+          <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
+            {/* Sub-items */}
+            {hasSubItems && (
+              <div className="space-y-1">
+                {request.sub_items!.map((item, idx) => {
+                  const isMissing = item.status === "missing";
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-center gap-2 rounded-lg text-sm px-2.5 py-1.5 ${
+                        isMissing
+                          ? "bg-amber-50 border border-amber-200 text-amber-700 font-medium"
+                          : "bg-gray-50 text-text-secondary"
+                      }`}
+                    >
+                      <span className="flex-1">{item.name}</span>
+                      {isMissing && (
+                        <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                          <AlertCircle size={9} /> Missing
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Notes */}
+            {(request.notes || request.urgency_reason) && (
+              <p className="text-sm text-text-secondary italic line-clamp-3">
+                {request.notes || request.urgency_reason}
+              </p>
+            )}
+
+            {/* Deadline bar */}
+            <DeadlineBar requestedAt={request.requested_at} urgency={request.urgency_level} status={request.status} />
+
+            {/* Action buttons */}
+            {mode === "idle" && (
+              <div className="flex gap-2 pt-1">
+                {request.status === "problem" ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setMode("resolve"); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-brand text-white hover:bg-brand-dark active:scale-[0.97] transition"
+                  >
+                    <RotateCcw size={14} />
+                    Resolve
+                  </button>
+                ) : canStartTransit ? (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onStartTransit?.(); }}
+                      disabled={actionLoading !== null}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.97] transition disabled:opacity-50"
+                    >
+                      {actionLoading === "transit" ? (
+                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Truck size={14} />
+                          Start Delivery
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setMode("problem"); }}
+                      className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-medium bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 active:scale-[0.97] transition"
+                    >
+                      <AlertTriangle size={14} />
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            )}
+
+            {/* Problem report form (compact) */}
+            {mode === "problem" && (() => {
+              const selectedReason = PROBLEM_REASONS.find((r) => r.value === selectedProblem);
+              const needsPhoto = selectedReason?.requiresPhoto ?? false;
+              return (
+                <div className="space-y-2 pt-1 border-t border-border/50 mt-1">
+                  <p className="text-sm font-medium text-text">What happened?</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {PROBLEM_REASONS.map((r) => (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setSelectedProblem(r.value); setPhotoFile(null); setPhotoPreview(null); }}
+                        className={`px-2.5 py-2.5 rounded-lg border text-sm font-medium text-left transition active:scale-[0.97] ${
+                          selectedProblem === r.value
+                            ? "border-red-500 bg-red-50 text-red-700"
+                            : "border-border bg-bg text-text hover:border-red-300"
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Photo area — required for not_safe / not_ready */}
+                  {selectedProblem && needsPhoto && (
+                    <div>
+                      {photoPreview ? (
+                        <div className="relative rounded-lg overflow-hidden">
+                          <img src={photoPreview} alt="Problem" className="w-full h-24 object-cover" />
+                          <div className="flex items-center gap-2 p-1.5 bg-gray-50">
+                            <span className="text-[11px] text-green-600 font-medium flex items-center gap-1 flex-1">
+                              <CheckCircle size={11} /> Photo ready
+                            </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); cameraRef.current?.click(); }}
+                              className="text-[11px] text-text-secondary bg-gray-100 px-1.5 py-0.5 rounded"
+                            >
+                              Retake
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); cameraRef.current?.click(); }}
+                          className="w-full flex items-center justify-center gap-1.5 py-3 border-2 border-dashed border-red-300 rounded-lg hover:border-red-400 hover:bg-red-50/50 transition"
+                        >
+                          <Camera size={16} className="text-red-500" />
+                          <span className="text-xs font-medium text-red-600">Take Photo (required)</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedProblem && (
+                    <textarea
+                      value={problemNotes}
+                      onChange={(e) => setProblemNotes(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="Details (optional)"
+                      rows={2}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-bg text-xs text-text outline-none focus:ring-2 focus:ring-red-200 resize-none"
+                    />
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); resetMode(); }}
+                      className="px-3 py-2 text-xs text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleProblem(); }}
+                      disabled={!selectedProblem || actionLoading !== null || uploading || (needsPhoto && !photoFile)}
+                      className="flex-1 flex items-center justify-center gap-1 bg-red-600 text-white font-medium py-2 px-3 rounded-lg text-xs hover:bg-red-700 active:scale-[0.97] transition disabled:opacity-50"
+                    >
+                      {actionLoading === "problem" || uploading ? (
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <AlertTriangle size={12} />
+                          Report Problem
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Resolve form (compact) */}
+            {mode === "resolve" && (
+              <div className="space-y-2 pt-1 border-t border-border/50 mt-1">
+                <p className="text-sm font-medium text-text">How was it resolved?</p>
+                <textarea
+                  value={resolveNotes}
+                  onChange={(e) => setResolveNotes(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="e.g. swapped item, restocked... (optional)"
+                  rows={2}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-bg text-xs text-text outline-none focus:ring-2 focus:ring-brand/30 resize-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); resetMode(); }}
+                    className="px-2.5 py-2 text-xs text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleResolveBackToTransit(); }}
+                    disabled={actionLoading !== null}
+                    className="flex-1 flex items-center justify-center gap-1 bg-blue-500 text-white font-medium py-2 px-3 rounded-lg text-xs hover:bg-blue-600 active:scale-[0.97] transition disabled:opacity-50"
+                  >
+                    {actionLoading === "resolve" ? (
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Truck size={12} />
+                        Back to Route
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleResolveDeliverNow(); }}
+                    disabled={actionLoading !== null}
+                    className="flex-1 flex items-center justify-center gap-1 bg-green-600 text-white font-medium py-2 px-3 rounded-lg text-xs hover:bg-green-700 active:scale-[0.97] transition disabled:opacity-50"
+                  >
+                    {actionLoading === "resolve" ? (
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <CheckCircle size={12} />
+                        Deliver Now
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      </>
     );
   }
 
@@ -364,15 +651,26 @@ export function QueueCard({
     <div
       className={`rounded-xl overflow-hidden transition-all ${
         isInTransit
-          ? "bg-brand/5 border-2 border-brand/40 ring-2 ring-brand/15 shadow-lg"
+          ? request.urgency_level === "critical"
+            ? "bg-red-50/40 border-2 border-red-400 ring-2 ring-red-100 shadow-lg"
+            : "bg-brand/5 border-2 border-brand/40 ring-2 ring-brand/15 shadow-lg"
           : dimmed
-          ? "bg-card border border-border opacity-40 pointer-events-none shadow-sm"
+          ? "bg-card border border-border opacity-40 shadow-sm"
           : isUrgentDeadline
           ? "bg-amber-50/80 border border-amber-300 shadow-sm"
           : "bg-card border border-border shadow-sm"
       }`}
       style={!isInTransit ? { borderLeftWidth: 4, borderLeftColor: isUrgentDeadline ? "#F59E0B" : borderColor } : undefined}
+      onClick={disabled ? (e) => { e.stopPropagation(); onDisabledClick?.(); } : undefined}
     >
+      {/* Urgent banner */}
+      {request.urgency_level === "critical" && (
+        <div className="bg-red-500 text-white px-3.5 py-1.5 flex items-center gap-1.5 text-xs font-bold">
+          <AlertTriangle size={12} />
+          URGENT — Supervisor priority
+        </div>
+      )}
+
       {/* Active task banner */}
       {isInTransit && mode === "idle" && (
         <div className="bg-brand/10 border-b border-brand/20 px-3.5 py-2 flex items-center gap-2">
@@ -397,11 +695,11 @@ export function QueueCard({
             className="w-2.5 h-2.5 rounded-full shrink-0"
             style={{ backgroundColor: urgencyColor }}
           />
-          <span className="font-bold text-text text-[17px] truncate flex-1">
+          <span className="font-bold text-text text-lg truncate flex-1">
             {lotNumber ? `Lot ${lotNumber}` : "—"}
           </span>
           {request.requested_by_name && (
-            <span className="text-[13px] text-text-muted shrink-0">{request.requested_by_name}</span>
+            <span className="text-sm text-text-muted shrink-0">{request.requested_by_name}</span>
           )}
         </div>
 
@@ -411,7 +709,7 @@ export function QueueCard({
             <button
               type="button"
               onClick={() => setItemsOpen(!itemsOpen)}
-              className="flex items-center gap-1.5 text-[14px] font-medium text-text hover:text-brand transition w-full text-left"
+              className="flex items-center gap-1.5 text-base font-medium text-text hover:text-brand transition w-full text-left"
             >
               <span className="truncate">{request.material_name}</span>
               {missingCount > 0 && (
@@ -425,7 +723,7 @@ export function QueueCard({
               />
             </button>
           ) : (
-            <span className="text-[14px] font-medium text-text">
+            <span className="text-base font-medium text-text">
               {request.material_name}
             </span>
           )}
@@ -435,7 +733,7 @@ export function QueueCard({
         {hasSubItems && itemsOpen && (
           <div className={`ml-[18px] mt-2 space-y-1 ${isInTransit ? "p-2 bg-white/60 rounded-lg border border-brand/10" : ""}`}>
             {isInTransit && (
-              <p className="text-[11px] text-text-muted font-medium mb-1 px-1">Tap to mark missing items:</p>
+              <p className="text-xs text-text-muted font-medium mb-1 px-1">Tap to mark missing items:</p>
             )}
             {request.sub_items!.map((item, idx) => {
               const isMissing = item.status === "missing";
@@ -446,7 +744,7 @@ export function QueueCard({
                   type="button"
                   disabled={!canToggle}
                   onClick={() => canToggle && toggleSubItemMissing(idx)}
-                  className={`w-full flex items-center gap-2 rounded-lg text-[13px] transition text-left ${
+                  className={`w-full flex items-center gap-2 rounded-lg text-sm transition text-left ${
                     canToggle ? "active:scale-[0.98] cursor-pointer" : "cursor-default"
                   } ${
                     isMissing
@@ -479,7 +777,7 @@ export function QueueCard({
 
         {/* Notes */}
         {(request.notes || request.urgency_reason) && (
-          <p className="text-[13px] text-text-secondary italic ml-[18px] mt-1 line-clamp-2">
+          <p className="text-sm text-text-secondary italic ml-[18px] mt-1 line-clamp-2">
             {request.notes || request.urgency_reason}
           </p>
         )}
@@ -510,38 +808,82 @@ export function QueueCard({
         </div>
       )}
 
-      {/* ─── PROBLEM RESOLVED ─── */}
+      {/* ─── PROBLEM: Open resolve mode ─── */}
       {mode === "idle" && request.status === "problem" && (
         <div className="px-3.5 pb-3.5">
           <button
-            onClick={handleResolve}
-            disabled={actionLoading !== null}
-            className="w-full flex items-center justify-center gap-1.5 bg-brand text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+            onClick={() => setMode("resolve")}
+            className="w-full flex items-center justify-center gap-1.5 bg-brand text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-brand-dark active:scale-[0.98] transition"
           >
-            {actionLoading === "resolve" ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <RotateCcw size={16} />
-                Problem Resolved — Back to Queue
-              </>
-            )}
+            <RotateCcw size={16} />
+            Resolve
           </button>
         </div>
       )}
 
+      {/* ─── RESOLVE FORM ─── */}
+      {mode === "resolve" && (
+        <div className="px-3.5 pb-3.5 space-y-3 border-t border-border pt-3">
+          <p className="text-sm font-medium text-text">How was it resolved?</p>
+          <textarea
+            value={resolveNotes}
+            onChange={(e) => setResolveNotes(e.target.value)}
+            placeholder="e.g. swapped item, restocked... (optional)"
+            rows={2}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm text-text outline-none focus:ring-2 focus:ring-brand/30 resize-none"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={resetMode}
+              className="px-3 py-2.5 text-sm text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleResolveBackToTransit}
+              disabled={actionLoading !== null}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-500 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-blue-600 active:scale-[0.98] transition disabled:opacity-50"
+            >
+              {actionLoading === "resolve" ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Truck size={15} />
+                  Back to Route
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleResolveDeliverNow}
+              disabled={actionLoading !== null}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-green-700 active:scale-[0.98] transition disabled:opacity-50"
+            >
+              {actionLoading === "resolve" ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle size={15} />
+                  Deliver Now
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden camera input — shared between deliver and problem modes */}
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handlePhotoChange}
+      />
+
       {/* ─── DELIVERY CONFIRMATION ─── */}
       {mode === "deliver" && (
         <div className="px-3.5 pb-3 space-y-3 border-t border-border pt-3">
-          <input
-            ref={cameraRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handlePhotoChange}
-          />
-
           {photoPreview ? (
             <div className="relative rounded-lg overflow-hidden">
               <img src={photoPreview} alt="Delivery" className="w-full h-40 object-cover" />
@@ -602,60 +944,94 @@ export function QueueCard({
       )}
 
       {/* ─── PROBLEM REPORT ─── */}
-      {mode === "problem" && (
-        <div className="px-3.5 pb-3 space-y-3 border-t border-border pt-3">
-          <p className="text-sm font-medium text-text">What happened?</p>
-          <div className="grid grid-cols-2 gap-2">
-            {PROBLEM_REASONS.map((r) => (
+      {mode === "problem" && (() => {
+        const selectedReason = PROBLEM_REASONS.find((r) => r.value === selectedProblem);
+        const needsPhoto = selectedReason?.requiresPhoto ?? false;
+        return (
+          <div className="px-3.5 pb-3 space-y-3 border-t border-border pt-3">
+            <p className="text-sm font-medium text-text">What happened?</p>
+            <div className="grid grid-cols-2 gap-2">
+              {PROBLEM_REASONS.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => { setSelectedProblem(r.value); setPhotoFile(null); setPhotoPreview(null); }}
+                  className={`px-3 py-2.5 rounded-xl border text-sm font-medium text-left transition active:scale-[0.97] ${
+                    selectedProblem === r.value
+                      ? "border-red-500 bg-red-50 text-red-700"
+                      : "border-border bg-bg text-text hover:border-red-300"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Photo area — required for not_safe / not_ready */}
+            {selectedProblem && needsPhoto && (
+              <div className="space-y-1">
+                {photoPreview ? (
+                  <div className="relative rounded-lg overflow-hidden">
+                    <img src={photoPreview} alt="Problem" className="w-full h-32 object-cover" />
+                    <div className="flex items-center gap-2 p-2 bg-gray-50">
+                      <span className="text-xs text-green-600 font-medium flex items-center gap-1 flex-1">
+                        <CheckCircle size={14} /> Photo ready
+                      </span>
+                      <button
+                        onClick={() => cameraRef.current?.click()}
+                        className="text-xs text-text-secondary bg-gray-100 px-2 py-1 rounded cursor-pointer hover:bg-gray-200"
+                      >
+                        Retake
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => cameraRef.current?.click()}
+                    className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-red-300 rounded-lg hover:border-red-400 hover:bg-red-50/50 transition"
+                  >
+                    <Camera size={20} className="text-red-500" />
+                    <span className="text-sm font-medium text-red-600">Take Photo (required)</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {selectedProblem && (
+              <textarea
+                value={problemNotes}
+                onChange={(e) => setProblemNotes(e.target.value)}
+                placeholder="Additional details (optional)"
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm text-text outline-none focus:ring-2 focus:ring-red-200 resize-none"
+              />
+            )}
+
+            <div className="flex gap-2">
               <button
-                key={r.value}
-                type="button"
-                onClick={() => setSelectedProblem(r.value)}
-                className={`px-3 py-2.5 rounded-xl border text-sm font-medium text-left transition active:scale-[0.97] ${
-                  selectedProblem === r.value
-                    ? "border-red-500 bg-red-50 text-red-700"
-                    : "border-border bg-bg text-text hover:border-red-300"
-                }`}
+                onClick={resetMode}
+                className="px-4 py-2.5 text-sm text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50"
               >
-                {r.label}
+                Cancel
               </button>
-            ))}
+              <button
+                onClick={handleProblem}
+                disabled={!selectedProblem || actionLoading !== null || uploading || (needsPhoto && !photoFile)}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-red-700 active:scale-[0.98] transition disabled:opacity-50"
+              >
+                {actionLoading === "problem" || uploading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <AlertTriangle size={16} />
+                    Report Problem
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-
-          {selectedProblem && (
-            <textarea
-              value={problemNotes}
-              onChange={(e) => setProblemNotes(e.target.value)}
-              placeholder="Additional details (optional)"
-              rows={2}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm text-text outline-none focus:ring-2 focus:ring-red-200 resize-none"
-            />
-          )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={resetMode}
-              className="px-4 py-2.5 text-sm text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleProblem}
-              disabled={!selectedProblem || actionLoading !== null}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-red-700 active:scale-[0.98] transition disabled:opacity-50"
-            >
-              {actionLoading === "problem" ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <AlertTriangle size={16} />
-                  Report Problem
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

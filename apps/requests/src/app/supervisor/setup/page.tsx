@@ -69,10 +69,64 @@ export default function SetupPage() {
   const [quickLotNumber, setQuickLotNumber] = useState("");
   const [quickAdding, setQuickAdding] = useState(false);
 
+  // Block link selection mode
+  const [blockLinkMode, setBlockLinkMode] = useState<string | null>(null); // blockId or null
+  const [blockLinkSelection, setBlockLinkSelection] = useState<Set<string>>(new Set());
+  const [blockLinkLoading, setBlockLinkLoading] = useState(false);
+
+  // Site settings toggle
+  const [showSettings, setShowSettings] = useState(false);
+
   // Delete site
   const [deleteTarget, setDeleteTarget] = useState<Site | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  function startBlockLinkMode(blockId: string, blockLots: Lot[]) {
+    setBlockLinkMode(blockId);
+    // Pre-select all units
+    setBlockLinkSelection(new Set(blockLots.map((l) => l.id)));
+  }
+
+  function cancelBlockLinkMode() {
+    setBlockLinkMode(null);
+    setBlockLinkSelection(new Set());
+  }
+
+  function toggleBlockLinkLot(lotId: string) {
+    setBlockLinkSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(lotId)) next.delete(lotId);
+      else next.add(lotId);
+      return next;
+    });
+  }
+
+  async function createBlockLink(blockId: string) {
+    if (!selectedSite || blockLinkSelection.size === 0 || blockLinkLoading) return;
+    setBlockLinkLoading(true);
+    try {
+      const res = await fetch("/api/bundles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobsite_id: selectedSite,
+          label: `Block ${blockId}`,
+          lot_ids: Array.from(blockLinkSelection),
+        }),
+      });
+      if (res.ok) {
+        const bundle = await res.json();
+        const url = `${window.location.origin}/bundle/${bundle.id}`;
+        await navigator.clipboard.writeText(url);
+        setCopiedId(`block-${blockId}`);
+        setTimeout(() => setCopiedId(null), 2000);
+        cancelBlockLinkMode();
+      }
+    } finally {
+      setBlockLinkLoading(false);
+    }
+  }
 
   async function loadSites() {
     const res = await fetch("/api/sites");
@@ -312,9 +366,9 @@ export default function SetupPage() {
     );
     for (const [, lots] of sortedBlocks) {
       lots.sort((a, b) => {
-        const ua = parseInt(a.lot_number.split("-")[1] || "0");
-        const ub = parseInt(b.lot_number.split("-")[1] || "0");
-        return ua - ub;
+        const ua = a.lot_number.split("-")[1] || "";
+        const ub = b.lot_number.split("-")[1] || "";
+        return ua.localeCompare(ub);
       });
     }
 
@@ -471,7 +525,7 @@ export default function SetupPage() {
                           inputMode="numeric"
                           value={blockNumber}
                           onChange={(e) => setBlockNumber(e.target.value)}
-                          placeholder="e.g. 4"
+                          placeholder="e.g. 70"
                           className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                         />
                       </div>
@@ -480,7 +534,7 @@ export default function SetupPage() {
                         <input
                           type="number"
                           min={1}
-                          max={50}
+                          max={26}
                           inputMode="numeric"
                           value={blockUnits}
                           onChange={(e) => setBlockUnits(e.target.value)}
@@ -491,7 +545,7 @@ export default function SetupPage() {
                     {blockNumber.trim() && parseInt(blockUnits) > 0 && (
                       <p className="text-xs text-text-muted">
                         Will create <strong>{blockUnits}</strong> lots:{" "}
-                        {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${i + 1}`).join(", ")}
+                        {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${String.fromCharCode(65 + i)}`).join(", ")}
                         {(parseInt(blockUnits) || 0) > 8 && ", ..."}
                       </p>
                     )}
@@ -771,8 +825,8 @@ export default function SetupPage() {
 
               {/* Singles */}
               {singles.map((lot) => (
+                <div key={lot.id} className={`transition-all ${blockLinkMode ? "opacity-30 pointer-events-none" : ""}`}>
                 <LotRow
-                  key={lot.id}
                   lot={lot}
                   archiveSelected={archiveSelection.has(lot.id)}
                   copiedId={copiedId}
@@ -799,64 +853,310 @@ export default function SetupPage() {
                   onEditSave={() => renameLot(lot.id, editingLotValue)}
                   onEditCancel={() => { setEditingLotId(null); setEditingLotValue(""); }}
                 />
+                </div>
               ))}
 
               {/* Blocks */}
-              {blocks.map(([blockId, blockLots]) => (
-                <div key={`block-${blockId}`} className={`border rounded-lg overflow-hidden ${lotView === "archived" ? "border-amber-200" : "border-blue-200"}`}>
-                  <div className={`px-3 py-1.5 flex items-center gap-1.5 ${lotView === "archived" ? "bg-amber-50" : "bg-blue-50"}`}>
-                    <Building2 size={12} className={lotView === "archived" ? "text-amber-600" : "text-blue-600"} />
-                    <span className={`text-xs font-medium ${lotView === "archived" ? "text-amber-700" : "text-blue-700"}`}>Block {blockId}</span>
-                    <span className={`text-xs ${lotView === "archived" ? "text-amber-500" : "text-blue-500"}`}>{blockLots.length} units</span>
+              {blocks.map(([blockId, blockLots]) => {
+                const isLinkMode = blockLinkMode === blockId;
+                const isDimmed = blockLinkMode !== null && !isLinkMode;
+                return (
+                  <div
+                    key={`block-${blockId}`}
+                    className={`border rounded-lg overflow-hidden transition-all ${
+                      isDimmed
+                        ? "opacity-30 pointer-events-none border-border/50"
+                        : isLinkMode
+                        ? "border-brand ring-2 ring-brand/20"
+                        : lotView === "archived"
+                        ? "border-amber-200"
+                        : "border-blue-200"
+                    }`}
+                  >
+                    <div className={`px-3 py-1.5 flex items-center gap-1.5 ${
+                      isLinkMode ? "bg-brand/10" : lotView === "archived" ? "bg-amber-50" : "bg-blue-50"
+                    }`}>
+                      <Building2 size={12} className={isLinkMode ? "text-brand" : lotView === "archived" ? "text-amber-600" : "text-blue-600"} />
+                      <span className={`text-xs font-medium ${isLinkMode ? "text-brand" : lotView === "archived" ? "text-amber-700" : "text-blue-700"}`}>Block {blockId}</span>
+                      <span className={`text-xs ${isLinkMode ? "text-brand/70" : lotView === "archived" ? "text-amber-500" : "text-blue-500"}`}>{blockLots.length} units</span>
+                      {lotView !== "archived" && !isLinkMode && (
+                        <button
+                          onClick={() => startBlockLinkMode(blockId, blockLots)}
+                          disabled={blockLinkMode !== null}
+                          className={`ml-auto flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md transition ${
+                            copiedId === `block-${blockId}`
+                              ? "bg-green-50 text-green-600"
+                              : "bg-brand/10 text-brand hover:bg-brand/20"
+                          }`}
+                        >
+                          {copiedId === `block-${blockId}` ? (
+                            <>
+                              <Check size={10} />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Link2 size={10} />
+                              Block Link
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {isLinkMode && (
+                        <button
+                          onClick={cancelBlockLinkMode}
+                          className="ml-auto text-xs text-text-muted hover:text-text px-1.5 py-0.5 rounded-md hover:bg-gray-100 transition"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Selection hint */}
+                    {isLinkMode && (
+                      <div className="px-3 py-1.5 bg-brand/5 border-b border-brand/10 text-[11px] text-brand font-medium">
+                        Select units to include in the link:
+                      </div>
+                    )}
+
+                    <div className="space-y-0.5 p-1">
+                      {blockLots.map((lot) => {
+                        if (isLinkMode) {
+                          const selected = blockLinkSelection.has(lot.id);
+                          return (
+                            <button
+                              key={lot.id}
+                              type="button"
+                              onClick={() => toggleBlockLinkLot(lot.id)}
+                              className={`w-full flex items-center gap-3 p-2 rounded-lg border transition active:scale-[0.98] ${
+                                selected
+                                  ? "border-brand bg-brand/5"
+                                  : "border-border/50 bg-gray-50/50 opacity-50"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                readOnly
+                                className="w-4 h-4 rounded accent-[var(--color-brand,#0F766E)]"
+                              />
+                              <span className={`text-xs font-medium ${selected ? "text-text" : "text-text-muted"}`}>
+                                Lot {lot.lot_number}
+                              </span>
+                            </button>
+                          );
+                        }
+
+                        return (
+                          <LotRow
+                            key={lot.id}
+                            lot={lot}
+                            archiveSelected={archiveSelection.has(lot.id)}
+                            copiedId={copiedId}
+                            onArchiveToggle={() => {
+                              setArchiveSelection((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(lot.id)) next.delete(lot.id);
+                                else next.add(lot.id);
+                                return next;
+                              });
+                            }}
+                            onCopy={() => {
+                              const url = `${window.location.origin}/request/${lot.id}`;
+                              navigator.clipboard.writeText(url);
+                              setCopiedId(lot.id);
+                              setTimeout(() => setCopiedId(null), 2000);
+                            }}
+                            compact
+                            isArchived={lotView === "archived"}
+                            editing={editingLotId === lot.id}
+                            editValue={editingLotId === lot.id ? editingLotValue : undefined}
+                            saving={savingLot}
+                            onEditStart={() => { setEditingLotId(lot.id); setEditingLotValue(lot.lot_number); }}
+                            onEditChange={setEditingLotValue}
+                            onEditSave={() => renameLot(lot.id, editingLotValue)}
+                            onEditCancel={() => { setEditingLotId(null); setEditingLotValue(""); }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* Create link footer */}
+                    {isLinkMode && (
+                      <div className="px-3 py-2 bg-gray-50 border-t border-border flex items-center gap-2">
+                        <button
+                          onClick={cancelBlockLinkMode}
+                          className="px-3 py-1.5 text-xs text-text-secondary bg-white border border-border rounded-lg hover:bg-gray-50 transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => createBlockLink(blockId)}
+                          disabled={blockLinkSelection.size === 0 || blockLinkLoading}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand text-white hover:bg-brand-dark active:scale-[0.97] transition disabled:opacity-50"
+                        >
+                          {blockLinkLoading ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : (
+                            <>
+                              <Link2 size={11} />
+                              Create Link for {blockLinkSelection.size} unit{blockLinkSelection.size !== 1 ? "s" : ""}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-0.5 p-1">
-                    {blockLots.map((lot) => (
-                      <LotRow
-                        key={lot.id}
-                        lot={lot}
-                        archiveSelected={archiveSelection.has(lot.id)}
-                        copiedId={copiedId}
-                        onArchiveToggle={() => {
-                          setArchiveSelection((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(lot.id)) next.delete(lot.id);
-                            else next.add(lot.id);
-                            return next;
-                          });
-                        }}
-                        onCopy={() => {
-                          const url = `${window.location.origin}/request/${lot.id}`;
-                          navigator.clipboard.writeText(url);
-                          setCopiedId(lot.id);
-                          setTimeout(() => setCopiedId(null), 2000);
-                        }}
-                        compact
-                        isArchived={lotView === "archived"}
-                        editing={editingLotId === lot.id}
-                        editValue={editingLotId === lot.id ? editingLotValue : undefined}
-                        saving={savingLot}
-                        onEditStart={() => { setEditingLotId(lot.id); setEditingLotValue(lot.lot_number); }}
-                        onEditChange={setEditingLotValue}
-                        onEditSave={() => renameLot(lot.id, editingLotValue)}
-                        onEditCancel={() => { setEditingLotId(null); setEditingLotValue(""); }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
 
-        {/* Section 3: Site Settings — edit + add lots */}
+        {/* Section 3: Add Lots */}
         {selectedSite && (
-          <section className="bg-card rounded-xl border border-border p-4 space-y-4">
+          <section className="bg-card rounded-xl border border-border p-4 space-y-3">
             <h2 className="font-semibold text-text flex items-center gap-2">
-              <Settings size={18} className="text-text-muted" />
-              Site Settings
+              <Plus size={18} className="text-brand" />
+              Add Lots
             </h2>
 
-            {/* Edit site fields */}
+            {/* Mode tabs */}
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setAddMode("singles")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
+                  addMode === "singles"
+                    ? "bg-white text-brand shadow-sm"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                <Home size={14} />
+                Singles
+              </button>
+              <button
+                onClick={() => setAddMode("block")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
+                  addMode === "block"
+                    ? "bg-white text-brand shadow-sm"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                <Building2 size={14} />
+                Block
+              </button>
+            </div>
+
+            {addMode === "singles" ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">From</label>
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={singlesFrom}
+                      onChange={(e) => setSinglesFrom(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">To</label>
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={singlesTo}
+                      onChange={(e) => setSinglesTo(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                  </div>
+                </div>
+                {singlesPreviewCount > 0 && (
+                  <p className="text-xs text-text-muted">
+                    Will create <strong>{singlesPreviewCount}</strong> lots: {singlesFrom} to {singlesTo}
+                  </p>
+                )}
+                <button
+                  onClick={addLots}
+                  disabled={addingLots || singlesPreviewCount < 1}
+                  className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                >
+                  {addingLots ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Plus size={16} />
+                  )}
+                  Add {singlesPreviewCount} Singles
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">Block #</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={blockNumber}
+                      onChange={(e) => setBlockNumber(e.target.value)}
+                      placeholder="e.g. 70"
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted font-medium mb-1">Units</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={26}
+                      inputMode="numeric"
+                      value={blockUnits}
+                      onChange={(e) => setBlockUnits(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                  </div>
+                </div>
+                {blockNumber.trim() && parseInt(blockUnits) > 0 && (
+                  <p className="text-xs text-text-muted">
+                    Will create <strong>{blockUnits}</strong> lots:{" "}
+                    {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${String.fromCharCode(65 + i)}`).join(", ")}
+                    {(parseInt(blockUnits) || 0) > 8 && ", ..."}
+                  </p>
+                )}
+                <button
+                  onClick={addLots}
+                  disabled={addingLots || !blockNumber.trim() || !parseInt(blockUnits)}
+                  className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                >
+                  {addingLots ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Building2 size={16} />
+                  )}
+                  Add Block {blockNumber || "..."}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Section 3b: Site Settings — clickable link */}
+        {selectedSite && (
+          <button
+            onClick={() => setShowSettings((v) => !v)}
+            className="w-full flex items-center gap-2 px-4 py-3 bg-card rounded-xl border border-border text-sm font-medium text-text-secondary hover:bg-gray-50 transition"
+          >
+            <Settings size={16} className="text-text-muted" />
+            Site Settings
+            <span className="ml-auto text-xs text-text-muted">{showSettings ? "▲" : "▼"}</span>
+          </button>
+        )}
+
+        {/* Site Settings expanded */}
+        {selectedSite && showSettings && (
+          <section className="bg-card rounded-xl border border-border p-4 space-y-3">
             <div className="space-y-3">
               <div>
                 <label className="block text-xs text-text-muted font-medium mb-1">Site Name</label>
@@ -906,207 +1206,75 @@ export default function SetupPage() {
               )}
             </div>
 
-            {/* Divider */}
-            <div className="border-t border-border" />
+            {/* Danger Zone inside settings */}
+            <div className="border-t border-border pt-4 mt-4 space-y-3">
+              <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
+                <AlertTriangle size={14} />
+                Danger Zone
+              </h3>
 
-            {/* Add Lots */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-text">Add Lots</h3>
-
-              {/* Mode tabs */}
-              <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-                <button
-                  onClick={() => setAddMode("singles")}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
-                    addMode === "singles"
-                      ? "bg-white text-brand shadow-sm"
-                      : "text-text-muted hover:text-text"
-                  }`}
-                >
-                  <Home size={14} />
-                  Singles
-                </button>
-                <button
-                  onClick={() => setAddMode("block")}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition ${
-                    addMode === "block"
-                      ? "bg-white text-brand shadow-sm"
-                      : "text-text-muted hover:text-text"
-                  }`}
-                >
-                  <Building2 size={14} />
-                  Block
-                </button>
-              </div>
-
-              {addMode === "singles" ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-text-muted font-medium mb-1">From</label>
-                      <input
-                        type="number"
-                        min={1}
-                        inputMode="numeric"
-                        value={singlesFrom}
-                        onChange={(e) => setSinglesFrom(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-text-muted font-medium mb-1">To</label>
-                      <input
-                        type="number"
-                        min={1}
-                        inputMode="numeric"
-                        value={singlesTo}
-                        onChange={(e) => setSinglesTo(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                      />
-                    </div>
-                  </div>
-                  {singlesPreviewCount > 0 && (
-                    <p className="text-xs text-text-muted">
-                      Will create <strong>{singlesPreviewCount}</strong> lots: {singlesFrom} to {singlesTo}
-                    </p>
-                  )}
+              {!deleteTarget ? (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-text-muted">
+                    Permanently remove site, lots, and requests.
+                  </p>
                   <button
-                    onClick={addLots}
-                    disabled={addingLots || singlesPreviewCount < 1}
-                    className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+                    onClick={() => {
+                      const site = sites.find((s) => s.id === selectedSite);
+                      if (site) setDeleteTarget(site);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition"
                   >
-                    {addingLots ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Plus size={16} />
-                    )}
-                    Add {singlesPreviewCount} Singles
+                    <Trash2 size={14} />
+                    Delete Site
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-text-muted font-medium mb-1">Block #</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={blockNumber}
-                        onChange={(e) => setBlockNumber(e.target.value)}
-                        placeholder="e.g. 4"
-                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-text-muted font-medium mb-1">Units</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={50}
-                        inputMode="numeric"
-                        value={blockUnits}
-                        onChange={(e) => setBlockUnits(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                      />
-                    </div>
+                <div className="space-y-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    This will permanently delete <strong>{deleteTarget.name}</strong>,
+                    including <strong>{deleteTarget.total_lots} lot{deleteTarget.total_lots !== 1 ? "s" : ""}</strong> and
+                    all associated requests. This action cannot be undone.
+                  </p>
+                  <div>
+                    <label className="block text-xs text-red-600 font-medium mb-1">
+                      Type &quot;{deleteTarget.name}&quot; to confirm
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteConfirm}
+                      onChange={(e) => setDeleteConfirm(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-red-300 bg-white text-text text-sm outline-none focus:ring-2 focus:ring-red-300"
+                      placeholder={deleteTarget.name}
+                      autoFocus
+                    />
                   </div>
-                  {blockNumber.trim() && parseInt(blockUnits) > 0 && (
-                    <p className="text-xs text-text-muted">
-                      Will create <strong>{blockUnits}</strong> lots:{" "}
-                      {Array.from({ length: Math.min(parseInt(blockUnits) || 0, 8) }, (_, i) => `${blockNumber}-${i + 1}`).join(", ")}
-                      {(parseInt(blockUnits) || 0) > 8 && ", ..."}
-                    </p>
-                  )}
-                  <button
-                    onClick={addLots}
-                    disabled={addingLots || !blockNumber.trim() || !parseInt(blockUnits)}
-                    className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
-                  >
-                    {addingLots ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Building2 size={16} />
-                    )}
-                    Add Block {blockNumber || "..."}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setDeleteTarget(null);
+                        setDeleteConfirm("");
+                      }}
+                      className="px-3 py-2 text-sm text-text-secondary rounded-lg hover:bg-white transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={deleteSite}
+                      disabled={deleting || deleteConfirm !== deleteTarget.name}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-red-700 active:scale-[0.98] transition disabled:opacity-40"
+                    >
+                      {deleting ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                      Permanently Delete
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
-          </section>
-        )}
-
-        {/* Section 4: Danger Zone */}
-        {selectedSite && (
-          <section className="bg-card rounded-xl border border-red-200 p-4 space-y-4">
-            <h2 className="font-semibold text-red-600 flex items-center gap-2">
-              <AlertTriangle size={18} />
-              Danger Zone
-            </h2>
-
-            {!deleteTarget ? (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-text">Delete this site</p>
-                  <p className="text-xs text-text-muted">
-                    Permanently remove the site, all its lots, and all requests.
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    const site = sites.find((s) => s.id === selectedSite);
-                    if (site) setDeleteTarget(site);
-                  }}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition"
-                >
-                  <Trash2 size={14} />
-                  Delete Site
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">
-                  This will permanently delete <strong>{deleteTarget.name}</strong>,
-                  including <strong>{deleteTarget.total_lots} lot{deleteTarget.total_lots !== 1 ? "s" : ""}</strong> and
-                  all associated requests. This action cannot be undone.
-                </p>
-                <div>
-                  <label className="block text-xs text-red-600 font-medium mb-1">
-                    Type &quot;{deleteTarget.name}&quot; to confirm
-                  </label>
-                  <input
-                    type="text"
-                    value={deleteConfirm}
-                    onChange={(e) => setDeleteConfirm(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-red-300 bg-white text-text text-sm outline-none focus:ring-2 focus:ring-red-300"
-                    placeholder={deleteTarget.name}
-                    autoFocus
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setDeleteTarget(null);
-                      setDeleteConfirm("");
-                    }}
-                    className="px-3 py-2 text-sm text-text-secondary rounded-lg hover:bg-white transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={deleteSite}
-                    disabled={deleting || deleteConfirm !== deleteTarget.name}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-red-700 active:scale-[0.98] transition disabled:opacity-40"
-                  >
-                    {deleting ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Trash2 size={14} />
-                    )}
-                    Permanently Delete
-                  </button>
-                </div>
-              </div>
-            )}
           </section>
         )}
       </div>
@@ -1165,6 +1333,7 @@ function LotRow({
           type="checkbox"
           checked={archiveSelected}
           onChange={onArchiveToggle}
+          onClick={(e) => e.stopPropagation()}
           className={`w-4 h-4 rounded border-border focus:ring-brand/30 ${
             archiveSelected ? "accent-amber-600" : "accent-[var(--color-brand,#0F766E)]"
           }`}

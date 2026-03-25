@@ -47,13 +47,13 @@ export async function POST(req: NextRequest) {
       }];
     } else if (block_number && unit_count) {
       // --- Block mode ---
-      if (unit_count < 1 || unit_count > 50) {
-        return NextResponse.json({ error: "unit_count must be 1-50" }, { status: 400 });
+      if (unit_count < 1 || unit_count > 26) {
+        return NextResponse.json({ error: "unit_count must be 1-26" }, { status: 400 });
       }
 
       lots = Array.from({ length: unit_count }, (_, i) => ({
         jobsite_id,
-        lot_number: `${block_number}-${i + 1}`,
+        lot_number: `${block_number}-${String.fromCharCode(65 + i)}`,
         block: String(block_number),
         status: "pending",
       }));

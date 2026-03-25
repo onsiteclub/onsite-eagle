@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@onsite/supabase/client'
 import { AuthProvider, useAuth } from '@onsite/auth'
 import { AuthFlow } from '@onsite/auth-ui/web'
@@ -20,13 +20,17 @@ export default function LoginPage() {
 function AuthFlowWrapper({ supabase }: { supabase: ReturnType<typeof createClient> }) {
   const { user, loading, signIn, signUp } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Read redirect destination from URL (set by middleware when protecting routes)
+  const redirectTo = searchParams.get('redirect') || '/club'
 
   // Redirect if already authenticated
   useEffect(() => {
     if (user && !loading) {
-      router.push('/club')
+      router.push(redirectTo)
     }
-  }, [user, loading, router])
+  }, [user, loading, router, redirectTo])
 
   return (
     <AuthFlow
@@ -69,7 +73,7 @@ function AuthFlowWrapper({ supabase }: { supabase: ReturnType<typeof createClien
         if (error) throw new Error(error.message)
       }}
       onSuccess={() => {
-        router.push('/club')
+        router.push(redirectTo)
         router.refresh()
       }}
     />

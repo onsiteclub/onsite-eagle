@@ -15,6 +15,7 @@
   "dependencies": {
     "@onsite/agenda": "*",
     "@onsite/auth-ui": "*",
+    "@onsite/framing": "*",
     "@onsite/media": "*",
     "@onsite/offline": "*",
     "@onsite/shared": "*",

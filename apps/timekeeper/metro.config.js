@@ -18,6 +18,7 @@ config.watchFolders = [
   path.resolve(monorepoRoot, 'packages', 'agenda'),
   path.resolve(monorepoRoot, 'packages', 'media'),
   path.resolve(monorepoRoot, 'packages', 'ui'),
+  path.resolve(monorepoRoot, 'packages', 'framing'),
 ];
 
 // 2. Let Metro know where to resolve packages and in what order

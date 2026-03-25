@@ -254,6 +254,7 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
   const [formData, setFormData] = useState({
     name: '',
+    builder_name: '',
     address: '',
     city: '',
     total_lots: '',
@@ -270,6 +271,11 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
       return
     }
 
+    if (!formData.builder_name.trim()) {
+      alert('Please enter the builder name')
+      return
+    }
+
     const totalLots = formData.total_lots ? parseInt(formData.total_lots) : 0
 
     setLoading(true)
@@ -278,6 +284,7 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
         .from('frm_jobsites')
         .insert({
           name: formData.name.trim(),
+          builder_name: formData.builder_name.trim(),
           address: formData.address.trim() || null,
           city: formData.city.trim() || null,
           total_lots: autoCreateLots ? 0 : totalLots,
@@ -300,9 +307,6 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
             jobsite_id: data.id,
             lot_number: String(i),
             status: 'pending',
-            current_phase: 1,
-            progress_percentage: 0,
-            is_issued: false,
           })
         }
 
@@ -376,6 +380,24 @@ function NewJobsiteContent({ router }: { router: ReturnType<typeof useRouter> })
               className="w-full bg-[#F5F5F7] border border-[#D2D2D7] rounded-xl pl-12 pr-4 py-3 text-[#1D1D1F] placeholder-[#86868B] focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
+        </div>
+
+        {/* Builder Name */}
+        <div>
+          <label className="block text-sm font-medium text-[#1D1D1F] mb-2">
+            Builder / Developer *
+          </label>
+          <div className="relative">
+            <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
+            <input
+              type="text"
+              required
+              placeholder="e.g., Caivan, Minto, Mattamy"
+              className="w-full bg-[#F5F5F7] border border-[#D2D2D7] rounded-xl pl-12 pr-4 py-3 text-[#1D1D1F] placeholder-[#86868B] focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
+              value={formData.builder_name}
+              onChange={(e) => setFormData({ ...formData, builder_name: e.target.value })}
             />
           </div>
         </div>

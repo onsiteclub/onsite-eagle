@@ -18,6 +18,7 @@
   "dependencies": {
     "@onsite/auth": "*",
     "@onsite/auth-ui": "*",
+    "@onsite/framing": "*",
     "@onsite/logger": "*",
     "@onsite/tokens": "*",
     "@onsite/camera": "*",

@@ -1,7 +1,8 @@
 /**
  * Pedidos (Requests Queue) — Main screen
  *
- * Cards sorted by urgency with inline action buttons.
+ * Toggle between Material and Equipment requests.
+ * Cards sorted by urgency/priority with inline action buttons.
  * Operator lives here 95% of the time.
  */
 
@@ -22,9 +23,18 @@ import { useAuth } from '@onsite/auth';
 import { supabase } from '../../src/lib/supabase';
 import type { MaterialRequest, MaterialRequestStatus } from '@onsite/shared';
 import { getOperatorQueue, updateRequestStatus } from '@onsite/shared';
+import type { FrmEquipmentRequest } from '@onsite/framing';
+import {
+  getEquipmentQueue,
+  acceptEquipmentRequest,
+  completeEquipmentRequest,
+  EQUIPMENT_TYPES,
+} from '@onsite/framing';
 import { formatDistanceToNow } from 'date-fns';
 
 const ACCENT = '#0F766E';
+
+type QueueTab = 'materials' | 'equipment';
 
 const URGENCY_COLORS: Record<string, string> = {
   critical: '#DC2626',
@@ -33,18 +43,48 @@ const URGENCY_COLORS: Record<string, string> = {
   low: '#9CA3AF',
 };
 
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: '#DC2626',
+  high: '#F59E0B',
+  normal: '#0F766E',
+  low: '#9CA3AF',
+};
+
 const STATUS_BORDER: Record<string, string> = {
+  // Material statuses
   pending: '#DC2626',
   acknowledged: '#F59E0B',
   in_transit: '#0F766E',
   delivered: '#D1D5DB',
+  // Equipment statuses
+  requested: '#DC2626',
+  accepted: '#F59E0B',
+  scheduled: '#3B82F6',
+  in_progress: '#0F766E',
+  completed: '#D1D5DB',
 };
+
+/** Enriched equipment request with joined lot/phase data */
+type EquipmentItem = FrmEquipmentRequest & {
+  lot: { id: string; lot_number: string; address: string | null; jobsite_id: string; jobsite: { id: string; name: string } | null } | null;
+  phase: { id: string; name: string } | null;
+};
+
+function getEquipmentLabel(code: string): string {
+  const match = EQUIPMENT_TYPES.find(t => t.code === code);
+  return match ? match.label : code.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 
 export default function RequestsQueue() {
   const router = useRouter();
   const { user } = useAuth();
   const operatorId = user?.id || null;
   const operatorName = user?.name?.split(' ')[0] || 'Operator';
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<QueueTab>('materials');
+
+  // Material state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
@@ -52,20 +92,32 @@ export default function RequestsQueue() {
   const [siteIds, setSiteIds] = useState<string[]>([]);
   const loadRequestsRef = useRef<() => void>();
 
-  // Load assigned sites + initial requests when user is available
+  // Equipment state
+  const [equipmentLoading, setEquipmentLoading] = useState(true);
+  const [equipmentRequests, setEquipmentRequests] = useState<EquipmentItem[]>([]);
+  const [equipmentUpdatingId, setEquipmentUpdatingId] = useState<string | null>(null);
+  const loadEquipmentRef = useRef<() => void>();
+
+  // Load assigned sites + initial data when user is available
   useEffect(() => {
     if (operatorId) loadAssignments(operatorId);
-    else setLoading(false);
+    else {
+      setLoading(false);
+      setEquipmentLoading(false);
+    }
   }, [operatorId]);
 
-  // Load requests when screen gets focus
+  // Reload when screen gets focus
   useFocusEffect(
     useCallback(() => {
-      if (operatorId) loadRequests();
+      if (operatorId) {
+        loadRequests();
+        loadEquipment();
+      }
     }, [operatorId])
   );
 
-  // Realtime subscription — reload when material requests change
+  // Realtime subscription — material requests
   useEffect(() => {
     if (siteIds.length === 0) return;
 
@@ -74,9 +126,8 @@ export default function RequestsQueue() {
       : { event: '*' as const, schema: 'public', table: 'frm_material_requests' };
 
     const channel = supabase
-      .channel('operator-requests')
+      .channel('operator-material-requests')
       .on('postgres_changes', channelConfig, (payload) => {
-        // Multi-site: check if change belongs to our sites
         if (siteIds.length > 1) {
           const siteId = (payload.new as any)?.jobsite_id || (payload.old as any)?.jobsite_id;
           if (siteId && !siteIds.includes(siteId)) return;
@@ -90,8 +141,27 @@ export default function RequestsQueue() {
     };
   }, [siteIds]);
 
+  // Realtime subscription — equipment requests
+  useEffect(() => {
+    if (siteIds.length === 0) return;
+
+    const channel = supabase
+      .channel('operator-equipment-requests')
+      .on('postgres_changes', {
+        event: '*' as const,
+        schema: 'public',
+        table: 'frm_equipment_requests',
+      }, () => {
+        loadEquipmentRef.current?.();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [siteIds]);
+
   async function loadAssignments(userId: string) {
-    // Load assigned site IDs for realtime filter
     const { data: assignments } = await supabase
       .from('frm_operator_assignments')
       .select('jobsite_id')
@@ -102,20 +172,23 @@ export default function RequestsQueue() {
       setSiteIds(assignments.map((a: any) => a.jobsite_id));
     }
 
-    // Initial load
-    await loadRequestsForOperator(userId);
+    // Initial load — both queues in parallel
+    await Promise.all([
+      loadMaterialsForOperator(userId),
+      loadEquipmentForOperator(userId),
+    ]);
   }
 
-  async function loadRequestsForOperator(opId: string) {
+  // --- Material loading ---
+
+  async function loadMaterialsForOperator(opId: string) {
     try {
       const { data, error } = await getOperatorQueue(supabase, opId);
-
       if (error) {
-        console.error('Error loading requests:', error);
+        console.error('Error loading material requests:', error);
         return;
       }
-
-      processRequests(data);
+      processMaterialRequests(data);
     } catch (err) {
       console.error('Error:', err);
     } finally {
@@ -126,13 +199,12 @@ export default function RequestsQueue() {
 
   async function loadRequests() {
     if (!operatorId) return;
-    await loadRequestsForOperator(operatorId);
+    await loadMaterialsForOperator(operatorId);
   }
 
-  // Keep ref updated for realtime callback
   loadRequestsRef.current = loadRequests;
 
-  function processRequests(data: MaterialRequest[] | null) {
+  function processMaterialRequests(data: MaterialRequest[] | null) {
     const activeStatuses = ['pending', 'acknowledged', 'in_transit'];
     const urgencyOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
     const statusOrder: Record<string, number> = { pending: 0, acknowledged: 1, in_transit: 2 };
@@ -157,6 +229,49 @@ export default function RequestsQueue() {
     setRequests(active);
   }
 
+  // --- Equipment loading ---
+
+  async function loadEquipmentForOperator(opId: string) {
+    try {
+      const data = await getEquipmentQueue(supabase, opId);
+      processEquipmentRequests(data);
+    } catch (err) {
+      console.error('Error loading equipment requests:', err);
+    } finally {
+      setEquipmentLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  async function loadEquipment() {
+    if (!operatorId) return;
+    await loadEquipmentForOperator(operatorId);
+  }
+
+  loadEquipmentRef.current = loadEquipment;
+
+  function processEquipmentRequests(data: EquipmentItem[] | null) {
+    const activeStatuses = ['requested', 'accepted', 'scheduled', 'in_progress'];
+    const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+    const statusOrder: Record<string, number> = { requested: 0, accepted: 1, scheduled: 2, in_progress: 3 };
+
+    const active = (data || [])
+      .filter(req => activeStatuses.includes(req.status))
+      .sort((a, b) => {
+        const priA = priorityOrder[a.priority] ?? 99;
+        const priB = priorityOrder[b.priority] ?? 99;
+        if (priA !== priB) return priA - priB;
+        const stA = statusOrder[a.status] ?? 99;
+        const stB = statusOrder[b.status] ?? 99;
+        if (stA !== stB) return stA - stB;
+        return new Date(a.requested_at).getTime() - new Date(b.requested_at).getTime();
+      });
+
+    setEquipmentRequests(active);
+  }
+
+  // --- Material actions ---
+
   async function handleInTransit(item: MaterialRequest) {
     setUpdatingId(item.id);
     try {
@@ -179,20 +294,55 @@ export default function RequestsQueue() {
     router.push(`/deliver/${item.id}`);
   }
 
+  // --- Equipment actions ---
+
+  async function handleAcceptEquipment(item: EquipmentItem) {
+    if (!operatorId) return;
+    setEquipmentUpdatingId(item.id);
+    try {
+      await acceptEquipmentRequest(supabase, item.id, operatorId);
+      loadEquipment();
+    } catch (err) {
+      console.error('Error accepting equipment request:', err);
+      Alert.alert('Error', 'Failed to accept request');
+    } finally {
+      setEquipmentUpdatingId(null);
+    }
+  }
+
+  async function handleCompleteEquipment(item: EquipmentItem) {
+    setEquipmentUpdatingId(item.id);
+    try {
+      await completeEquipmentRequest(supabase, item.id);
+      loadEquipment();
+    } catch (err) {
+      console.error('Error completing equipment request:', err);
+      Alert.alert('Error', 'Failed to complete request');
+    } finally {
+      setEquipmentUpdatingId(null);
+    }
+  }
+
+  // --- Refresh ---
+
   const onRefresh = () => {
     setRefreshing(true);
-    loadRequests();
+    if (activeTab === 'materials') {
+      loadRequests();
+    } else {
+      loadEquipment();
+    }
   };
 
-  const renderCard = ({ item }: { item: MaterialRequest }) => {
+  // --- Material card ---
+
+  const renderMaterialCard = ({ item }: { item: MaterialRequest }) => {
     const borderColor = STATUS_BORDER[item.status] || '#D1D5DB';
     const isUpdating = updatingId === item.id;
     const isPending = item.status === 'pending' || item.status === 'acknowledged';
-    const isInTransit = item.status === 'in_transit';
 
     return (
       <View style={[styles.card, { borderLeftColor: borderColor }]}>
-        {/* Card Content */}
         <TouchableOpacity
           style={styles.cardContent}
           onPress={() => router.push(`/requests/${item.id}`)}
@@ -203,7 +353,7 @@ export default function RequestsQueue() {
               styles.urgencyDot,
               { backgroundColor: URGENCY_COLORS[item.urgency_level] || '#9CA3AF' }
             ]} />
-            <Text style={styles.materialName} numberOfLines={1}>
+            <Text style={styles.itemName} numberOfLines={1}>
               {item.material_name}
               {item.quantity ? ` x${item.quantity}` : ''}
             </Text>
@@ -221,7 +371,6 @@ export default function RequestsQueue() {
           </Text>
         </TouchableOpacity>
 
-        {/* Action Buttons */}
         <View style={styles.actions}>
           {isPending && (
             <TouchableOpacity
@@ -253,7 +402,111 @@ export default function RequestsQueue() {
     );
   };
 
-  if (loading) {
+  // --- Equipment card ---
+
+  const renderEquipmentCard = ({ item }: { item: EquipmentItem }) => {
+    const borderColor = STATUS_BORDER[item.status] || '#D1D5DB';
+    const isUpdating = equipmentUpdatingId === item.id;
+    const isRequested = item.status === 'requested';
+    const canComplete = item.status === 'accepted' || item.status === 'scheduled' || item.status === 'in_progress';
+    const lotNumber = item.lot?.lot_number || null;
+    const siteName = item.lot?.jobsite?.name || null;
+    const phaseName = item.phase?.name || null;
+
+    return (
+      <View style={[styles.card, { borderLeftColor: borderColor }]}>
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <View style={[
+              styles.urgencyDot,
+              { backgroundColor: PRIORITY_COLORS[item.priority] || '#9CA3AF' }
+            ]} />
+            <Ionicons name="construct" size={16} color="#6B7280" style={{ marginRight: -4 }} />
+            <Text style={styles.itemName} numberOfLines={1}>
+              {getEquipmentLabel(item.operation_type)}
+            </Text>
+            {lotNumber && (
+              <Text style={styles.lotBadge}>Lot {lotNumber}</Text>
+            )}
+          </View>
+
+          {item.description ? (
+            <Text style={styles.descriptionText} numberOfLines={2}>
+              {item.description}
+            </Text>
+          ) : null}
+
+          <Text style={styles.metaText} numberOfLines={1}>
+            {siteName || 'Site'}
+            {phaseName ? ` · ${phaseName}` : ''}
+            {' · '}
+            {item.priority}
+            {' · '}
+            {formatDistanceToNow(new Date(item.requested_at), { addSuffix: true })}
+          </Text>
+
+          {item.status !== 'requested' && (
+            <View style={styles.statusRow}>
+              <View style={[styles.statusChip, { backgroundColor: `${STATUS_BORDER[item.status]}18` }]}>
+                <Text style={[styles.statusChipText, { color: STATUS_BORDER[item.status] }]}>
+                  {item.status.replace('_', ' ')}
+                </Text>
+              </View>
+              {item.scheduled_at && (
+                <Text style={styles.scheduledText}>
+                  Scheduled {formatDistanceToNow(new Date(item.scheduled_at), { addSuffix: true })}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.actions}>
+          {isRequested && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.acceptBtn]}
+              onPress={() => handleAcceptEquipment(item)}
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="hand-left" size={16} color="#fff" />
+                  <Text style={styles.actionBtnText}>Accept</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {canComplete && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.completeBtn]}
+              onPress={() => handleCompleteEquipment(item)}
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                  <Text style={styles.actionBtnText}>Complete</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // --- Main render ---
+
+  const isCurrentTabLoading = activeTab === 'materials' ? loading : equipmentLoading;
+  const currentData = activeTab === 'materials' ? requests : equipmentRequests;
+  const totalActive = requests.length + equipmentRequests.length;
+
+  if (loading && equipmentLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={ACCENT} />
@@ -268,7 +521,7 @@ export default function RequestsQueue() {
         <View>
           <Text style={styles.headerTitle}>Requests</Text>
           <Text style={styles.headerSubtitle}>
-            {requests.length} active
+            {totalActive} active
           </Text>
         </View>
         <View style={styles.syncBadge}>
@@ -277,22 +530,93 @@ export default function RequestsQueue() {
         </View>
       </View>
 
-      <FlatList
-        data={requests}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCard}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />
-        }
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="cube-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>No active requests</Text>
-            <Text style={styles.emptySubtitle}>Pull to refresh</Text>
-          </View>
-        }
-      />
+      {/* Tab Toggle */}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[styles.toggleBtn, activeTab === 'materials' && styles.toggleBtnActive]}
+          onPress={() => setActiveTab('materials')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="cube"
+            size={16}
+            color={activeTab === 'materials' ? '#fff' : '#6B7280'}
+          />
+          <Text style={[styles.toggleText, activeTab === 'materials' && styles.toggleTextActive]}>
+            Materials
+          </Text>
+          {requests.length > 0 && (
+            <View style={[styles.toggleCount, activeTab === 'materials' && styles.toggleCountActive]}>
+              <Text style={[styles.toggleCountText, activeTab === 'materials' && styles.toggleCountTextActive]}>
+                {requests.length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.toggleBtn, activeTab === 'equipment' && styles.toggleBtnActive]}
+          onPress={() => setActiveTab('equipment')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="construct"
+            size={16}
+            color={activeTab === 'equipment' ? '#fff' : '#6B7280'}
+          />
+          <Text style={[styles.toggleText, activeTab === 'equipment' && styles.toggleTextActive]}>
+            Equipment
+          </Text>
+          {equipmentRequests.length > 0 && (
+            <View style={[styles.toggleCount, activeTab === 'equipment' && styles.toggleCountActive]}>
+              <Text style={[styles.toggleCountText, activeTab === 'equipment' && styles.toggleCountTextActive]}>
+                {equipmentRequests.length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* List */}
+      {isCurrentTabLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={ACCENT} />
+        </View>
+      ) : activeTab === 'materials' ? (
+        <FlatList
+          data={requests}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMaterialCard}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />
+          }
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="cube-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No material requests</Text>
+              <Text style={styles.emptySubtitle}>Pull to refresh</Text>
+            </View>
+          }
+        />
+      ) : (
+        <FlatList
+          data={equipmentRequests}
+          keyExtractor={(item) => item.id}
+          renderItem={renderEquipmentCard}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />
+          }
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="construct-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No equipment requests</Text>
+              <Text style={styles.emptySubtitle}>Pull to refresh</Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Camera FAB */}
       <TouchableOpacity
@@ -352,6 +676,60 @@ const styles = StyleSheet.create({
     color: '#0F766E',
     fontWeight: '500',
   },
+
+  // Toggle
+  toggleContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  toggleBtnActive: {
+    backgroundColor: ACCENT,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  toggleTextActive: {
+    color: '#FFFFFF',
+  },
+  toggleCount: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleCountActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  toggleCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  toggleCountTextActive: {
+    color: '#FFFFFF',
+  },
+
+  // List
   listContent: {
     padding: 16,
     paddingBottom: 32,
@@ -382,7 +760,7 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-  materialName: {
+  itemName: {
     fontSize: 15,
     fontWeight: '600',
     color: '#101828',
@@ -397,10 +775,37 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
+  descriptionText: {
+    fontSize: 13,
+    color: '#374151',
+    marginLeft: 18,
+    marginBottom: 2,
+  },
   metaText: {
     fontSize: 13,
     color: '#6B7280',
     marginLeft: 18,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 18,
+    marginTop: 6,
+  },
+  statusChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  scheduledText: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   actions: {
     flexDirection: 'row',
@@ -422,6 +827,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F766E',
   },
   deliveredBtn: {
+    backgroundColor: '#16A34A',
+  },
+  acceptBtn: {
+    backgroundColor: '#0F766E',
+  },
+  completeBtn: {
     backgroundColor: '#16A34A',
   },
   actionBtnText: {

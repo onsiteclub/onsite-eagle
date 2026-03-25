@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { getCookie } from "@/lib/cookies";
 import { TransactionCard } from "@/components/TransactionCard";
 import { NewRequestModal } from "@/components/NewRequestModal";
-import { RefreshCw, Loader2, Inbox } from "lucide-react";
+import { RefreshCw, Loader2, Inbox, AlertTriangle, Fuel } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
@@ -29,6 +29,14 @@ interface MaterialRequest {
   jobsite: { name: string } | null;
 }
 
+interface SiteAlert {
+  id: string;
+  name: string;
+  machine_down?: boolean;
+  machine_down_reason?: string | null;
+  refuel_needed?: boolean;
+}
+
 type Filter = "all" | "pending" | "delivered" | "problem" | "missing";
 
 const POLL_INTERVAL = 4000;
@@ -39,6 +47,7 @@ export default function SupervisorPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
   const [siteCount, setSiteCount] = useState(0);
+  const [siteAlerts, setSiteAlerts] = useState<SiteAlert[]>([]);
   const [userName, setUserName] = useState("Supervisor");
   const [modalLot, setModalLot] = useState<{ id: string; label: string } | null>(null);
 
@@ -55,6 +64,9 @@ export default function SupervisorPage() {
     if (siteRes.ok) {
       const sites = await siteRes.json();
       setSiteCount(sites.length);
+      setSiteAlerts(
+        sites.filter((s: SiteAlert) => s.machine_down || s.refuel_needed)
+      );
     }
   }, []);
 
@@ -75,14 +87,21 @@ export default function SupervisorPage() {
   // "Active" = everything that needs attention (excludes clean delivered)
   const isActive = (r: MaterialRequest) => r.status !== "delivered";
 
-  const filtered = requests.filter((r) => {
-    if (filter === "pending") return ["requested", "acknowledged", "in_transit"].includes(r.status);
-    if (filter === "delivered") return r.status === "delivered";
-    if (filter === "problem") return r.status === "problem";
-    if (filter === "missing") return hasMissing(r);
-    // "all" = active only (no clean delivered)
-    return isActive(r);
-  });
+  const filtered = requests
+    .filter((r) => {
+      if (filter === "pending") return ["requested", "acknowledged", "in_transit"].includes(r.status);
+      if (filter === "delivered") return r.status === "delivered";
+      if (filter === "problem") return r.status === "problem";
+      if (filter === "missing") return hasMissing(r);
+      // "all" = active only (no clean delivered)
+      return isActive(r);
+    })
+    .sort((a, b) => {
+      // in_transit always first
+      if (a.status === "in_transit" && b.status !== "in_transit") return -1;
+      if (b.status === "in_transit" && a.status !== "in_transit") return 1;
+      return 0;
+    });
 
   const activeCount = requests.filter(isActive).length;
   const pendingCount = requests.filter((r) =>
@@ -102,9 +121,70 @@ export default function SupervisorPage() {
 
   return (
     <main className="pb-8">
-      {/* Filters + live indicator */}
-      <div className="flex items-center px-4 pt-3 pb-2">
-        <div className="flex items-center gap-2 flex-1 overflow-x-auto">
+      {/* Site alert banners */}
+      {siteAlerts.map((site) => (
+        <div key={site.id} className="space-y-0">
+          {site.machine_down && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-black text-white">
+              <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+              <span className="text-sm font-bold">MACHINE DOWN</span>
+              <span className="text-sm text-white/60">—</span>
+              <span className="text-sm text-white/80 truncate">{site.name}</span>
+              {site.machine_down_reason && (
+                <span className="text-sm text-white/50 truncate ml-auto">{site.machine_down_reason}</span>
+              )}
+            </div>
+          )}
+          {site.refuel_needed && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white">
+              <Fuel size={16} className="shrink-0" />
+              <span className="text-sm font-bold">REFUEL NEEDED</span>
+              <span className="text-sm text-white/60">—</span>
+              <span className="text-sm text-white/80 truncate">{site.name}</span>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Priority action cards — always visible */}
+      <div className="grid grid-cols-2 gap-2 px-4 pt-3">
+        <button
+          onClick={() => setFilter(filter === "missing" ? "all" : "missing")}
+          className={`relative flex flex-col items-start p-3 rounded-xl border-2 transition active:scale-[0.97] ${
+            filter === "missing"
+              ? "bg-amber-50 border-amber-400 shadow-sm"
+              : "bg-card border-border hover:border-amber-300"
+          }`}
+        >
+          <span className={`text-2xl font-bold ${missingCount > 0 ? "text-amber-600" : "text-text-muted"}`}>
+            {missingCount}
+          </span>
+          <span className="text-sm font-medium text-text-secondary mt-0.5">Missing</span>
+          {missingCount > 0 && (
+            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
+          )}
+        </button>
+        <button
+          onClick={() => setFilter(filter === "problem" ? "all" : "problem")}
+          className={`relative flex flex-col items-start p-3 rounded-xl border-2 transition active:scale-[0.97] ${
+            filter === "problem"
+              ? "bg-red-50 border-red-400 shadow-sm"
+              : "bg-card border-border hover:border-red-300"
+          }`}
+        >
+          <span className={`text-2xl font-bold ${problemCount > 0 ? "text-red-600" : "text-text-muted"}`}>
+            {problemCount}
+          </span>
+          <span className="text-sm font-medium text-text-secondary mt-0.5">Problem</span>
+          {problemCount > 0 && (
+            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+          )}
+        </button>
+      </div>
+
+      {/* Secondary filters + live indicator */}
+      <div className="flex items-center px-4 pt-2 pb-1">
+        <div className="flex items-center gap-1.5 flex-1">
           <FilterChip
             label={`Active (${activeCount})`}
             active={filter === "all"}
@@ -120,22 +200,10 @@ export default function SupervisorPage() {
             active={filter === "delivered"}
             onClick={() => setFilter("delivered")}
           />
-          <FilterChip
-            label={`Missing (${missingCount})`}
-            active={filter === "missing"}
-            onClick={() => setFilter("missing")}
-            variant="missing"
-          />
-          <FilterChip
-            label={`Problem (${problemCount})`}
-            active={filter === "problem"}
-            onClick={() => setFilter("problem")}
-            variant="problem"
-          />
         </div>
-        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           <RefreshCw size={12} className="text-brand animate-spin" style={{ animationDuration: "3s" }} />
-          <span className="text-xs text-text-muted">4s</span>
+          <span className="text-sm text-text-muted">4s</span>
         </div>
       </div>
 
@@ -161,6 +229,7 @@ export default function SupervisorPage() {
               request={req}
               onUpdate={loadData}
               onNewRequest={(lotId, lotLabel) => setModalLot({ id: lotId, label: lotLabel })}
+              supervisorName={userName}
             />
           ))
         )}
@@ -201,7 +270,7 @@ function FilterChip({
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${
+      className={`shrink-0 px-3 py-2 rounded-full text-sm font-medium transition ${
         active
           ? activeClass
           : "bg-card text-text-secondary border border-border hover:bg-gray-50"

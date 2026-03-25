@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { FrmPhaseAssignment, PhaseAssignmentStatus } from '../types/carried-over'
+import type { FrmPhaseAssignment, PhaseAssignmentStatus } from '../types/assignment'
 import type { PhaseId } from '../types/phase'
 
 const TABLE = 'frm_phase_assignments'
@@ -50,7 +50,7 @@ export async function listAssignmentsByLot(supabase: SupabaseClient, lotId: stri
   }>
 }
 
-/** Assign a crew to a phase on a lot */
+/** Assign a crew to a phase on a lot. Auto-creates a payment entry if none exists. */
 export async function createAssignment(supabase: SupabaseClient, input: CreateAssignmentInput) {
   const { data, error } = await supabase
     .from(TABLE)
@@ -66,6 +66,38 @@ export async function createAssignment(supabase: SupabaseClient, input: CreateAs
     .single()
 
   if (error) throw error
+
+  // Auto-create payment if one doesn't already exist for this lot+phase+crew
+  const { count } = await supabase
+    .from('frm_phase_payments')
+    .select('id', { count: 'exact', head: true })
+    .eq('lot_id', input.lot_id)
+    .eq('phase_id', input.phase_id)
+    .eq('crew_id', input.crew_id)
+
+  if ((count ?? 0) === 0) {
+    // Get lot sqft (foreman can update rate later)
+    const { data: lot } = await supabase
+      .from('frm_lots')
+      .select('total_sqft')
+      .eq('id', input.lot_id)
+      .single()
+
+    await supabase
+      .from('frm_phase_payments')
+      .insert({
+        lot_id: input.lot_id,
+        phase_id: input.phase_id,
+        crew_id: input.crew_id,
+        sqft: lot?.total_sqft ?? 0,
+        rate_per_sqft: 0,
+        status: 'unpaid',
+        deductions: 0,
+        extras: 0,
+        organization_id: input.organization_id ?? null,
+      })
+  }
+
   return data as FrmPhaseAssignment
 }
 

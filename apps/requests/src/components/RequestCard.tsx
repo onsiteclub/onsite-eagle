@@ -139,7 +139,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
             className="w-2.5 h-2.5 rounded-full shrink-0"
             style={{ backgroundColor: urgencyColor }}
           />
-          <span className="font-bold text-text text-[17px] truncate flex-1">
+          <span className="font-bold text-text text-lg truncate flex-1">
             {lotNumber ? `Lot ${lotNumber}` : "—"}
           </span>
           <DeadlineBadge
@@ -156,7 +156,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
             <button
               type="button"
               onClick={() => setItemsOpen(!itemsOpen)}
-              className="flex items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text transition w-full text-left"
+              className="flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text transition w-full text-left"
             >
               <span className="truncate">{request.material_name}</span>
               {missingCount > 0 && (
@@ -170,7 +170,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
               />
             </button>
           ) : (
-            <span className="text-[13px] text-text-secondary">
+            <span className="text-sm text-text-secondary">
               {request.material_name}
               {request.requested_by_name ? ` · ${request.requested_by_name}` : ""}
             </span>
@@ -185,7 +185,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
               return (
                 <div
                   key={idx}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] ${
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm ${
                     isMissing
                       ? "bg-amber-50 border border-amber-200"
                       : "bg-gray-50 border border-transparent"
@@ -208,7 +208,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
 
         {/* Notes */}
         {(request.notes || request.urgency_reason) && (
-          <p className="text-[13px] text-text-secondary italic ml-[18px] mt-1.5 line-clamp-2">
+          <p className="text-sm text-text-secondary italic ml-[18px] mt-1.5 line-clamp-2">
             {request.notes || request.urgency_reason}
           </p>
         )}
@@ -233,11 +233,11 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
         {/* Delivery info (if delivered) */}
         {request.status === "delivered" && request.delivered_by_name && (
           <div className="ml-[18px] mt-2 bg-green-50 rounded-lg px-3 py-2">
-            <p className="text-[13px] text-green-700 font-medium">
+            <p className="text-sm text-green-700 font-medium">
               Delivered by {request.delivered_by_name}
             </p>
             {request.delivery_notes && (
-              <p className="text-[12px] text-green-600 mt-0.5">{request.delivery_notes}</p>
+              <p className="text-sm text-green-600 mt-0.5">{request.delivery_notes}</p>
             )}
           </div>
         )}
@@ -247,14 +247,14 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
           <div className="ml-[18px] mt-2 flex items-center gap-3">
             <button
               onClick={() => setContesting(true)}
-              className="text-xs text-text-muted hover:text-amber-600 transition"
+              className="text-sm text-text-muted hover:text-amber-600 transition"
             >
               Something wrong?
             </button>
             {hasSubItems && (
               <button
                 onClick={() => { setMissingMode(true); setItemsOpen(true); }}
-                className="text-xs text-text-muted hover:text-amber-600 transition"
+                className="text-sm text-text-muted hover:text-amber-600 transition"
               >
                 Items missing?
               </button>
@@ -274,7 +274,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
                     key={idx}
                     type="button"
                     onClick={() => toggleMissingItem(idx)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[13px] text-left transition active:scale-[0.98] ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left transition active:scale-[0.98] ${
                       isSelected
                         ? "bg-amber-200/60 border border-amber-300 text-amber-800 font-medium"
                         : "bg-white border border-border text-text-secondary hover:border-amber-300"
@@ -324,7 +324,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
                 <button
                   key={r.value}
                   onClick={() => setContestReason(r.value)}
-                  className={`px-2.5 py-2 rounded-lg border text-xs font-medium text-left transition active:scale-[0.97] ${
+                  className={`px-2.5 py-2.5 rounded-lg border text-sm font-medium text-left transition active:scale-[0.97] ${
                     contestReason === r.value
                       ? "border-amber-500 bg-amber-100 text-amber-800"
                       : "border-border bg-white text-text hover:border-amber-300"
@@ -371,11 +371,11 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
         {/* Problem info */}
         {request.status === "problem" && request.delivery_notes && (
           <div className="ml-[18px] mt-2 bg-red-50 rounded-lg px-3 py-2">
-            <p className="text-[13px] text-red-700 font-medium">
+            <p className="text-sm text-red-700 font-medium">
               {request.delivery_notes}
             </p>
             {request.delivered_by_name && (
-              <p className="text-[12px] text-red-600 mt-0.5">
+              <p className="text-sm text-red-600 mt-0.5">
                 Reported by {request.delivered_by_name}
               </p>
             )}

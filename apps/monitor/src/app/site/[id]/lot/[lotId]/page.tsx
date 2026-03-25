@@ -16,6 +16,7 @@ import MaterialRequestsView from '@/components/MaterialRequestsView'
 import HouseItemsList from '@/components/HouseItemsList'
 import GateCheckView from '@/components/GateCheckView'
 import SafetyPanel from '@/components/SafetyPanel'
+import SafetyTab from '@/components/SafetyTab'
 import LotStatusBar from '@/components/LotStatusBar'
 import type { PhaseId } from '@onsite/framing'
 import { useAICopilot } from '@/hooks/useAICopilot'
@@ -336,7 +337,7 @@ export default function LotDetail() {
             <GateCheckView lotId={lotId} />
           )}
           {activeSection === 'safety' && (
-            <SafetyPanel lotId={lotId} />
+            <SafetyTab lotId={lotId} jobsiteId={siteId} />
           )}
           {activeSection === 'documents' && (
             <DocumentsSection documents={documents} siteId={siteId} houseId={lotId} onRefresh={loadLotData} />

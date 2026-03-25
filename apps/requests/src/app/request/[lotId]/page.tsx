@@ -13,7 +13,7 @@ interface LotInfo {
   block: string | null;
   jobsite_id: string;
   status: string;
-  jobsite: { name: string } | null;
+  jobsite: { name: string; machine_down?: boolean; machine_down_reason?: string | null } | null;
 }
 
 interface MyLot {
@@ -58,6 +58,7 @@ export default function LotRequestPage() {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showMachineDownAlert, setShowMachineDownAlert] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [myLots, setMyLots] = useState<MyLot[]>([]);
 
@@ -124,12 +125,15 @@ export default function LotRequestPage() {
     init();
   }, [loadLot, loadRequests, registerWorker]);
 
-  // Polling
+  // Polling (requests + lot info for machine_down)
   useEffect(() => {
     if (!userName) return;
-    const interval = setInterval(loadRequests, POLL_INTERVAL);
+    const interval = setInterval(() => {
+      loadRequests();
+      loadLot();
+    }, POLL_INTERVAL);
     return () => clearInterval(interval);
-  }, [loadRequests, userName]);
+  }, [loadRequests, loadLot, userName]);
 
   // Set page title
   useEffect(() => {
@@ -238,27 +242,40 @@ export default function LotRequestPage() {
     { key: "problem", label: "Problem", count: problemCount },
   ];
 
+  const isMachineDown = lotInfo.jobsite?.machine_down === true;
+
   // Logged in — show requests for this lot
   return (
     <main className="pb-24">
+      {/* Machine Down banner */}
+      {isMachineDown && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span className="text-sm font-semibold">Machine Down</span>
+          {lotInfo.jobsite?.machine_down_reason && (
+            <span className="text-sm text-white/80 truncate">— {lotInfo.jobsite.machine_down_reason}</span>
+          )}
+        </div>
+      )}
+
       {/* Lot info bar */}
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
-          <span className="bg-brand/10 text-brand text-xs font-medium px-2 py-1 rounded-full">
+          <span className="bg-brand/10 text-brand text-sm font-medium px-2.5 py-1 rounded-full">
             Lot {lotInfo.lot_number}
           </span>
-          {siteName && <span className="text-xs text-text-muted">{siteName}</span>}
+          {siteName && <span className="text-sm text-text-muted">{siteName}</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <RefreshCw size={12} className="text-brand animate-spin" style={{ animationDuration: "3s" }} />
-          <span className="text-xs text-text-muted">5s</span>
+          <span className="text-sm text-text-muted">5s</span>
         </div>
       </div>
 
       {/* My Lots — other lots this worker is registered on */}
       {myLots.length > 0 && (
         <div className="px-4 pt-3">
-          <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-1.5">My Lots</p>
+          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1.5">My Lots</p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {myLots.map((ml) => (
               <a
@@ -270,9 +287,9 @@ export default function LotRequestPage() {
                   <Home size={14} className="text-brand" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-semibold text-[13px] text-text">Lot {ml.lot_number}</span>
+                  <span className="font-semibold text-sm text-text">Lot {ml.lot_number}</span>
                   {ml.jobsite?.name && (
-                    <span className="text-[11px] text-text-muted leading-tight">{ml.jobsite.name}</span>
+                    <span className="text-xs text-text-muted leading-tight">{ml.jobsite.name}</span>
                   )}
                 </div>
                 <ChevronRight size={14} className="text-text-muted ml-1" />
@@ -288,7 +305,7 @@ export default function LotRequestPage() {
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+            className={`px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
               filter === tab.key
                 ? tab.key === "problem"
                   ? "bg-red-100 text-red-700"
@@ -326,6 +343,32 @@ export default function LotRequestPage() {
         <Plus size={28} />
       </button>
 
+      {/* Machine Down alert modal */}
+      {showMachineDownAlert && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center space-y-4">
+            <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
+              <AlertTriangle size={28} className="text-amber-500" />
+            </div>
+            <h2 className="text-lg font-bold text-text">Machine Down</h2>
+            <p className="text-sm text-text-secondary">
+              Your request was submitted, but the machine is currently down. Delivery will start once the operator resumes operations.
+            </p>
+            {lotInfo.jobsite?.machine_down_reason && (
+              <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                {lotInfo.jobsite.machine_down_reason}
+              </p>
+            )}
+            <button
+              onClick={() => setShowMachineDownAlert(false)}
+              className="w-full bg-brand text-white font-medium py-3 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal — lot is fixed, siblings from same block offered */}
       {showModal && (
         <NewRequestModal
@@ -333,7 +376,7 @@ export default function LotRequestPage() {
           lotLabel={`Lot ${lotInfo.lot_number}${siteName ? ` — ${siteName}` : ""}`}
           userName={userName}
           onClose={() => setShowModal(false)}
-          onCreated={loadRequests}
+          onCreated={() => { loadRequests(); if (isMachineDown) setShowMachineDownAlert(true); }}
           siblingLots={
             lotInfo.block
               ? myLots.filter(

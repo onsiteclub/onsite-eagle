@@ -2,20 +2,10 @@
 export interface Database {
   public: {
     Tables: {
-      egl_app_registry: {
+      core_app_registry: {
         Row: AppRegistryRow;
         Insert: Partial<AppRegistryRow>;
         Update: Partial<AppRegistryRow>;
-      };
-      egl_data_metrics: {
-        Row: DataMetricRow;
-        Insert: Partial<DataMetricRow>;
-        Update: Partial<DataMetricRow>;
-      };
-      egl_business_metrics: {
-        Row: BusinessMetricRow;
-        Insert: Partial<BusinessMetricRow>;
-        Update: Partial<BusinessMetricRow>;
       };
     };
   };

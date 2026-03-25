@@ -19,7 +19,7 @@ const URGENCY_CONFIG: Record<string, { label: string; color: string }> = {
 export function StatusBadge({ status }: { status: string }) {
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.requested;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
       {config.label}
     </span>
   );
@@ -29,7 +29,7 @@ export function UrgencyBadge({ urgency }: { urgency: string }) {
   if (urgency === "medium" || urgency === "low") return null;
   const config = URGENCY_CONFIG[urgency] ?? URGENCY_CONFIG.medium;
   return (
-    <span className={`text-xs font-semibold ${config.color}`}>
+    <span className={`text-sm font-semibold ${config.color}`}>
       {urgency === "critical" ? "!!! " : "! "}
       {config.label}
     </span>

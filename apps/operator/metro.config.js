@@ -11,6 +11,7 @@ const config = getDefaultConfig(projectRoot);
 config.watchFolders = [
   path.resolve(monorepoRoot, 'packages', 'auth'),
   path.resolve(monorepoRoot, 'packages', 'auth-ui'),
+  path.resolve(monorepoRoot, 'packages', 'framing'),
   path.resolve(monorepoRoot, 'packages', 'tokens'),
   path.resolve(monorepoRoot, 'packages', 'shared'),
   path.resolve(monorepoRoot, 'packages', 'timeline'),

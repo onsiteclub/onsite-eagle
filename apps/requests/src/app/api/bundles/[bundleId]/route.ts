@@ -23,7 +23,7 @@ export async function GET(
     // Fetch site info
     const { data: site } = await supabase
       .from("frm_jobsites")
-      .select("id, name, address, city")
+      .select("id, name, address, city, machine_down, machine_down_reason")
       .eq("id", bundle.jobsite_id)
       .single();
 

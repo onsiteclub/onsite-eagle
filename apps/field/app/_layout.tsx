@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider, useAuth } from '@onsite/auth';
+import { useActiveWarnings } from '@onsite/framing';
 import { initQueue, useOfflineSync } from '@onsite/offline';
 import { logger } from '@onsite/logger';
 import { supabase } from '../src/lib/supabase';
@@ -21,6 +22,64 @@ export default function RootLayout() {
         <AppContent />
       </AuthProvider>
     </SafeAreaProvider>
+  );
+}
+
+function WarningBanners() {
+  const { user } = useAuth();
+  const [userId, setUserId] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (user) {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user) setUserId(data.user.id);
+      });
+    } else {
+      setUserId(undefined);
+    }
+  }, [user]);
+
+  const {
+    safetyWarnings,
+    complianceWarnings,
+    operationalWarnings,
+    dismissWarning,
+  } = useActiveWarnings({
+    supabase: supabase as never,
+    workerId: userId,
+  });
+
+  const hasWarnings =
+    safetyWarnings.length > 0 ||
+    complianceWarnings.length > 0 ||
+    operationalWarnings.length > 0;
+
+  if (!hasWarnings) return null;
+
+  return (
+    <View>
+      {safetyWarnings.map((w) => (
+        <View key={w.id} style={bannerStyles.safety}>
+          <Text style={bannerStyles.safetyIcon}>{'\u{1F6E1}'}</Text>
+          <Text style={bannerStyles.safetyText}>{w.title}</Text>
+        </View>
+      ))}
+      {complianceWarnings.map((w) => (
+        <View key={w.id} style={bannerStyles.compliance}>
+          <Text style={bannerStyles.complianceIcon}>{'\u26A0'}</Text>
+          <Text style={bannerStyles.complianceText}>{w.title}</Text>
+        </View>
+      ))}
+      {operationalWarnings.map((w) => (
+        <View key={w.id} style={bannerStyles.operational}>
+          <Text style={bannerStyles.operationalIcon}>{'\u2139'}</Text>
+          <Text style={bannerStyles.operationalText}>{w.title}</Text>
+          <TouchableOpacity onPress={() => dismissWarning(w.id)}>
+            <Text style={bannerStyles.dismissBtn}>{'\u2715'}</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -70,34 +129,37 @@ function AppContent() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen
-        name="lot/[id]"
-        options={{
+    <View style={{ flex: 1 }}>
+      <WarningBanners />
+      <Stack
+        screenOptions={{
           headerShown: false,
         }}
-      />
-      <Stack.Screen
-        name="camera"
-        options={{
-          headerShown: false,
-          presentation: 'fullScreenModal',
-        }}
-      />
-      <Stack.Screen
-        name="scanner"
-        options={{
-          headerShown: false,
-          presentation: 'fullScreenModal',
-        }}
-      />
-    </Stack>
+      >
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="lot/[id]"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="camera"
+          options={{
+            headerShown: false,
+            presentation: 'fullScreenModal',
+          }}
+        />
+        <Stack.Screen
+          name="scanner"
+          options={{
+            headerShown: false,
+            presentation: 'fullScreenModal',
+          }}
+        />
+      </Stack>
+    </View>
   );
 }
 
@@ -107,5 +169,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F6F7F9',
+  },
+});
+
+const bannerStyles = StyleSheet.create({
+  safety: {
+    backgroundColor: '#DC2626',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  safetyIcon: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  safetyText: {
+    color: '#FFFFFF',
+    flex: 1,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  compliance: {
+    backgroundColor: '#F59E0B',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  complianceIcon: {
+    color: '#1F2937',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  complianceText: {
+    color: '#1F2937',
+    flex: 1,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  operational: {
+    backgroundColor: '#3B82F6',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  operationalIcon: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  operationalText: {
+    color: '#FFFFFF',
+    flex: 1,
+    fontSize: 14,
+  },
+  dismissBtn: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    paddingLeft: 12,
+    fontSize: 16,
   },
 });

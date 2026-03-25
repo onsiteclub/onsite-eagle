@@ -40,7 +40,9 @@ export async function middleware(request: NextRequest) {
   const isProtected = protectedPaths.some(p => pathname.startsWith(p))
 
   if (isProtected && !user) {
-    return NextResponse.redirect(new URL('/', request.url))
+    const loginUrl = new URL('/', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
   // Admin - requires admin role

@@ -4,8 +4,8 @@ import path from 'path';
 import type { HealthFinding } from '../../../lib/types';
 
 const VALID_PREFIXES = [
-  'core_', 'egl_', 'tmk_', 'ccl_', 'bil_', 'shp_', 'club_',
-  'crd_', 'sht_', 'ref_', 'log_', 'agg_', 'int_', 'v_',
+  'core_', 'frm_', 'tmk_', 'ccl_', 'bil_', 'shp_',
+  'sht_', 'ref_', 'log_', 'agg_', 'int_', 'v_',
 ];
 
 function readJson(filename: string): unknown {

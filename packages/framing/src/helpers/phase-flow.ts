@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PhaseId } from '../types/phase'
 import type { GateCheckTransition } from '../types/gate-check'
 import { countBlockingItems } from '../queries/house-items'
+import { countOpenSafetyChecks } from '../queries/safety'
 
 /**
  * Map a phase progression to the gate check transition that must pass
@@ -46,7 +47,13 @@ export async function canAdvancePhase(
     blockers.push(`${blockingCount} blocking item(s) unresolved on phase ${currentPhaseId}`)
   }
 
-  // 2. Check if a gate check is required and passed
+  // 2. Check for open safety checks (always blocking)
+  const openSafety = await countOpenSafetyChecks(supabase, lotId)
+  if (openSafety > 0) {
+    blockers.push(`${openSafety} open safety check(s) must be resolved before advancing`)
+  }
+
+  // 3. Check if a gate check is required and passed
   const requiredTransition = getRequiredTransition(currentPhaseId)
   if (requiredTransition) {
     const { data: latestGc, error } = await supabase

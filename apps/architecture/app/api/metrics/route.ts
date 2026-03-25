@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (last_deploy) updates.last_deploy = last_deploy;
 
     const { error } = await supabase
-      .from('egl_app_registry')
+      .from('core_app_registry')
       .update(updates)
       .eq('app_slug', app_slug);
 

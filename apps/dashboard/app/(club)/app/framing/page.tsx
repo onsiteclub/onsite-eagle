@@ -1,7 +1,7 @@
 import { createClient } from '@onsite/supabase/server'
 import { redirect } from 'next/navigation'
-import { MapPin, Home, Users, ClipboardList, ArrowRight, Building2 } from 'lucide-react'
-import { listJobsites, listCrews } from '@onsite/framing'
+import { MapPin, Home, Users, ClipboardList, DollarSign, ArrowRight, Building2 } from 'lucide-react'
+import { listJobsites, listCrews, getPaymentSummary } from '@onsite/framing'
 import { StatBox } from '@/components/ui/StatBox'
 import Link from 'next/link'
 
@@ -25,12 +25,37 @@ export default async function FramingHubPage() {
     .from('frm_phase_assignments')
     .select('*', { count: 'exact', head: true })
 
+  // Get payment summaries for all jobsites
+  const paymentSummaries = await Promise.all(
+    jobsites.map(j =>
+      getPaymentSummary(supabase, j.id).catch(() => ({
+        total_count: 0,
+        unpaid: { count: 0, amount: 0 },
+        pending: { count: 0, amount: 0 },
+        approved: { count: 0, amount: 0 },
+        paid: { count: 0, amount: 0 },
+        total_amount: 0,
+      })),
+    ),
+  )
+  const totalPendingPayments = paymentSummaries.reduce(
+    (sum, s) => sum + s.unpaid.count + s.pending.count,
+    0,
+  )
+  const totalPendingAmount = paymentSummaries.reduce(
+    (sum, s) => sum + s.unpaid.amount + s.pending.amount,
+    0,
+  )
+  const formatCAD = (n: number) =>
+    new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(n)
+
   const recentJobsites = jobsites.slice(0, 5)
 
   const quickLinks = [
     { href: '/app/framing/jobsites', label: 'Jobsites', description: 'Manage construction sites', icon: MapPin },
     { href: '/app/framing/crews', label: 'Crews', description: 'Manage framing crews', icon: Users },
     { href: '/app/framing/assignments', label: 'Assignments', description: 'Phase assignments', icon: ClipboardList },
+    { href: '/app/framing/payments', label: 'Payments', description: 'Track crew payments', icon: DollarSign },
   ]
 
   return (
@@ -41,7 +66,7 @@ export default async function FramingHubPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatBox
           variant="card"
           icon={<MapPin className="w-5 h-5 text-teal-500" />}
@@ -66,10 +91,16 @@ export default async function FramingHubPage() {
           value={(totalAssignments ?? 0).toString()}
           label="Assignments"
         />
+        <StatBox
+          variant="card"
+          icon={<DollarSign className="w-5 h-5 text-green-500" />}
+          value={totalPendingPayments > 0 ? formatCAD(totalPendingAmount) : '$0'}
+          label={`Pending (${totalPendingPayments})`}
+        />
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {quickLinks.map(link => (
           <Link
             key={link.href}

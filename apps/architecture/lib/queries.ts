@@ -26,7 +26,7 @@ export async function getApps(): Promise<AppRegistryRow[]> {
   if (isStaticMode) return STATIC_APPS;
 
   const { data, error } = await supabase
-    .from('egl_app_registry')
+    .from('core_app_registry')
     .select('*')
     .order('sort_order', { ascending: true });
 
@@ -37,35 +37,14 @@ export async function getApps(): Promise<AppRegistryRow[]> {
   return data;
 }
 
+// Tables egl_data_metrics and egl_business_metrics were dropped (cleanup_phantom_tables)
+// These functions return empty arrays as the feature was never implemented
 export async function getMetrics(): Promise<DataMetricRow[]> {
-  if (isStaticMode) return [];
-
-  const { data, error } = await supabase
-    .from('egl_data_metrics')
-    .select('*')
-    .order('app_slug');
-
-  if (error) {
-    console.error('Failed to fetch metrics:', error);
-    return [];
-  }
-  return data;
+  return [];
 }
 
-export async function getBusinessMetrics(limit = 30): Promise<BusinessMetricRow[]> {
-  if (isStaticMode) return [];
-
-  const { data, error } = await supabase
-    .from('egl_business_metrics')
-    .select('*')
-    .order('metric_date', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error('Failed to fetch business metrics:', error);
-    return [];
-  }
-  return data;
+export async function getBusinessMetrics(_limit = 30): Promise<BusinessMetricRow[]> {
+  return [];
 }
 
 export async function updateAppStatus(
@@ -78,7 +57,7 @@ export async function updateAppStatus(
   if (updates.last_deploy) payload.last_deploy = updates.last_deploy;
 
   const { error } = await supabase
-    .from('egl_app_registry')
+    .from('core_app_registry')
     .update(payload as any)
     .eq('app_slug', appSlug);
 

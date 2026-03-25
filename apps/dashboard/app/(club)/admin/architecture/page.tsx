@@ -35,7 +35,7 @@ export default async function ArchitecturePage() {
 
   // Fetch app registry from Supabase
   const { data: appRegistry } = await supabase
-    .from('egl_app_registry')
+    .from('core_app_registry')
     .select('*')
     .order('sort_order')
 

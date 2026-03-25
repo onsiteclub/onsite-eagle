@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, Share2 } from 'lucide-react'
 import type { FrmJobsite } from '@onsite/framing'
 import { JobsiteForm } from './JobsiteForm'
 import { DeleteButton } from './DeleteButton'
+import { ShareBuilder } from './ShareBuilder'
 import { createClient } from '@onsite/supabase/client'
 import { deleteJobsite } from '@onsite/framing'
 
@@ -15,6 +16,7 @@ interface JobsiteActionsProps {
 
 export function JobsiteActions({ jobsite }: JobsiteActionsProps) {
   const [showEdit, setShowEdit] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const router = useRouter()
 
   async function handleDelete() {
@@ -27,6 +29,13 @@ export function JobsiteActions({ jobsite }: JobsiteActionsProps) {
   return (
     <>
       <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => setShowShare(true)}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Share with builder"
+        >
+          <Share2 className="w-4 h-4 text-[#667085]" />
+        </button>
         <button
           onClick={() => setShowEdit(true)}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -48,6 +57,13 @@ export function JobsiteActions({ jobsite }: JobsiteActionsProps) {
             setShowEdit(false)
             router.refresh()
           }}
+        />
+      )}
+
+      {showShare && (
+        <ShareBuilder
+          jobsite={jobsite}
+          onClose={() => setShowShare(false)}
         />
       )}
     </>

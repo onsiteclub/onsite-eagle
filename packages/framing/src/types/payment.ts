@@ -1,6 +1,7 @@
 import type { PhaseId } from './phase'
 
 export type PaymentStatus = 'unpaid' | 'pending' | 'approved' | 'paid'
+export type HoldbackStatus = 'none' | 'held' | 'released' | 'reassigned'
 
 export interface FrmPhasePayment {
   id: string
@@ -19,4 +20,13 @@ export interface FrmPhasePayment {
   extras: number
   final_amount: number // GENERATED ALWAYS
   notes: string | null
+  // Holdback / Retention (10% default)
+  holdback_pct: number
+  holdback_amount: number // GENERATED ALWAYS
+  payable_now: number // GENERATED ALWAYS
+  holdback_status: HoldbackStatus
+  holdback_released_at: string | null
+  holdback_released_by: string | null
+  holdback_reassigned_to: string | null
+  holdback_notes: string | null
 }

@@ -153,17 +153,50 @@ export async function updateLot(supabase: SupabaseClient, id: string, input: Upd
   return data as FrmLot
 }
 
-/** Update lot status with timestamp tracking */
-export async function updateLotStatus(supabase: SupabaseClient, id: string, status: LotStatus) {
-  const timestamps: Record<string, string | null> = {}
+/**
+ * Valid lot status transitions.
+ * Exported so UI can show only valid next states.
+ */
+export const VALID_LOT_TRANSITIONS: Record<LotStatus, LotStatus[]> = {
+  pending: ['released'],
+  released: ['in_progress'],
+  in_progress: ['paused_for_trades', 'backframe'],
+  paused_for_trades: ['backframe'],
+  backframe: ['inspection'],
+  inspection: ['completed', 'backframe'],
+  completed: [],
+}
 
-  if (status === 'released') timestamps.released_at = new Date().toISOString()
-  if (status === 'in_progress') timestamps.started_at = new Date().toISOString()
-  if (status === 'completed') timestamps.completed_at = new Date().toISOString()
+/** Update lot status with state machine validation + timestamp tracking */
+export async function updateLotStatus(supabase: SupabaseClient, id: string, newStatus: LotStatus) {
+  // 1. Fetch current status
+  const { data: current, error: fetchError } = await supabase
+    .from(TABLE)
+    .select('status')
+    .eq('id', id)
+    .single()
+
+  if (fetchError) throw fetchError
+
+  const currentStatus = current.status as LotStatus
+
+  // 2. Validate transition
+  const validNext = VALID_LOT_TRANSITIONS[currentStatus]
+  if (!validNext.includes(newStatus)) {
+    throw new Error(
+      `Invalid lot status transition: ${currentStatus} → ${newStatus}. Valid transitions: ${validNext.length > 0 ? validNext.join(', ') : 'none (terminal state)'}`,
+    )
+  }
+
+  // 3. Apply timestamps
+  const timestamps: Record<string, string | null> = {}
+  if (newStatus === 'released') timestamps.released_at = new Date().toISOString()
+  if (newStatus === 'in_progress') timestamps.started_at = new Date().toISOString()
+  if (newStatus === 'completed') timestamps.completed_at = new Date().toISOString()
 
   const { data, error } = await supabase
     .from(TABLE)
-    .update({ status, ...timestamps })
+    .update({ status: newStatus, ...timestamps })
     .eq('id', id)
     .select()
     .single()

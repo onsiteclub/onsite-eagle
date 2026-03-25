@@ -13,7 +13,7 @@ interface BundleLot {
 interface BundleData {
   id: string;
   label: string | null;
-  site: { id: string; name: string };
+  site: { id: string; name: string; machine_down?: boolean; machine_down_reason?: string | null };
   lots: BundleLot[];
 }
 
@@ -46,6 +46,13 @@ export default function BundlePage() {
     }
     init();
   }, [loadBundle]);
+
+  // Poll for machine_down changes
+  useEffect(() => {
+    if (!userName) return;
+    const interval = setInterval(loadBundle, 5000);
+    return () => clearInterval(interval);
+  }, [loadBundle, userName]);
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -130,9 +137,77 @@ export default function BundlePage() {
     );
   }
 
+  // Group lots from the same block into a single entry
+  function groupLots(lots: BundleLot[]) {
+    // Check if all lots share a common block prefix (e.g. "70-1", "70-2" → block "70")
+    const parsed = lots.map((lot) => {
+      const dashIdx = lot.lot_number.lastIndexOf("-");
+      if (dashIdx > 0) {
+        return { ...lot, block: lot.lot_number.slice(0, dashIdx), unit: lot.lot_number.slice(dashIdx + 1) };
+      }
+      return { ...lot, block: null, unit: lot.lot_number };
+    });
+
+    const blocks = new Map<string, typeof parsed>();
+    const singles: typeof parsed = [];
+
+    for (const p of parsed) {
+      if (p.block) {
+        if (!blocks.has(p.block)) blocks.set(p.block, []);
+        blocks.get(p.block)!.push(p);
+      } else {
+        singles.push(p);
+      }
+    }
+
+    const groups: { label: string; lotIds: string[]; primaryLotId: string }[] = [];
+
+    for (const [block, items] of blocks) {
+      if (items.length > 1) {
+        const units = items.map((i) => i.unit).join("/");
+        groups.push({
+          label: `Lot ${block}-${units}`,
+          lotIds: items.map((i) => i.id),
+          primaryLotId: items[0].id,
+        });
+      } else {
+        groups.push({
+          label: `Lot ${items[0].lot_number}`,
+          lotIds: [items[0].id],
+          primaryLotId: items[0].id,
+        });
+      }
+    }
+
+    for (const s of singles) {
+      groups.push({
+        label: `Lot ${s.lot_number}`,
+        lotIds: [s.id],
+        primaryLotId: s.id,
+      });
+    }
+
+    return groups;
+  }
+
+  const lotGroups = groupLots(bundle.lots);
+
+  const isMachineDown = bundle.site.machine_down === true;
+
   // Lot cards
   return (
     <main className="pb-8">
+      {/* Machine Down banner */}
+      {isMachineDown && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span className="text-sm font-semibold">Machine Down</span>
+          {bundle.site.machine_down_reason && (
+            <span className="text-sm text-white/80 truncate">— {bundle.site.machine_down_reason}</span>
+          )}
+        </div>
+      )}
+
       <div className="bg-brand text-white px-4 py-4">
         <h1 className="text-lg font-bold">{bundle.site.name}</h1>
         <p className="text-sm text-white/80">
@@ -143,14 +218,14 @@ export default function BundlePage() {
 
       <div className="px-4 py-4 space-y-3">
         <p className="text-sm text-text-secondary">
-          Tap a lot to view or create material requests.
+          Tap to view or create material requests.
         </p>
 
         <div className="grid gap-3">
-          {bundle.lots.map((lot) => (
+          {lotGroups.map((group) => (
             <button
-              key={lot.id}
-              onClick={() => router.push(`/request/${lot.id}`)}
+              key={group.primaryLotId}
+              onClick={() => router.push(`/request/${group.primaryLotId}`)}
               className="flex items-center justify-between p-4 bg-card rounded-xl border border-border hover:border-brand hover:bg-brand/5 active:scale-[0.98] transition text-left"
             >
               <div className="flex items-center gap-3">
@@ -159,10 +234,10 @@ export default function BundlePage() {
                 </div>
                 <div>
                   <div className="text-base font-semibold text-text">
-                    Lot {lot.lot_number}
+                    {group.label}
                   </div>
                   <div className="text-xs text-text-muted">
-                    Material requests
+                    Material requests{group.lotIds.length > 1 ? ` · ${group.lotIds.length} units` : ""}
                   </div>
                 </div>
               </div>

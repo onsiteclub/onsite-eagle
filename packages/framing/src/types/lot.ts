@@ -30,7 +30,13 @@ export interface FrmLot {
   closing_date: string | null
   buyer_name: string | null
   buyer_contact: string | null
+  is_issued: boolean
+  issued_at: string | null
+  issued_to_worker_id: string | null
+  issued_to_worker_name: string | null
   is_sold: boolean
+  progress_percentage: number
+  schedule_notes: string | null
   released_at: string | null
   started_at: string | null
   completed_at: string | null

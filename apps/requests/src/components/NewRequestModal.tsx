@@ -203,6 +203,8 @@ function SubItemsModal({
   initialOther,
   onConfirm,
   onClose,
+  submitting,
+  submitLabel,
 }: {
   phase: string;
   subItems: string[];
@@ -210,6 +212,8 @@ function SubItemsModal({
   initialOther: string;
   onConfirm: (checked: Set<string>, other: string) => void;
   onClose: () => void;
+  submitting?: boolean;
+  submitLabel?: string;
 }) {
   const [checked, setChecked] = useState<Set<string>>(new Set(initialChecked));
   const [other, setOther] = useState(initialOther);
@@ -246,11 +250,11 @@ function SubItemsModal({
 
         <div className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-text">Select items</span>
+            <span className="text-base font-medium text-text">Select items</span>
             <button
               type="button"
               onClick={toggleAll}
-              className="text-xs text-brand font-medium hover:underline"
+              className="text-sm text-brand font-medium hover:underline"
             >
               {checked.size === subItems.length ? "Unselect all" : "Select all"}
             </button>
@@ -281,7 +285,7 @@ function SubItemsModal({
                     strokeWidth={1.5}
                     className={active ? "text-brand" : "text-brand/70"}
                   />
-                  <span className={`text-xs font-medium leading-tight text-center transition-colors ${
+                  <span className={`text-sm font-medium leading-tight text-center transition-colors ${
                     active ? "text-brand" : "text-text"
                   }`}>
                     {item}
@@ -316,7 +320,7 @@ function SubItemsModal({
                 strokeWidth={1.5}
                 className={otherActive ? "text-brand" : "text-brand/70"}
               />
-              <span className={`text-xs font-medium text-center transition-colors ${
+              <span className={`text-sm font-medium text-center transition-colors ${
                 otherActive ? "text-brand" : "text-text"
               }`}>
                 Other
@@ -332,18 +336,22 @@ function SubItemsModal({
               value={other}
               onChange={(e) => setOther(e.target.value)}
               placeholder="Describe what you need..."
-              className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              className="w-full px-3 py-3 rounded-xl border border-border bg-bg text-text text-base outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
             />
           )}
 
-          {/* Confirm button */}
+          {/* Submit button */}
           <button
             type="button"
             onClick={() => onConfirm(checked, other)}
-            disabled={checked.size === 0 && !other.trim()}
-            className="w-full bg-brand text-white font-medium py-3 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+            disabled={(checked.size === 0 && !other.trim()) || submitting}
+            className="w-full bg-brand text-white text-base font-semibold py-3.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
           >
-            Confirm ({checked.size + (other.trim() ? 1 : 0)} items)
+            {submitting ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+            ) : (
+              `${submitLabel ?? "Confirm"} (${checked.size + (other.trim() ? 1 : 0)} items)`
+            )}
           </button>
         </div>
       </div>
@@ -367,7 +375,9 @@ export function NewRequestModal(props: Props) {
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [otherItem, setOtherItem] = useState("");
   const [subItemsModalPhase, setSubItemsModalPhase] = useState<string | null>(null);
-  const [extraLotIds, setExtraLotIds] = useState<Set<string>>(new Set());
+  const [extraLotIds, setExtraLotIds] = useState<Set<string>>(
+    new Set(siblingLots?.map((sl) => sl.id) ?? [])
+  );
 
   const hasSiblings = !!siblingLots?.length;
 
@@ -408,28 +418,23 @@ export function NewRequestModal(props: Props) {
     setOtherItem("");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
-
+  // Direct submit for bundles — called from SubItemsModal confirm
+  async function submitBundle(phase: string, items: Set<string>, otherText: string) {
+    if (!effectiveLotId) return;
     setLoading(true);
     setError("");
 
-    // Build sub_items array for bundles
-    let subItemsPayload: { name: string; status: string }[] | null = null;
-    if (isBundle && hasSubItems) {
-      subItemsPayload = [];
-      for (const item of subItems) {
-        if (checkedItems.has(item)) {
-          subItemsPayload.push({ name: item, status: "pending" });
-        }
-      }
-      if (otherItem.trim()) {
-        subItemsPayload.push({ name: otherItem.trim(), status: "pending" });
+    const subs = BUNDLE_SUB_ITEMS[phase] ?? [];
+    const subItemsPayload: { name: string; status: string }[] = [];
+    for (const item of subs) {
+      if (items.has(item)) {
+        subItemsPayload.push({ name: item, status: "pending" });
       }
     }
+    if (otherText.trim()) {
+      subItemsPayload.push({ name: otherText.trim(), status: "pending" });
+    }
 
-    // Submit for main lot + any checked sibling lots
     const allLotIds = [effectiveLotId, ...Array.from(extraLotIds)];
 
     const results = await Promise.all(
@@ -438,14 +443,60 @@ export function NewRequestModal(props: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            material_name: materialName,
+            material_name: phase,
             quantity: 1,
-            unit: isBundle ? "bundle" : "pcs",
+            unit: "bundle",
             lot_id: lotId,
             urgency_level: "medium",
             notes: null,
             requested_by_name: userName,
-            sub_items: subItemsPayload,
+            sub_items: subItemsPayload.length > 0 ? subItemsPayload : null,
+          }),
+        })
+      )
+    );
+
+    const failed = results.filter((r) => !r.ok).length;
+    if (failed === results.length) {
+      setError("Failed to submit request. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    onCreated();
+    onClose();
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+
+    if (isBundle && selected) {
+      await submitBundle(selected, checkedItems, otherItem);
+      return;
+    }
+
+    // Loose items
+    if (!isLoose || !effectiveLotId) return;
+    setLoading(true);
+    setError("");
+
+    const allLotIds = [effectiveLotId, ...Array.from(extraLotIds)];
+
+    const results = await Promise.all(
+      allLotIds.map((lotId) =>
+        fetch("/api/requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            material_name: looseText.trim(),
+            quantity: 1,
+            unit: "pcs",
+            lot_id: lotId,
+            urgency_level: "medium",
+            notes: null,
+            requested_by_name: userName,
+            sub_items: null,
           }),
         })
       )
@@ -476,7 +527,7 @@ export function NewRequestModal(props: Props) {
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Fixed lot badge */}
           {fixedLotLabel && (
-            <div className="bg-brand/5 border border-brand/20 rounded-xl px-3 py-2 text-sm text-brand font-medium">
+            <div className="bg-brand/5 border border-brand/20 rounded-xl px-3 py-2.5 text-base text-brand font-medium">
               {fixedLotLabel}
             </div>
           )}
@@ -484,7 +535,7 @@ export function NewRequestModal(props: Props) {
           {/* Sibling lots in same block */}
           {hasSiblings && (
             <div className="bg-gray-50 border border-border rounded-xl p-3 space-y-2">
-              <p className="text-xs font-medium text-text-secondary">Also request for these lots?</p>
+              <p className="text-sm font-medium text-text-secondary">Also request for these lots?</p>
               {siblingLots!.map((sl) => (
                 <label key={sl.id} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -500,7 +551,7 @@ export function NewRequestModal(props: Props) {
                     }
                     className="w-4 h-4 rounded border-border text-brand focus:ring-brand/30 accent-[var(--color-brand)]"
                   />
-                  <span className="text-sm text-text">Lot {sl.lot_number}</span>
+                  <span className="text-base text-text">Lot {sl.lot_number}</span>
                 </label>
               ))}
             </div>
@@ -508,8 +559,8 @@ export function NewRequestModal(props: Props) {
 
           {/* ─── 6 phases + Loose Items ─── */}
           <div>
-            <label className="flex items-center gap-1.5 text-sm font-medium text-text mb-2">
-              <Package size={14} />
+            <label className="flex items-center gap-1.5 text-base font-medium text-text mb-2">
+              <Package size={16} />
               What do you need?
             </label>
             <div className="flex flex-col gap-2">
@@ -528,7 +579,7 @@ export function NewRequestModal(props: Props) {
                         selectBundle(b.value);
                       }
                     }}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-sm font-medium transition active:scale-[0.97] ${
+                    className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl border text-left text-base font-medium transition active:scale-[0.97] ${
                       isSelected
                         ? "border-brand bg-brand/5 text-brand"
                         : "border-border bg-bg text-text hover:border-brand/40"
@@ -555,7 +606,7 @@ export function NewRequestModal(props: Props) {
               <button
                 type="button"
                 onClick={selectLoose}
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-sm font-medium transition active:scale-[0.97] ${
+                className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl border text-left text-base font-medium transition active:scale-[0.97] ${
                   isLoose
                     ? "border-brand bg-brand/5 text-brand"
                     : "border-border bg-bg text-text hover:border-brand/40"
@@ -570,8 +621,8 @@ export function NewRequestModal(props: Props) {
           {/* ─── LOOSE ITEM TEXT INPUT ─── */}
           {isLoose && (
             <div>
-              <label className="flex items-center gap-1.5 text-sm font-medium text-text mb-2">
-                <Pencil size={14} />
+              <label className="flex items-center gap-1.5 text-base font-medium text-text mb-2">
+                <Pencil size={16} />
                 What do you need?
               </label>
               <input
@@ -613,7 +664,7 @@ export function NewRequestModal(props: Props) {
           <button
             type="submit"
             disabled={loading || !canSubmit}
-            className="w-full bg-brand text-white font-medium py-3 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
+            className="w-full bg-brand text-white text-base font-semibold py-3.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
@@ -631,10 +682,12 @@ export function NewRequestModal(props: Props) {
           subItems={BUNDLE_SUB_ITEMS[subItemsModalPhase]}
           initialChecked={checkedItems}
           initialOther={otherItem}
+          submitting={loading}
+          submitLabel="Request"
           onConfirm={(checked, other) => {
             setCheckedItems(checked);
             setOtherItem(other);
-            setSubItemsModalPhase(null);
+            submitBundle(subItemsModalPhase!, checked, other);
           }}
           onClose={() => setSubItemsModalPhase(null)}
         />

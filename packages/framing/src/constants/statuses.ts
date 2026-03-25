@@ -1,6 +1,8 @@
 import type { LotStatus } from '../types/lot'
 import type { ItemSeverity } from '../types/house-item'
 import type { WarningCategory } from '../types/warning'
+import type { PaymentStatus, HoldbackStatus } from '../types/payment'
+import type { EquipmentRequestStatus, EquipmentPriority } from '../types/material'
 
 // ==========================================
 // Lot Status
@@ -49,4 +51,43 @@ export const URGENCY_LABELS: Record<string, string> = {
   high: 'High - Needed within hours',
   medium: 'Medium - Needed today',
   low: 'Low - Can wait 24+ hours',
+}
+
+// ==========================================
+// Payment Status
+// ==========================================
+export const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { color: string; label: string; labelPt: string }> = {
+  unpaid: { color: '#8E8E93', label: 'Unpaid', labelPt: 'Não pago' },
+  pending: { color: '#FF9500', label: 'Pending', labelPt: 'Pendente' },
+  approved: { color: '#007AFF', label: 'Approved', labelPt: 'Aprovado' },
+  paid: { color: '#30D158', label: 'Paid', labelPt: 'Pago' },
+}
+
+// ==========================================
+// Holdback Status
+// ==========================================
+export const HOLDBACK_STATUS_CONFIG: Record<HoldbackStatus, { color: string; label: string; labelPt: string }> = {
+  none: { color: '#8E8E93', label: 'No Holdback', labelPt: 'Sem Retenção' },
+  held: { color: '#FF9500', label: 'Held', labelPt: 'Retido' },
+  released: { color: '#30D158', label: 'Released', labelPt: 'Liberado' },
+  reassigned: { color: '#5856D6', label: 'Reassigned', labelPt: 'Reatribuído' },
+}
+
+// ==========================================
+// Equipment Status
+// ==========================================
+export const EQUIPMENT_STATUS_CONFIG: Record<EquipmentRequestStatus, { color: string; label: string }> = {
+  requested: { color: '#FF9500', label: 'Requested' },
+  accepted: { color: '#007AFF', label: 'Accepted' },
+  scheduled: { color: '#5856D6', label: 'Scheduled' },
+  in_progress: { color: '#34C759', label: 'In Progress' },
+  completed: { color: '#30D158', label: 'Completed' },
+  cancelled: { color: '#8E8E93', label: 'Cancelled' },
+}
+
+export const EQUIPMENT_PRIORITY_CONFIG: Record<EquipmentPriority, { color: string; label: string }> = {
+  low: { color: '#8E8E93', label: 'Low' },
+  normal: { color: '#007AFF', label: 'Normal' },
+  high: { color: '#FF9500', label: 'High' },
+  urgent: { color: '#FF3B30', label: 'Urgent' },
 }

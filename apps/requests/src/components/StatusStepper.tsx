@@ -110,7 +110,7 @@ export function StatusStepper({
           )}
         </div>
         <span
-          className={`text-[10px] font-medium leading-none whitespace-nowrap ${
+          className={`text-xs font-medium leading-none whitespace-nowrap ${
             isCompleted || isCurrent || canClick
               ? step.text
               : "text-gray-400"
@@ -119,7 +119,7 @@ export function StatusStepper({
           {step.label}
         </span>
         {ts && (
-          <span className="flex items-center gap-0.5 text-[9px] text-text-muted leading-none mt-0.5">
+          <span className="flex items-center gap-0.5 text-[11px] text-text-muted leading-none mt-0.5">
             <Clock size={8} />
             {ts}
           </span>

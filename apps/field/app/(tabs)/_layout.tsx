@@ -1,8 +1,9 @@
 /**
- * Tabs Layout - OnSite Field
+ * Tabs Layout - EagleField
  *
- * 3 tabs: My Lots (main), Agenda, Settings
- * Enterprise v3 theme — identical to Operator.
+ * 4 tabs: Sites (main), Schedule, Tasks, Materials
+ * Config hidden from tab bar but accessible via route.
+ * Enterprise v3 theme.
  */
 
 import { Platform } from 'react-native';
@@ -40,29 +41,47 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'My Lots',
+          title: 'Sites',
           tabBarIcon: ({ color }: { color: string }) => (
             <Ionicons name="home" size={24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="agenda"
+        name="schedule"
         options={{
-          title: 'Agenda',
+          title: 'Schedule',
           tabBarIcon: ({ color }: { color: string }) => (
             <Ionicons name="calendar" size={24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="config"
+        name="tasks"
         options={{
-          title: 'Settings',
+          title: 'Tasks',
           tabBarIcon: ({ color }: { color: string }) => (
-            <Ionicons name="settings" size={24} color={color} />
+            <Ionicons name="clipboard" size={24} color={color} />
           ),
         }}
+      />
+      <Tabs.Screen
+        name="materials"
+        options={{
+          title: 'Materials',
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="cube" size={24} color={color} />
+          ),
+        }}
+      />
+      {/* Hidden tabs - accessible via router.push but not in tab bar */}
+      <Tabs.Screen
+        name="config"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="agenda"
+        options={{ href: null }}
       />
     </Tabs>
   );

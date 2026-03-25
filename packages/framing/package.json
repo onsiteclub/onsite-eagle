@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@supabase/supabase-js": ">=2.0.0"
+    "@supabase/supabase-js": ">=2.0.0",
+    "react": ">=18.0.0"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.49.0",

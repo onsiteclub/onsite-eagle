@@ -12,7 +12,7 @@ export async function GET(
 
     const { data, error } = await supabase
       .from("frm_jobsites")
-      .select("id, name, address, city, total_lots, status")
+      .select("id, name, address, city, total_lots, status, machine_down, machine_down_at, machine_down_reason, refuel_needed, refuel_needed_at")
       .eq("id", siteId)
       .single();
 
@@ -36,10 +36,28 @@ export async function PATCH(
     const supabase = createAdminClient();
     const body = await req.json();
 
-    const updates: Record<string, string | null> = {};
+    const updates: Record<string, unknown> = {};
     if ("name" in body) updates.name = body.name?.trim() || null;
     if ("address" in body) updates.address = body.address?.trim() || null;
     if ("city" in body) updates.city = body.city?.trim() || null;
+
+    // Machine down toggle
+    if ("machine_down" in body) {
+      updates.machine_down = !!body.machine_down;
+      if (body.machine_down) {
+        updates.machine_down_at = new Date().toISOString();
+        updates.machine_down_reason = body.machine_down_reason?.trim() || null;
+      } else {
+        updates.machine_down_at = null;
+        updates.machine_down_reason = null;
+      }
+    }
+
+    // Refuel needed toggle
+    if ("refuel_needed" in body) {
+      updates.refuel_needed = !!body.refuel_needed;
+      updates.refuel_needed_at = body.refuel_needed ? new Date().toISOString() : null;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
@@ -53,7 +71,7 @@ export async function PATCH(
       .from("frm_jobsites")
       .update(updates)
       .eq("id", siteId)
-      .select("id, name, address, city, total_lots")
+      .select("id, name, address, city, total_lots, machine_down, machine_down_at, machine_down_reason, refuel_needed, refuel_needed_at")
       .single();
 
     if (error) {
