@@ -37,6 +37,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Reject reports where cleanup item (house_clean) has no photos
+    const cleanupItem = items.find((i) => i.code === 'house_clean')
+    if (cleanupItem && cleanupItem.result !== 'na' && (!cleanupItem.photoUrls || cleanupItem.photoUrls.length === 0)) {
+      return NextResponse.json({ error: 'Cleanup photos are required' }, { status: 400 })
+    }
+
     const supabase = createAdminClient()
     const token = generateToken()
     const reference = generateReference()

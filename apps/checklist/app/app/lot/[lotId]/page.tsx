@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getLot, getLatestGateCheck, GATE_CHECK_TRANSITIONS, TRANSITION_LABELS, LOT_STATUS_CONFIG } from '@onsite/framing'
 import type { GateCheckTransition } from '@onsite/framing'
 import TransitionCard from '@/components/TransitionCard'
+import DeleteLotButton from '@/components/DeleteLotButton'
 import Link from 'next/link'
 
 export const metadata = { title: 'Lot Detail' }
@@ -51,6 +52,9 @@ export default async function LotDetailPage({ params }: Props) {
           </p>
         )}
       </div>
+
+      {/* Delete (temporary — testing phase) */}
+      <DeleteLotButton lotId={lotId} lotNumber={lot.lot_number} />
 
       {/* Gate Checks */}
       <div>

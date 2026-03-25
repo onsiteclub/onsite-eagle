@@ -195,6 +195,7 @@ export default function SelfChecklistPage() {
 
     // Upload photos one by one (avoids body size limit)
     const uploadedUrls: Record<string, string[]> = {}
+    let failedUploads = 0
     if (photoTasks.length > 0) {
       for (let i = 0; i < photoTasks.length; i++) {
         const task = photoTasks[i]
@@ -203,8 +204,28 @@ export default function SelfChecklistPage() {
         if (url) {
           if (!uploadedUrls[task.code]) uploadedUrls[task.code] = []
           uploadedUrls[task.code].push(url)
+        } else {
+          failedUploads++
         }
       }
+    }
+
+    // Check that required photos actually uploaded
+    const requiredPhotosMissing = items.some((item) => {
+      if (!item.minPhotos) return false
+      const s = state[item.code]
+      if (!s || s.result === 'na' || s.result === 'pending') return false
+      const uploaded = uploadedUrls[item.code]?.length ?? 0
+      return uploaded < item.minPhotos
+    })
+
+    if (requiredPhotosMissing) {
+      setSubmitError(
+        `${failedUploads} photo${failedUploads > 1 ? 's' : ''} failed to upload. Check your connection and try again.`
+      )
+      setSubmitting(false)
+      setUploadProgress('')
+      return
     }
 
     setUploadProgress('Saving report...')
@@ -389,6 +410,7 @@ export default function SelfChecklistPage() {
                     >
                       &#10005; Fail
                     </button>
+                    {!item.minPhotos && (
                     <button
                       onClick={() => updateResult(item.code, 'na')}
                       className={`
@@ -400,6 +422,7 @@ export default function SelfChecklistPage() {
                     >
                       N/A
                     </button>
+                    )}
                   </div>
 
                   {/* + Add Note button (mobile-friendly, full width) */}
