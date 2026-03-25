@@ -169,76 +169,60 @@ export default function EditableReportView({ report: initialReport }: EditableRe
       </div>
 
       <div className="w-full max-w-[520px] px-4">
-        {/* Reference + Last Updated */}
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-mono text-[#888884]">{report.reference}</span>
-          {report.updated_by && (
-            <span className="text-xs text-[#B0AFA9]">
-              Updated by {report.updated_by}
-            </span>
-          )}
-        </div>
-        {report.updated_at && (
-          <p className="text-[10px] text-[#B0AFA9] mb-4 text-right">
-            {new Date(report.updated_at).toLocaleString('en-CA', {
+        {/* Report Header */}
+        <div className="text-center mb-6">
+          <p className="text-xs font-mono text-[#B0AFA9] mb-3">{report.reference}</p>
+          <h1 className="text-4xl font-bold text-[#1A1A1A] mb-1">
+            LOT: #{report.lot_number}
+          </h1>
+          <h2 className="text-xl font-semibold text-[#1A1A1A] mb-0.5">
+            {report.inspector_name}
+          </h2>
+          <h2 className="text-lg text-[#888884] mb-0.5">
+            {new Date(report.completed_at).toLocaleString('en-CA', {
               year: 'numeric', month: 'short', day: 'numeric',
               hour: '2-digit', minute: '2-digit',
             })}
-          </p>
-        )}
-
-        {/* Lot Number — H1 */}
-        <h1 className="text-3xl font-bold text-[#1A1A1A] text-center mb-1">
-          {report.lot_number}
-        </h1>
-        <p className="text-sm text-[#888884] text-center mb-4">{report.jobsite}</p>
+          </h2>
+          <h3 className="text-sm text-[#B0AFA9]">
+            {report.jobsite}
+            {report.inspector_company ? ` \u2014 ${report.inspector_company}` : ''}
+          </h3>
+        </div>
 
         {/* Result Banner */}
         <div className={`
-          rounded-[14px] p-6 text-center mb-6
+          rounded-[14px] p-5 text-center mb-4
           ${report.passed ? 'bg-[#D1FAE5] border border-[#16A34A]/30' : 'bg-[rgba(220,38,38,0.12)] border border-[#DC2626]/30'}
         `}>
-          <div className={`text-4xl mb-2 ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-            {report.passed ? '\u2713' : '\u2717'}
+          <div className="flex items-center justify-center gap-3">
+            <span className={`text-3xl ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+              {report.passed ? '\u2713' : '\u2717'}
+            </span>
+            <span className={`text-2xl font-bold ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+              {report.passed ? 'PASSED' : 'FAILED'}
+            </span>
           </div>
-          <h2 className={`text-2xl font-bold ${report.passed ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-            {report.passed ? 'PASSED' : 'FAILED'}
-          </h2>
-          <p className="text-[15px] font-medium text-[#1A1A1A] mt-2">{report.transition_label}</p>
+          <p className="text-[13px] text-[#1A1A1A] mt-1">{report.transition_label}</p>
         </div>
 
-        {/* Summary */}
-        <div className="bg-white rounded-[14px] border border-[#D1D0CE] p-5 mb-4">
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            <div className="text-center p-3 bg-[#D1FAE5] rounded-[14px]">
-              <div className="text-lg font-bold text-[#16A34A]">{passCount}</div>
-              <div className="text-xs text-[#888884]">Pass</div>
-            </div>
-            <div className="text-center p-3 bg-[rgba(220,38,38,0.12)] rounded-[14px]">
-              <div className="text-lg font-bold text-[#DC2626]">{failCount}</div>
-              <div className="text-xs text-[#888884]">Fail</div>
-            </div>
-            <div className="text-center p-3 bg-[#E5E5E3] rounded-[14px]">
-              <div className="text-lg font-bold text-[#888884]">{naCount}</div>
-              <div className="text-xs text-[#888884]">N/A</div>
-            </div>
-            <div className="text-center p-3 bg-[#FFF3D6] rounded-[14px]">
-              <div className="text-lg font-bold text-[#C58B1B]">{totalPhotos}</div>
-              <div className="text-xs text-[#888884]">Photos</div>
-            </div>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          <div className="text-center p-3 bg-[#D1FAE5] rounded-[14px]">
+            <div className="text-lg font-bold text-[#16A34A]">{passCount}</div>
+            <div className="text-xs text-[#888884]">Pass</div>
           </div>
-
-          <div className="pt-3 border-t border-[#E5E5E3] text-xs text-[#888884] space-y-1">
-            <p>Inspector: <span className="text-[#1A1A1A]">{report.inspector_name}</span></p>
-            {report.inspector_company && (
-              <p>Company: <span className="text-[#1A1A1A]">{report.inspector_company}</span></p>
-            )}
-            <p>Date: <span className="text-[#1A1A1A]">
-              {new Date(report.completed_at).toLocaleString('en-CA', {
-                year: 'numeric', month: 'short', day: 'numeric',
-                hour: '2-digit', minute: '2-digit',
-              })}
-            </span></p>
+          <div className="text-center p-3 bg-[rgba(220,38,38,0.12)] rounded-[14px]">
+            <div className="text-lg font-bold text-[#DC2626]">{failCount}</div>
+            <div className="text-xs text-[#888884]">Fail</div>
+          </div>
+          <div className="text-center p-3 bg-[#E5E5E3] rounded-[14px]">
+            <div className="text-lg font-bold text-[#888884]">{naCount}</div>
+            <div className="text-xs text-[#888884]">N/A</div>
+          </div>
+          <div className="text-center p-3 bg-[#FFF3D6] rounded-[14px]">
+            <div className="text-lg font-bold text-[#C58B1B]">{totalPhotos}</div>
+            <div className="text-xs text-[#888884]">Photos</div>
           </div>
         </div>
 
