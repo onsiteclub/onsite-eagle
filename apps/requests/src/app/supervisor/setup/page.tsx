@@ -230,38 +230,39 @@ export default function SetupPage() {
     if (!selectedSite) return;
     setAddingLots(true);
 
-    if (addMode === "singles") {
-      const from = parseInt(singlesFrom);
-      const to = parseInt(singlesTo);
-      if (isNaN(from) || isNaN(to) || to < from) {
-        setAddingLots(false);
-        return;
+    try {
+      if (addMode === "singles") {
+        const from = parseInt(singlesFrom);
+        const to = parseInt(singlesTo);
+        if (isNaN(from) || isNaN(to) || to < from) {
+          return;
+        }
+        const count = to - from + 1;
+        await fetch("/api/lots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobsite_id: selectedSite, count, from }),
+        });
+      } else {
+        const bn = blockNumber.trim();
+        const units = parseInt(blockUnits);
+        if (!bn || isNaN(units) || units < 1) {
+          return;
+        }
+        await fetch("/api/lots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobsite_id: selectedSite, block_number: bn, unit_count: units, unit_naming: blockNaming }),
+        });
       }
-      const count = to - from + 1;
-      await fetch("/api/lots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobsite_id: selectedSite, count, from }),
-      });
-    } else {
-      const bn = blockNumber.trim();
-      const units = parseInt(blockUnits);
-      if (!bn || isNaN(units) || units < 1) {
-        setAddingLots(false);
-        return;
-      }
-      await fetch("/api/lots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobsite_id: selectedSite, block_number: bn, unit_count: units, unit_naming: blockNaming }),
-      });
-    }
 
-    await loadLots(selectedSite);
-    await loadSites();
-    setBlockNumber("");
-    setBlockUnits("3");
-    setAddingLots(false);
+      await loadLots(selectedSite);
+      await loadSites();
+      setBlockNumber("");
+      setBlockUnits("3");
+    } finally {
+      setAddingLots(false);
+    }
   }
 
   async function saveSite() {
@@ -324,20 +325,23 @@ export default function SetupPage() {
   async function quickAddSingleLot() {
     if (!selectedSite || !quickLotNumber.trim()) return;
     setQuickAdding(true);
-    await fetch("/api/lots", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jobsite_id: selectedSite,
-        count: 1,
-        from: parseInt(quickLotNumber) || undefined,
-        custom_number: quickLotNumber.trim(),
-      }),
-    });
-    setQuickLotNumber("");
-    await loadLots(selectedSite);
-    await loadSites();
-    setQuickAdding(false);
+    try {
+      await fetch("/api/lots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobsite_id: selectedSite,
+          count: 1,
+          from: parseInt(quickLotNumber) || undefined,
+          custom_number: quickLotNumber.trim(),
+        }),
+      });
+      setQuickLotNumber("");
+      await loadLots(selectedSite);
+      await loadSites();
+    } finally {
+      setQuickAdding(false);
+    }
   }
 
   // Group lots by status filter, then singles vs blocks
@@ -594,50 +598,53 @@ export default function SetupPage() {
                   if (!siteName.trim()) return;
                   setCreatingSite(true);
 
-                  const res = await fetch("/api/sites", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      name: siteName.trim(),
-                      address: siteAddress.trim() || null,
-                      city: siteCity.trim() || null,
-                    }),
-                  });
+                  try {
+                    const res = await fetch("/api/sites", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        name: siteName.trim(),
+                        address: siteAddress.trim() || null,
+                        city: siteCity.trim() || null,
+                      }),
+                    });
 
-                  if (res.ok) {
-                    const site = await res.json();
+                    if (res.ok) {
+                      const site = await res.json();
 
-                    // Add lots based on selected mode
-                    if (addMode === "singles") {
-                      const from = parseInt(singlesFrom || "1");
-                      const to = parseInt(singlesTo || "10");
-                      if (!isNaN(from) && !isNaN(to) && to >= from) {
-                        await fetch("/api/lots", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ jobsite_id: site.id, count: to - from + 1, from }),
-                        });
+                      // Add lots based on selected mode
+                      if (addMode === "singles") {
+                        const from = parseInt(singlesFrom || "1");
+                        const to = parseInt(singlesTo || "10");
+                        if (!isNaN(from) && !isNaN(to) && to >= from) {
+                          await fetch("/api/lots", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ jobsite_id: site.id, count: to - from + 1, from }),
+                          });
+                        }
+                      } else {
+                        const bn = blockNumber.trim();
+                        const units = parseInt(blockUnits);
+                        if (bn && !isNaN(units) && units > 0) {
+                          await fetch("/api/lots", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ jobsite_id: site.id, block_number: bn, unit_count: units, unit_naming: blockNaming }),
+                          });
+                        }
                       }
-                    } else {
-                      const bn = blockNumber.trim();
-                      const units = parseInt(blockUnits);
-                      if (bn && !isNaN(units) && units > 0) {
-                        await fetch("/api/lots", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ jobsite_id: site.id, block_number: bn, unit_count: units, unit_naming: blockNaming }),
-                        });
-                      }
+
+                      setSiteName("");
+                      setSiteAddress("");
+                      setSiteCity("");
+                      setSelectedSite(site.id);
+                      await loadSites();
+                      await loadLots(site.id);
                     }
-
-                    setSiteName("");
-                    setSiteAddress("");
-                    setSiteCity("");
-                    setSelectedSite(site.id);
-                    await loadSites();
-                    await loadLots(site.id);
+                  } finally {
+                    setCreatingSite(false);
                   }
-                  setCreatingSite(false);
                 }}
                 disabled={creatingSite || !siteName.trim()}
                 className="w-full flex items-center justify-center gap-1.5 bg-brand text-white text-sm font-medium py-2.5 px-4 rounded-xl hover:bg-brand-dark active:scale-[0.98] transition disabled:opacity-50"
