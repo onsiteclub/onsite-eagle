@@ -10,6 +10,8 @@ import { Plus, RefreshCw, Loader2, Inbox, AlertTriangle, ChevronRight, Home } fr
 interface LotInfo {
   id: string;
   lot_number: string;
+  block: string | null;
+  jobsite_id: string;
   status: string;
   jobsite: { name: string } | null;
 }
@@ -324,7 +326,7 @@ export default function LotRequestPage() {
         <Plus size={28} />
       </button>
 
-      {/* Modal — lot is fixed */}
+      {/* Modal — lot is fixed, siblings from same block offered */}
       {showModal && (
         <NewRequestModal
           lotId={lotInfo.id}
@@ -332,6 +334,13 @@ export default function LotRequestPage() {
           userName={userName}
           onClose={() => setShowModal(false)}
           onCreated={loadRequests}
+          siblingLots={
+            lotInfo.block
+              ? myLots.filter(
+                  (ml) => ml.block === lotInfo.block && ml.jobsite_id === lotInfo.jobsite_id
+                )
+              : undefined
+          }
         />
       )}
     </main>
