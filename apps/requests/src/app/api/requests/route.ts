@@ -118,7 +118,6 @@ export async function PATCH(req: NextRequest) {
         updates.delivered_at = new Date().toISOString();
         updates.delivered_by_name = delivered_by_name || null;
         updates.delivery_notes = delivery_notes || null;
-        if (photo_url) updates.photo_url = photo_url;
       } else if (status === "problem") {
         updates.delivered_by_name = delivered_by_name || null;
         updates.delivery_notes = delivery_notes || null;
@@ -128,6 +127,11 @@ export async function PATCH(req: NextRequest) {
         if (delivery_notes !== undefined) updates.delivery_notes = delivery_notes;
         updates.in_transit_at = null;
       }
+    }
+
+    // Save photo_url regardless of status
+    if (photo_url !== undefined) {
+      updates.photo_url = photo_url;
     }
 
     // Allow sub_items update (operator marking items as missing/delivered)

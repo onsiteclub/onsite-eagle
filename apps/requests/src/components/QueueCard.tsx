@@ -182,14 +182,20 @@ export function QueueCard({
     let photoUrl: string | undefined;
     if (photoFile) {
       setUploading(true);
-      const formData = new FormData();
-      formData.append("file", photoFile);
-      formData.append("request_id", request.id);
+      try {
+        const formData = new FormData();
+        formData.append("file", photoFile);
+        formData.append("request_id", request.id);
 
-      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-      if (uploadRes.ok) {
-        const data = await uploadRes.json();
-        photoUrl = data.url;
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        if (uploadRes.ok) {
+          const data = await uploadRes.json();
+          photoUrl = data.url;
+        } else {
+          console.error("Photo upload failed:", uploadRes.status);
+        }
+      } catch (err) {
+        console.error("Photo upload error:", err);
       }
       setUploading(false);
     }
@@ -250,13 +256,19 @@ export function QueueCard({
     let photoUrl: string | undefined;
     if (photoFile) {
       setUploading(true);
-      const formData = new FormData();
-      formData.append("file", photoFile);
-      formData.append("request_id", request.id);
-      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-      if (uploadRes.ok) {
-        const data = await uploadRes.json();
-        photoUrl = data.url;
+      try {
+        const formData = new FormData();
+        formData.append("file", photoFile);
+        formData.append("request_id", request.id);
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        if (uploadRes.ok) {
+          const data = await uploadRes.json();
+          photoUrl = data.url;
+        } else {
+          console.error("Photo upload failed:", uploadRes.status);
+        }
+      } catch (err) {
+        console.error("Photo upload error:", err);
       }
       setUploading(false);
     }
