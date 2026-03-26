@@ -5,7 +5,7 @@ import { UrgencyBadge } from "./StatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
 import { formatRequestTime, getDeadlineInfo } from "@/lib/deadline";
-import { Package, User, Truck, AlertTriangle, Loader2, Plus, Clock } from "lucide-react";
+import { Package, User, Truck, AlertTriangle, Loader2, Plus, Clock, CheckCircle2 } from "lucide-react";
 
 interface MaterialRequest {
   id: string;
@@ -48,7 +48,9 @@ export function TransactionCard({ request, onUpdate, onNewRequest, supervisorNam
   const isInTransit = request.status === "in_transit";
   const isProblem = request.status === "problem";
   const missingItems = request.sub_items?.filter((i) => i.status === "missing") ?? [];
+  const deliveredItems = request.sub_items?.filter((i) => i.status === "delivered") ?? [];
   const hasMissing = missingItems.length > 0;
+  const isPartialReturn = deliveredItems.length > 0 && hasMissing;
   const hasIssue = isProblem || hasMissing;
 
   // Detect overrideable problems (Not Safe / Not Ready)
@@ -172,18 +174,48 @@ export function TransactionCard({ request, onUpdate, onNewRequest, supervisorNam
           )}
           {hasMissing && (
             <div>
-              <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">Missing items</span>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {missingItems.map((i) => (
-                  <span
-                    key={i.name}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-700 text-sm font-medium border border-red-100"
-                  >
-                    <AlertTriangle size={9} />
-                    {i.name}
+              {isPartialReturn ? (
+                <>
+                  <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+                    Partial Delivery — {deliveredItems.length}/{request.sub_items!.length} items delivered
                   </span>
-                ))}
-              </div>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {deliveredItems.map((i) => (
+                      <span
+                        key={i.name}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-50 text-green-700 text-sm font-medium border border-green-100"
+                      >
+                        <CheckCircle2 size={9} />
+                        {i.name}
+                      </span>
+                    ))}
+                    {missingItems.map((i) => (
+                      <span
+                        key={i.name}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-sm font-medium border border-amber-200"
+                      >
+                        <AlertTriangle size={9} />
+                        {i.name}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">Missing items</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {missingItems.map((i) => (
+                      <span
+                        key={i.name}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-700 text-sm font-medium border border-red-100"
+                      >
+                        <AlertTriangle size={9} />
+                        {i.name}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
           {/* Supervisor override button */}

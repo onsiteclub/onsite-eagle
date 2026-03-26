@@ -118,6 +118,8 @@ export function QueueCard({
 
   const hasSubItems = request.sub_items && request.sub_items.length > 0;
   const missingCount = request.sub_items?.filter((i) => i.status === "missing").length ?? 0;
+  const deliveredCount = request.sub_items?.filter((i) => i.status === "delivered").length ?? 0;
+  const isPartialReturn = deliveredCount > 0 && missingCount > 0;
   const isInTransit = request.status === "in_transit";
 
   // Deadline-based amber glow when time is running out
@@ -159,14 +161,24 @@ export function QueueCard({
   async function handleStepClick(step: "in_transit" | "delivered") {
     if (step === "in_transit") {
       setActionLoading("transit");
+
+      // For partial returns: auto-reset "missing" → "pending" so operator
+      // doesn't have to manually un-toggle each item before delivering
+      const patchBody: Record<string, unknown> = {
+        id: request.id,
+        status: "in_transit",
+        delivered_by_name: operatorName,
+      };
+      if (isPartialReturn && request.sub_items) {
+        patchBody.sub_items = request.sub_items.map((item) =>
+          item.status === "missing" ? { ...item, status: "pending" } : item
+        );
+      }
+
       await fetch("/api/requests", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: request.id,
-          status: "in_transit",
-          delivered_by_name: operatorName,
-        }),
+        body: JSON.stringify(patchBody),
       });
       setActionLoading(null);
       onUpdate();
@@ -200,15 +212,18 @@ export function QueueCard({
       setUploading(false);
     }
 
-    // Check if any sub-items are marked missing → partial delivery
-    const hasMissingItems = request.sub_items?.some((i) => i.status === "missing");
+    // Build updated sub-items: pending→delivered, keep delivered as-is, keep missing as-is
+    const updatedItems = request.sub_items?.map((item) => {
+      if (item.status === "delivered") return item; // already delivered in previous round
+      if (item.status === "missing") return item;   // still missing
+      return { ...item, status: "delivered" };       // pending → delivered
+    });
 
-    if (hasMissingItems) {
-      // Mark non-missing items as delivered, keep missing as-is
-      const updatedItems = request.sub_items!.map((item) =>
-        item.status !== "missing" ? { ...item, status: "delivered" } : item
-      );
-      const missingNames = request.sub_items!.filter((i) => i.status === "missing").map((i) => i.name);
+    const stillMissing = updatedItems?.filter((i) => i.status === "missing") ?? [];
+
+    if (stillMissing.length > 0) {
+      // Partial delivery — some items still missing, send back to queue
+      const missingNames = stillMissing.map((i) => i.name);
       const notePrefix = `[Partial] Missing: ${missingNames.join(", ")}`;
       const fullNote = deliveryNotes.trim() ? `${notePrefix}. ${deliveryNotes.trim()}` : notePrefix;
 
@@ -225,7 +240,7 @@ export function QueueCard({
         }),
       });
     } else {
-      // Full delivery
+      // Full delivery — all items delivered (or no sub-items)
       await fetch("/api/requests", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -235,6 +250,7 @@ export function QueueCard({
           delivered_by_name: operatorName,
           delivery_notes: deliveryNotes.trim() || null,
           photo_url: photoUrl || null,
+          ...(updatedItems && { sub_items: updatedItems }),
         }),
       });
     }
@@ -404,7 +420,12 @@ export function QueueCard({
                 <span className="font-bold text-text text-lg">
                   {lotNumber ? `Lot ${lotNumber}` : "—"}
                 </span>
-                {missingCount > 0 && (
+                {isPartialReturn && (
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                    Partial — {missingCount} left
+                  </span>
+                )}
+                {missingCount > 0 && !isPartialReturn && (
                   <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
                     {missingCount} missing
                   </span>
@@ -443,20 +464,27 @@ export function QueueCard({
               <div className="space-y-1">
                 {request.sub_items!.map((item, idx) => {
                   const isMissing = item.status === "missing";
+                  const isItemDelivered = item.status === "delivered";
                   return (
                     <div
                       key={idx}
                       className={`flex items-center gap-2 rounded-lg text-sm px-2.5 py-1.5 ${
-                        isMissing
+                        isItemDelivered
+                          ? "bg-green-50 border border-green-200 opacity-60"
+                          : isMissing
                           ? "bg-amber-50 border border-amber-200 text-amber-700 font-medium"
                           : "bg-gray-50 text-text-secondary"
                       }`}
                     >
-                      <span className="flex-1">{item.name}</span>
+                      {isItemDelivered && <CheckCircle size={12} className="text-green-600 shrink-0" />}
+                      <span className={`flex-1 ${isItemDelivered ? "text-green-700 line-through" : ""}`}>{item.name}</span>
                       {isMissing && (
                         <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                           <AlertCircle size={9} /> Missing
                         </span>
+                      )}
+                      {isItemDelivered && (
+                        <span className="text-[10px] font-medium text-green-600">Done</span>
                       )}
                     </div>
                   );
@@ -691,8 +719,15 @@ export function QueueCard({
         </div>
       )}
 
-      {/* Issue banner — card returned to queue with missing items */}
-      {missingCount > 0 && !isInTransit && request.status !== "delivered" && request.status !== "problem" && (
+      {/* Partial return banner — card returned to queue with some items already delivered */}
+      {isPartialReturn && !isInTransit && request.status !== "delivered" && request.status !== "problem" && (
+        <div className="bg-amber-500 text-white px-3.5 py-2 flex items-center gap-1.5 text-xs font-bold">
+          <AlertCircle size={12} />
+          <span>PARTIAL — {missingCount} item(s) still pending. Will stay in queue until complete.</span>
+        </div>
+      )}
+      {/* Missing items banner (non-partial — e.g. worker reported missing after delivery) */}
+      {missingCount > 0 && !isPartialReturn && !isInTransit && request.status !== "delivered" && request.status !== "problem" && (
         <div className="bg-amber-500 text-white px-3.5 py-1.5 flex items-center gap-1.5 text-xs font-bold">
           <AlertCircle size={12} />
           ISSUE — {missingCount} item(s) missing
@@ -749,7 +784,23 @@ export function QueueCard({
             )}
             {request.sub_items!.map((item, idx) => {
               const isMissing = item.status === "missing";
-              const canToggle = mode === "idle" && request.status !== "delivered" && request.status !== "problem";
+              const isDelivered = item.status === "delivered";
+              const canToggle = !isDelivered && mode === "idle" && request.status !== "delivered" && request.status !== "problem";
+
+              // Already-delivered items: locked, dimmed, not interactive
+              if (isDelivered) {
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 rounded-lg text-sm px-2.5 py-1.5 bg-green-50 border border-green-200 opacity-60"
+                  >
+                    <CheckCircle size={14} className="text-green-600 shrink-0" />
+                    <span className="flex-1 text-green-700 line-through">{item.name}</span>
+                    <span className="text-[10px] font-medium text-green-600">Delivered</span>
+                  </div>
+                );
+              }
+
               return (
                 <button
                   key={idx}
@@ -940,10 +991,19 @@ export function QueueCard({
             <button
               onClick={handleDelivered}
               disabled={actionLoading !== null || uploading}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white font-medium py-2.5 px-3 rounded-lg text-sm hover:bg-green-700 active:scale-[0.98] transition disabled:opacity-50"
+              className={`flex-1 flex items-center justify-center gap-1.5 text-white font-medium py-2.5 px-3 rounded-lg text-sm active:scale-[0.98] transition disabled:opacity-50 ${
+                missingCount > 0
+                  ? "bg-amber-600 hover:bg-amber-700"
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
             >
               {actionLoading === "deliver" ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : missingCount > 0 ? (
+                <>
+                  <AlertCircle size={16} />
+                  Deliver &amp; Return ({missingCount} missing)
+                </>
               ) : (
                 <>
                   <CheckCircle size={16} />

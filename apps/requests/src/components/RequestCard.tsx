@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Loader2, AlertCircle, ChevronDown, RotateCcw } from "lucide-react";
+import { AlertTriangle, Loader2, AlertCircle, ChevronDown, RotateCcw, CheckCircle } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
 
@@ -63,6 +63,8 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
 
   const hasSubItems = request.sub_items && request.sub_items.length > 0;
   const missingCount = request.sub_items?.filter((i) => i.status === "missing").length ?? 0;
+  const deliveredCount = request.sub_items?.filter((i) => i.status === "delivered").length ?? 0;
+  const isPartialReturn = deliveredCount > 0 && missingCount > 0;
 
   async function submitContest() {
     if (!contestReason) return;
@@ -159,7 +161,12 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
               className="flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text transition w-full text-left"
             >
               <span className="truncate">{request.material_name}</span>
-              {missingCount > 0 && (
+              {isPartialReturn && (
+                <span className="shrink-0 text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                  {deliveredCount}/{request.sub_items!.length} delivered
+                </span>
+              )}
+              {missingCount > 0 && !isPartialReturn && (
                 <span className="shrink-0 text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
                   {missingCount} missing
                 </span>
@@ -180,25 +187,48 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
         {/* Sub-items dropdown */}
         {hasSubItems && itemsOpen && (
           <div className="ml-[18px] mt-2 space-y-1">
+            {isPartialReturn && (
+              <div className="flex items-center gap-2 px-2 py-1 mb-1">
+                <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all"
+                    style={{ width: `${(deliveredCount / request.sub_items!.length) * 100}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-medium text-text-muted shrink-0">
+                  {deliveredCount}/{request.sub_items!.length}
+                </span>
+              </div>
+            )}
             {request.sub_items!.map((item, idx) => {
               const isMissing = item.status === "missing";
+              const isItemDelivered = item.status === "delivered";
               return (
                 <div
                   key={idx}
                   className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm ${
-                    isMissing
+                    isItemDelivered
+                      ? "bg-green-50 border border-green-200 opacity-60"
+                      : isMissing
                       ? "bg-amber-50 border border-amber-200"
                       : "bg-gray-50 border border-transparent"
                   }`}
                 >
-                  <span className={`flex-1 ${isMissing ? "text-amber-700 font-medium" : "text-text-secondary"}`}>
+                  {isItemDelivered && <CheckCircle size={12} className="text-green-600 shrink-0" />}
+                  <span className={`flex-1 ${
+                    isItemDelivered ? "text-green-700 line-through" :
+                    isMissing ? "text-amber-700 font-medium" : "text-text-secondary"
+                  }`}>
                     {item.name}
                   </span>
                   {isMissing && (
                     <span className="text-[11px] text-amber-600 font-medium flex items-center gap-0.5">
                       <AlertCircle size={10} />
-                      Missing
+                      Pending
                     </span>
+                  )}
+                  {isItemDelivered && (
+                    <span className="text-[10px] font-medium text-green-600">Done</span>
                   )}
                 </div>
               );
