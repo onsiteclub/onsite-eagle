@@ -78,8 +78,8 @@ export function getDeadlineInfo(requestedAt: string, urgency: string): DeadlineI
   } else if (percentRemaining <= 50) {
     status = "attention";
     color = "#CA8A04"; // yellow-600
-    bgColor = "bg-yellow-50";
-    textColor = "text-yellow-700";
+    bgColor = "bg-amber-50";
+    textColor = "text-amber-700";
   } else {
     status = "on_track";
     color = "#16A34A"; // green-600

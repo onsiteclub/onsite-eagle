@@ -33,6 +33,7 @@ export default function RequestLayout({ children }: { children: React.ReactNode 
               onClick={handleSignOut}
               className="text-white/70 hover:text-white p-1"
               title="Sign out"
+              aria-label="Sign out"
             >
               <LogOut size={18} />
             </button>

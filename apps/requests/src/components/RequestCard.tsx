@@ -4,6 +4,8 @@ import { useState } from "react";
 import { AlertTriangle, Loader2, AlertCircle, ChevronDown, RotateCcw, CheckCircle } from "lucide-react";
 import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
+import { STATUS_BORDER, URGENCY_COLORS } from "@/lib/colors";
+import { showToast } from "@/lib/toast";
 
 const CONTEST_REASONS = [
   { value: "not_received", label: "Not received" },
@@ -32,22 +34,6 @@ interface MaterialRequest {
   lot?: { lot_number: string } | null;
 }
 
-const STATUS_BORDER: Record<string, string> = {
-  requested: "#DC2626",
-  acknowledged: "#F59E0B",
-  in_transit: "#0F766E",
-  delivered: "#D1D5DB",
-  problem: "#EF4444",
-  cancelled: "#9CA3AF",
-};
-
-const URGENCY_COLORS: Record<string, string> = {
-  critical: "#DC2626",
-  high: "#F59E0B",
-  medium: "#C58B1B",
-  low: "#9CA3AF",
-};
-
 export function RequestCard({ request, onUpdate }: { request: MaterialRequest; onUpdate?: () => void }) {
   const lotNumber = request.lot?.lot_number ?? null;
   const borderColor = STATUS_BORDER[request.status] || "#D1D5DB";
@@ -74,21 +60,26 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
       ? `Worker: ${label} — ${contestNote.trim()}`
       : `Worker: ${label}`;
 
-    await fetch("/api/requests", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: request.id,
-        status: "problem",
-        delivery_notes: note,
-      }),
-    });
-
-    setSubmitting(false);
-    setContesting(false);
-    setContestReason(null);
-    setContestNote("");
-    onUpdate?.();
+    try {
+      const res = await fetch("/api/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: request.id,
+          status: "problem",
+          delivery_notes: note,
+        }),
+      });
+      if (!res.ok) throw new Error("Server error");
+      setContesting(false);
+      setContestReason(null);
+      setContestNote("");
+      onUpdate?.();
+    } catch {
+      showToast({ type: "error", message: "Failed to submit report. Try again." });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function toggleMissingItem(idx: number) {
@@ -111,22 +102,27 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
         : item
     );
 
-    // Send back to queue with missing items marked
-    await fetch("/api/requests", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: request.id,
-        status: "requested",
-        sub_items: updated,
-        delivery_notes: `Worker: ${selectedMissing.size} item(s) missing`,
-      }),
-    });
-
-    setSubmitting(false);
-    setMissingMode(false);
-    setSelectedMissing(new Set());
-    onUpdate?.();
+    try {
+      // Send back to queue with missing items marked
+      const res = await fetch("/api/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: request.id,
+          status: "requested",
+          sub_items: updated,
+          delivery_notes: `Worker: ${selectedMissing.size} item(s) missing`,
+        }),
+      });
+      if (!res.ok) throw new Error("Server error");
+      setMissingMode(false);
+      setSelectedMissing(new Set());
+      onUpdate?.();
+    } catch {
+      showToast({ type: "error", message: "Failed to report missing items. Try again." });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -162,12 +158,12 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
             >
               <span className="truncate">{request.material_name}</span>
               {isPartialReturn && (
-                <span className="shrink-0 text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                <span className="shrink-0 text-xs font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
                   {deliveredCount}/{request.sub_items!.length} delivered
                 </span>
               )}
               {missingCount > 0 && !isPartialReturn && (
-                <span className="shrink-0 text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                <span className="shrink-0 text-xs font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
                   {missingCount} missing
                 </span>
               )}
@@ -195,7 +191,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
                     style={{ width: `${(deliveredCount / request.sub_items!.length) * 100}%` }}
                   />
                 </div>
-                <span className="text-[10px] font-medium text-text-muted shrink-0">
+                <span className="text-xs font-medium text-text-muted shrink-0">
                   {deliveredCount}/{request.sub_items!.length}
                 </span>
               </div>
@@ -206,7 +202,7 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
               return (
                 <div
                   key={idx}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm ${
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm min-h-[44px] ${
                     isItemDelivered
                       ? "bg-green-50 border border-green-200 opacity-60"
                       : isMissing
@@ -222,13 +218,13 @@ export function RequestCard({ request, onUpdate }: { request: MaterialRequest; o
                     {item.name}
                   </span>
                   {isMissing && (
-                    <span className="text-[11px] text-amber-600 font-medium flex items-center gap-0.5">
+                    <span className="text-xs text-amber-600 font-medium flex items-center gap-0.5">
                       <AlertCircle size={10} />
                       Pending
                     </span>
                   )}
                   {isItemDelivered && (
-                    <span className="text-[10px] font-medium text-green-600">Done</span>
+                    <span className="text-xs font-medium text-green-600">Done</span>
                   )}
                 </div>
               );

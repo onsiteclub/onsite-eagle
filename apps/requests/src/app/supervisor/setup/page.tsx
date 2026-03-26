@@ -953,7 +953,7 @@ export default function SetupPage() {
 
                     {/* Selection hint */}
                     {isLinkMode && (
-                      <div className="px-3 py-1.5 bg-brand/5 border-b border-brand/10 text-[11px] text-brand font-medium">
+                      <div className="px-3 py-1.5 bg-brand/5 border-b border-brand/10 text-xs text-brand font-medium">
                         Select units to include in the link:
                       </div>
                     )}
@@ -1436,7 +1436,7 @@ function LotRow({
               Lot {lot.lot_number}
             </span>
             {workers.length > 0 && (
-              <div className="text-[11px] text-text-muted truncate">
+              <div className="text-xs text-text-muted truncate">
                 {workers.join(", ")}
               </div>
             )}

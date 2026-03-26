@@ -1,13 +1,6 @@
 "use client";
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  requested: { label: "Requested", bg: "bg-gray-100", text: "text-gray-700" },
-  authorized: { label: "Authorized", bg: "bg-purple-100", text: "text-purple-700" },
-  acknowledged: { label: "Acknowledged", bg: "bg-purple-100", text: "text-purple-700" },
-  in_transit: { label: "In Transit", bg: "bg-cyan-100", text: "text-cyan-700" },
-  delivered: { label: "Delivered", bg: "bg-green-100", text: "text-green-700" },
-  cancelled: { label: "Cancelled", bg: "bg-red-100", text: "text-red-700" },
-};
+import { getStatusColors } from "@/lib/status";
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string }> = {
   low: { label: "Low", color: "text-text-muted" },
@@ -17,7 +10,7 @@ const URGENCY_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.requested;
+  const config = getStatusColors(status);
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
       {config.label}

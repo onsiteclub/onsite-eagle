@@ -167,7 +167,7 @@ export default function LotRequestPage() {
   if (lotError || !lotInfo) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-        <AlertTriangle size={48} className="text-yellow-500 mb-3" />
+        <AlertTriangle size={48} className="text-amber-500 mb-3" />
         <h2 className="text-lg font-semibold text-text">Lot not found</h2>
         <p className="text-sm text-text-muted mt-1">
           Check the link with your supervisor.
@@ -327,8 +327,17 @@ export default function LotRequestPage() {
               {myRequests.length === 0 ? "No requests yet" : "No matching requests"}
             </p>
             <p className="text-sm mt-1">
-              {myRequests.length === 0 ? "Tap + to request material" : "Try a different filter"}
+              {myRequests.length === 0 ? "Request materials for your lot" : "Try a different filter"}
             </p>
+            {myRequests.length === 0 && (
+              <button
+                onClick={() => setShowModal(true)}
+                className="mt-5 flex items-center gap-2 bg-brand text-white font-semibold text-base py-3 px-6 rounded-xl hover:bg-brand-dark active:scale-[0.97] transition"
+              >
+                <Plus size={20} />
+                Request Materials
+              </button>
+            )}
           </div>
         ) : (
           filtered.map((req) => <RequestCard key={req.id} request={req} onUpdate={loadRequests} />)
@@ -339,6 +348,7 @@ export default function LotRequestPage() {
       <button
         onClick={() => setShowModal(true)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-brand text-white rounded-full shadow-lg flex items-center justify-center hover:bg-brand-dark active:scale-95 transition safe-bottom"
+        aria-label="New request"
       >
         <Plus size={28} />
       </button>

@@ -74,7 +74,7 @@ export default function BundlePage() {
   if (error || !bundle) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-        <AlertTriangle size={48} className="text-yellow-500 mb-3" />
+        <AlertTriangle size={48} className="text-amber-500 mb-3" />
         <h2 className="text-lg font-semibold text-text">Bundle not found</h2>
         <p className="text-sm text-text-muted mt-1">
           Check the link with your supervisor.

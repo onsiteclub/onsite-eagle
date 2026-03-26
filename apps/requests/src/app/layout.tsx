@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ToastContainer } from "@/components/Toast";
 
 export const metadata: Metadata = {
   title: "OnSite Requests",
@@ -32,6 +33,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-dvh bg-bg safe-top">
         {children}
+        <ToastContainer />
         <script
           dangerouslySetInnerHTML={{
             __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,

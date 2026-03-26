@@ -31,7 +31,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="min-h-dvh bg-bg">
-      <header className="sticky top-0 z-40 bg-[#1E293B] safe-top">
+      <header className="sticky top-0 z-40 bg-slate-800 safe-top">
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <div className="flex items-center gap-2 text-white">
@@ -44,6 +44,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
               onClick={handleSignOut}
               className="text-white/70 hover:text-white p-1"
               title="Sign out"
+              aria-label="Sign out"
             >
               <LogOut size={18} />
             </button>

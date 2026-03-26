@@ -260,7 +260,7 @@ export default function SettingsPage() {
               <button
                 key={s.id}
                 onClick={() => setSelectedSite(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
                   selectedSite === s.id
                     ? "bg-brand text-white"
                     : "bg-gray-100 text-text-secondary hover:bg-gray-200"
@@ -584,7 +584,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => { setDeleteTarget(null); setDeleteConfirm(""); }}
-                    className="px-3 py-2 text-sm text-text-secondary rounded-lg hover:bg-white transition"
+                    className="px-3 py-2 text-sm text-text-secondary bg-white rounded-lg hover:bg-gray-50 transition"
                   >
                     Cancel
                   </button>

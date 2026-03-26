@@ -119,7 +119,7 @@ export function StatusStepper({
           {step.label}
         </span>
         {ts && (
-          <span className="flex items-center gap-0.5 text-[11px] text-text-muted leading-none mt-0.5">
+          <span className="flex items-center gap-0.5 text-xs text-text-muted leading-none mt-0.5">
             <Clock size={8} />
             {ts}
           </span>

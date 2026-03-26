@@ -99,7 +99,7 @@ export default function SummaryPage() {
               <button
                 key={s.id}
                 onClick={() => setSelectedSite(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
                   selectedSite === s.id
                     ? "bg-brand text-white"
                     : "bg-gray-100 text-text-secondary hover:bg-gray-200"
@@ -171,7 +171,7 @@ export default function SummaryPage() {
                       </span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                     req.status === "delivered" ? "bg-green-100 text-green-700"
                     : req.status === "in_transit" ? "bg-blue-100 text-blue-700"
                     : req.status === "problem" ? "bg-red-100 text-red-700"

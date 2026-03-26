@@ -6,6 +6,7 @@ import { StatusStepper } from "./StatusStepper";
 import { DeadlineBadge, DeadlineBar } from "./DeadlineBadge";
 import { formatRequestTime, getDeadlineInfo } from "@/lib/deadline";
 import { Package, User, Truck, AlertTriangle, Loader2, Plus, Clock, CheckCircle2 } from "lucide-react";
+import { showToast } from "@/lib/toast";
 
 interface MaterialRequest {
   id: string;
@@ -60,28 +61,40 @@ export function TransactionCard({ request, onUpdate, onNewRequest, supervisorNam
   async function handleOverride() {
     if (!supervisorName) return;
     setOverrideLoading(true);
-    await fetch("/api/requests", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: request.id,
-        status: "in_transit",
-        delivery_notes: `[Override by ${supervisorName}] ${request.delivery_notes}`,
-      }),
-    });
-    setOverrideLoading(false);
-    onUpdate?.();
+    try {
+      const res = await fetch("/api/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: request.id,
+          status: "in_transit",
+          delivery_notes: `[Override by ${supervisorName}] ${request.delivery_notes}`,
+        }),
+      });
+      if (!res.ok) throw new Error("Server error");
+      onUpdate?.();
+    } catch {
+      showToast({ type: "error", message: "Failed to override. Try again." });
+    } finally {
+      setOverrideLoading(false);
+    }
   }
 
   async function handleMarkUrgent() {
     setUrgencyLoading(true);
-    await fetch("/api/requests", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: request.id, urgency_level: "critical" }),
-    });
-    setUrgencyLoading(false);
-    onUpdate?.();
+    try {
+      const res = await fetch("/api/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: request.id, urgency_level: "critical" }),
+      });
+      if (!res.ok) throw new Error("Server error");
+      onUpdate?.();
+    } catch {
+      showToast({ type: "error", message: "Failed to mark urgent. Try again." });
+    } finally {
+      setUrgencyLoading(false);
+    }
   }
 
   return (
@@ -114,7 +127,7 @@ export function TransactionCard({ request, onUpdate, onNewRequest, supervisorNam
       )}
 
       {/* === TOP SECTION: Lot + Material === */}
-      <div className="px-4 pt-3 pb-2 space-y-1">
+      <div className="p-3.5 space-y-1">
         {/* Row 1: Lot number (H1) + site + urgency */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">

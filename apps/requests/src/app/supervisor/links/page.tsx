@@ -201,7 +201,7 @@ export default function LinksPage() {
               <button
                 key={s.id}
                 onClick={() => setSelectedSite(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
                   selectedSite === s.id
                     ? "bg-brand text-white"
                     : "bg-gray-100 text-text-secondary hover:bg-gray-200"
@@ -283,7 +283,7 @@ export default function LinksPage() {
                   )}
                 </button>
               </div>
-              <p className="text-[11px] text-text-muted">
+              <p className="text-xs text-text-muted">
                 Creates the lot automatically if it doesn&apos;t exist.
               </p>
             </section>
@@ -313,7 +313,7 @@ export default function LinksPage() {
                     onChange={(e) => setBlockUnits(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-border bg-bg text-text text-sm outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-text-muted pointer-events-none">units</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-muted pointer-events-none">units</span>
                 </div>
               </div>
               {blockNumber.trim() && parseInt(blockUnits) > 0 && (
@@ -348,7 +348,7 @@ export default function LinksPage() {
                   </>
                 )}
               </button>
-              <p className="text-[11px] text-text-muted">
+              <p className="text-xs text-text-muted">
                 Creates block lots (A, B, C...) and generates a single shared link.
               </p>
             </section>

@@ -184,7 +184,7 @@ export default function SiteOperatorPage() {
   if (siteError || !siteInfo) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-        <AlertTriangle size={48} className="text-yellow-500 mb-3" />
+        <AlertTriangle size={48} className="text-amber-500 mb-3" />
         <h2 className="text-lg font-semibold text-text">Site not found</h2>
         <p className="text-sm text-text-muted mt-1">
           Check the link with your supervisor.
@@ -360,7 +360,7 @@ export default function SiteOperatorPage() {
           onClick={() => setTab("delivered")}
           className={`px-3.5 py-2 rounded-full text-sm font-medium transition ${
             tab === "delivered"
-              ? "bg-green-600 text-white"
+              ? "bg-brand text-white"
               : "bg-card text-text-secondary border border-border hover:bg-gray-50"
           }`}
         >
@@ -550,7 +550,7 @@ function DeliveredCard({ request }: { request: MaterialRequest }) {
         <div className="flex items-center gap-2">
           <span className="font-semibold text-text text-base">Lot {lotNumber}</span>
           {missingCount > 0 && (
-            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+            <span className="text-xs font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
               {missingCount} missing
             </span>
           )}
