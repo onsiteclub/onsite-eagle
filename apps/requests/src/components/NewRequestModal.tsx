@@ -5,6 +5,7 @@ import {
   X, Package, Pencil, Check, Box,
   Bolt, ShieldCheck, Layers, Wrench, Footprints,
   LayoutGrid, TriangleAlert, Hammer, DoorOpen, Fence,
+  ClipboardList,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -43,6 +44,22 @@ function JoistsIcon({ className }: { className?: string }) {
       <line x1="13" y1="8" x2="11" y2="12" />
       <line x1="11" y1="12" x2="13" y2="16" />
       <line x1="13" y1="16" x2="11" y2="20" />
+    </svg>
+  );
+}
+
+// Custom backing icon (horizontal strapping on vertical studs)
+function BackingIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {/* Vertical studs */}
+      <line x1="5" y1="2" x2="5" y2="22" />
+      <line x1="12" y1="2" x2="12" y2="22" />
+      <line x1="19" y1="2" x2="19" y2="22" />
+      {/* Horizontal backing strips */}
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
     </svg>
   );
 }
@@ -121,13 +138,14 @@ interface SiblingLot {
 const WALL_ICON = "wall" as const;
 const ROOF_ICON = "roof" as const;
 const JOIST_ICON = "joist" as const;
+const BACKING_ICON = "backing" as const;
 const PHASE_BUNDLES: { value: string; label: string; icon: string }[] = [
   { value: "1st Sub-Floor", label: "1st Sub-Floor", icon: JOIST_ICON },
   { value: "1st Walls", label: "1st Walls", icon: WALL_ICON },
   { value: "2nd Sub-Floor", label: "2nd Sub-Floor", icon: JOIST_ICON },
   { value: "2nd Walls", label: "2nd Walls", icon: WALL_ICON },
   { value: "Roofing Load", label: "Roofing Load", icon: ROOF_ICON },
-  { value: "Backing", label: "Backing", icon: "📐" },
+  { value: "Backing", label: "Backing", icon: BACKING_ICON },
 ];
 
 // Sub-items per phase (from Shabba)
@@ -564,9 +582,10 @@ export function NewRequestModal(props: Props) {
               What do you need?
             </label>
             <div className="flex flex-col gap-2">
-              {PHASE_BUNDLES.map((b) => {
+              {PHASE_BUNDLES.map((b, idx) => {
                 const isSelected = selected === b.value;
                 const itemCount = isSelected ? checkedItems.size + (otherItem.trim() ? 1 : 0) : 0;
+                const iconColor = idx % 2 === 0 ? "text-teal-600" : "text-amber-600";
                 return (
                   <button
                     key={b.value}
@@ -581,16 +600,18 @@ export function NewRequestModal(props: Props) {
                     }}
                     className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl border text-left text-base font-medium transition active:scale-[0.97] ${
                       isSelected
-                        ? "border-brand bg-brand/5 text-brand"
+                        ? "border-brand bg-brand/10 text-text"
                         : "border-border bg-bg text-text hover:border-brand/40"
                     }`}
                   >
                     {b.icon === WALL_ICON
-                      ? <WallFrameIcon className={isSelected ? "text-brand" : "text-text-secondary"} />
+                      ? <WallFrameIcon className={iconColor} />
                       : b.icon === ROOF_ICON
-                      ? <RoofTrussIcon className={isSelected ? "text-brand" : "text-text-secondary"} />
+                      ? <RoofTrussIcon className={iconColor} />
                       : b.icon === JOIST_ICON
-                      ? <JoistsIcon className={isSelected ? "text-brand" : "text-text-secondary"} />
+                      ? <JoistsIcon className={iconColor} />
+                      : b.icon === BACKING_ICON
+                      ? <BackingIcon className={iconColor} />
                       : <span className="text-base">{b.icon}</span>
                     }
                     <span className="truncate flex-1">{b.label}</span>
@@ -608,11 +629,11 @@ export function NewRequestModal(props: Props) {
                 onClick={selectLoose}
                 className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl border text-left text-base font-medium transition active:scale-[0.97] ${
                   isLoose
-                    ? "border-brand bg-brand/5 text-brand"
+                    ? "border-brand bg-brand/10 text-text"
                     : "border-border bg-bg text-text hover:border-brand/40"
                 }`}
               >
-                <span className="text-base">📋</span>
+                <ClipboardList size={20} strokeWidth={1.4} className="text-violet-500" />
                 <span className="truncate">Loose Items</span>
               </button>
             </div>
