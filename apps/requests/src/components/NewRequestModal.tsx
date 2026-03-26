@@ -215,7 +215,7 @@ function SubItemsModal({
   submitting?: boolean;
   submitLabel?: string;
 }) {
-  const [checked, setChecked] = useState<Set<string>>(new Set(initialChecked));
+  const [checked, setChecked] = useState<Set<string>>(() => new Set(initialChecked));
   const [other, setOther] = useState(initialOther);
   const [otherActive, setOtherActive] = useState(!!initialOther.trim());
 
@@ -261,9 +261,10 @@ function SubItemsModal({
           </div>
 
           <div className="grid grid-cols-2 gap-3 bg-gray-100/60 rounded-2xl p-3">
-            {subItems.map((item) => {
+            {subItems.map((item, idx) => {
               const Icon = SUB_ITEM_ICONS[item] ?? Box;
               const active = checked.has(item);
+              const iconColor = idx % 2 === 0 ? "text-teal-600" : "text-amber-600";
               return (
                 <button
                   key={item}
@@ -271,7 +272,7 @@ function SubItemsModal({
                   onClick={() => toggle(item)}
                   className={`relative flex flex-col items-center justify-center gap-2.5 py-5 px-2 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.97] ${
                     active
-                      ? "bg-white shadow-sm ring-2 ring-brand"
+                      ? "bg-brand/10 shadow-sm ring-2 ring-brand"
                       : "bg-white shadow-sm hover:shadow-md"
                   }`}
                 >
@@ -283,10 +284,10 @@ function SubItemsModal({
                   <Icon
                     size={24}
                     strokeWidth={1.5}
-                    className={active ? "text-brand" : "text-brand/70"}
+                    className={iconColor}
                   />
                   <span className={`text-sm font-medium leading-tight text-center transition-colors ${
-                    active ? "text-brand" : "text-text"
+                    active ? "text-text" : "text-text-secondary"
                   }`}>
                     {item}
                   </span>
@@ -306,7 +307,7 @@ function SubItemsModal({
               }}
               className={`relative flex flex-col items-center justify-center gap-2.5 py-5 px-2 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.97] border-2 border-dashed ${
                 otherActive
-                  ? "bg-white shadow-sm ring-2 ring-brand border-transparent"
+                  ? "bg-brand/10 shadow-sm ring-2 ring-brand border-transparent"
                   : "bg-white/60 border-gray-300 hover:shadow-md hover:border-brand/40"
               }`}
             >
@@ -318,10 +319,10 @@ function SubItemsModal({
               <Pencil
                 size={24}
                 strokeWidth={1.5}
-                className={otherActive ? "text-brand" : "text-brand/70"}
+                className="text-violet-500"
               />
               <span className={`text-sm font-medium text-center transition-colors ${
-                otherActive ? "text-brand" : "text-text"
+                otherActive ? "text-text" : "text-text-secondary"
               }`}>
                 Other
               </span>
@@ -405,8 +406,7 @@ export function NewRequestModal(props: Props) {
   function selectBundle(value: string) {
     setSelected(value);
     setLooseText("");
-    const items = BUNDLE_SUB_ITEMS[value] ?? [];
-    setCheckedItems(new Set(items));
+    setCheckedItems(new Set());
     setOtherItem("");
     // Open sub-items modal immediately
     setSubItemsModalPhase(value);
