@@ -314,3 +314,25 @@ workflows:
           eas build --platform ios --profile production --non-interactive
     artifacts:
       - apps/timekeeper/build/**
+
+  ios-build-operator-2:
+    name: iOS Build — Operator 2 (EAS)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      node: 20
+      groups:
+        - expo_credentials
+    triggering:
+      events: []
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Install EAS CLI
+        script: npm install -g eas-cli
+      - name: Build iOS
+        script: |
+          cd apps/operator_2
+          eas build --platform ios --profile production --non-interactive
+    artifacts:
+      - apps/operator_2/build/**
