@@ -64,7 +64,7 @@ jobs:
       # Expo apps — typecheck but don't fail (React 18/19 false positives)
       - name: Typecheck Expo apps (informational)
         run: |
-          for app in timekeeper operator field inspect; do
+          for app in timekeeper operator operator_2 field inspect; do
             echo "::group::$app"
             npx tsc --noEmit -p apps/$app/tsconfig.json 2>&1 | tail -5 || true
             echo "::endgroup::"

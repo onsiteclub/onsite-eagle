@@ -12,6 +12,7 @@ on:
           - inspect
           - timekeeper
           - operator
+          - operator_2
           - field
       profile:
         description: 'Build profile'
