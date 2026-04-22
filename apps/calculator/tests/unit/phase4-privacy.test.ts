@@ -50,9 +50,10 @@ describe('F11 – Consent sync to Supabase', () => {
     expect(src).toContain("import { supabase, isSupabaseEnabled }");
   });
 
-  it('syncConsentToServer upserts to consents table', () => {
+  it('syncConsentToServer upserts to core_consents table', () => {
+    // core_consents is the canonical table name per Cerbero directive 2026-01-29
     const src = read('src/lib/consent.ts');
-    expect(src).toContain("from('consents').upsert");
+    expect(src).toContain("from('core_consents').upsert");
   });
 
   it('syncConsentToServer skips microphone_usage (local-only)', () => {

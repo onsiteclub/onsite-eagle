@@ -44,8 +44,14 @@ describe('formatInches', () => {
   it('formats whole inches', () => {
     // Whole inches without fractions/feet: no " suffix (engine v3.2 behavior)
     expect(formatInches(8)).toBe('8');
-    // 12 inches = 1 foot exactly: shows feet with " but no 0 inches
-    expect(formatInches(12)).toBe("1' \"");
+    expect(formatInches(11)).toBe('11');
+  });
+
+  it('formats exact feet without empty-quote (D2 fix)', () => {
+    expect(formatInches(12)).toBe("1'");
+    expect(formatInches(36)).toBe("3'");
+    // Regression for "9639' \"" bug (25' 6 × 31' 6 was showing empty inch quote)
+    expect(formatInches(115668)).toBe("9639'");
   });
 
   it('formats fractions', () => {
@@ -61,6 +67,32 @@ describe('formatInches', () => {
   it('formats feet and inches', () => {
     expect(formatInches(30)).toBe("2' 6\"");
     expect(formatInches(42)).toBe("3' 6\"");
+  });
+
+  it('formats feet + fraction without double space', () => {
+    // 1 foot + 1/2" — must be `1' 1/2"` with single space, not `1'  1/2"`
+    expect(formatInches(12.5)).toBe("1' 1/2\"");
+    expect(formatInches(24.25)).toBe("2' 1/4\"");
+  });
+
+  it('formats feet + whole + fraction', () => {
+    expect(formatInches(30.5)).toBe("2' 6 1/2\"");
+  });
+
+  it('handles zero', () => {
+    expect(formatInches(0)).toBe('0');
+  });
+
+  it('handles sixteenths rounding overflow', () => {
+    // 15.99" round(0.99*16)=16 → bumps to 16" → 1' 4"
+    expect(formatInches(15.99)).toBe("1' 4\"");
+    // 11.999" round(0.999*16)=16 → 12" → promotes to 1'
+    expect(formatInches(11.999)).toBe("1'");
+  });
+
+  it('handles negative values', () => {
+    expect(formatInches(-12)).toBe("-1'");
+    expect(formatInches(-6.5)).toBe("-6 1/2\"");
   });
 });
 
@@ -165,15 +197,15 @@ describe('calculate', () => {
     it('adds feet', () => {
       const result = calculate("2' + 1'");
       expect(result?.resultDecimal).toBe(36);
-      // 36 inches = 3 feet exactly
-      expect(result?.resultFeetInches).toBe("3' \"");
+      // 36 inches = 3 feet exactly — no empty inch quote (D2 fix)
+      expect(result?.resultFeetInches).toBe("3'");
     });
 
     it('adds feet and inches', () => {
       const result = calculate("2' 6 + 1' 6");
       expect(result?.resultDecimal).toBe(48);
-      // 48 inches = 4 feet exactly
-      expect(result?.resultFeetInches).toBe("4' \"");
+      // 48 inches = 4 feet exactly — no empty inch quote (D2 fix)
+      expect(result?.resultFeetInches).toBe("4'");
     });
   });
 

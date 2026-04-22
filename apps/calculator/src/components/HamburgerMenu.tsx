@@ -4,6 +4,7 @@
 import { useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import LegalModal from './LegalModal';
+import PrivacyDashboard from './PrivacyDashboard';
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 
@@ -17,6 +18,7 @@ export default function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
   const [legalChoice, setLegalChoice] = useState<'privacy' | 'terms' | null>(null);
+  const [showPrivacyDashboard, setShowPrivacyDashboard] = useState(false);
 
   const openUrl = useCallback((url: string) => {
     window.open(url, Capacitor.isNativePlatform() ? '_system' : '_blank');
@@ -132,9 +134,21 @@ export default function HamburgerMenu() {
 
           <div className="menu-divider" />
 
-          <button className="menu-item" onClick={handlePrivacyPolicy}>
+          <button
+            className="menu-item"
+            onClick={() => { setShowPrivacyDashboard(true); setIsOpen(false); }}
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+            <span>Privacidade</span>
+          </button>
+
+          <button className="menu-item" onClick={handlePrivacyPolicy}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
             </svg>
             <span>Privacy Policy</span>
           </button>
@@ -158,6 +172,11 @@ export default function HamburgerMenu() {
           <span className="menu-copyright">OnSite Club Inc.</span>
         </div>
       </div>
+
+      {/* Privacy Dashboard (Phase 5.2 — consent revocation, data deletion) */}
+      {showPrivacyDashboard && (
+        <PrivacyDashboard onClose={() => setShowPrivacyDashboard(false)} />
+      )}
 
       {/* Legal Modal (Privacy Policy / Terms of Service) */}
       <LegalModal

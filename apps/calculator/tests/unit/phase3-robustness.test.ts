@@ -5,8 +5,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-// Read source files
-const calculatorSrc = readFileSync(resolve(__dirname, '../../src/components/Calculator.tsx'), 'utf-8');
+// Read source files.
+// Phase 3.2: Calculator.tsx was replaced by ConversationalCalculator.tsx as the main container.
+// Regression checks (F04 timeout, F18/F19 toast) now target the new component.
+const calculatorSrc = readFileSync(resolve(__dirname, '../../src/components/ConversationalCalculator.tsx'), 'utf-8');
 
 const voiceRecorderSrc = readFileSync(resolve(__dirname, '../../src/hooks/useVoiceRecorder.ts'), 'utf-8');
 const appSrc = readFileSync(resolve(__dirname, '../../src/App.tsx'), 'utf-8');
@@ -88,7 +90,7 @@ describe('F08 - Max recording duration', () => {
 });
 
 describe('F18+F19 - No alert()/confirm() in source', () => {
-  it('Calculator.tsx has no alert() calls', () => {
+  it('ConversationalCalculator has no alert() calls', () => {
     // Match alert( but not setToast which might contain the word
     const alertCalls = calculatorSrc.match(/\balert\s*\(/g);
     expect(alertCalls).toBeNull();
@@ -114,21 +116,21 @@ describe('F18+F19 - No alert()/confirm() in source', () => {
     expect(toastSrc).toContain("'success'");
   });
 
-  it('Calculator uses Toast for error feedback', () => {
+  it('ConversationalCalculator uses Toast for error feedback', () => {
     expect(calculatorSrc).toContain('import Toast');
     expect(calculatorSrc).toContain('setToast');
     expect(calculatorSrc).toContain('<Toast');
   });
 
   it('shows toast when microphone denied', () => {
-    // The denied message and setToast may be on different lines (ternary expression)
-    expect(calculatorSrc).toContain('Microphone access denied');
+    // Phase 3.2 migrated copy to Portuguese — this checks the denial branch still raises a toast.
+    expect(calculatorSrc).toContain('Microfone negado');
     expect(calculatorSrc).toContain('setToast');
   });
 
   it('shows toast when voice API fails', () => {
     const lines = calculatorSrc.split('\n');
-    const failLine = lines.find(l => l.includes('Voice recognition failed'));
+    const failLine = lines.find(l => l.includes('Falha no reconhecimento'));
     expect(failLine).toBeDefined();
     expect(failLine).toContain('setToast');
   });

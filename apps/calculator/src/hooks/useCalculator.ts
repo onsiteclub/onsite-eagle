@@ -4,6 +4,7 @@
 import { useState, useCallback } from 'react';
 import { calculate, type CalculationResult } from '../lib/calculator';
 import { saveCalculation, type InputMethod } from '../lib/calculations';
+import { sanitizeExpression } from '../lib/sanitize-expression';
 import { logger } from '../lib/logger';
 import { logger as pkgLogger } from '@onsite/logger';
 
@@ -144,15 +145,8 @@ export function useCalculator(): UseCalculatorReturn {
   // Seta expressão e calcula imediatamente (para voice input)
   // NOVO: Se expressão começa com operador, continua do resultado anterior
   const setExpressionAndCompute = useCallback((value: string, saveOptions?: SaveOptions) => {
-    // Sanitizar separadores de milhar que GPT pode inserir (ex: "10.000" → "10000", "10,000" → "10000")
-    // Regra: ponto ou vírgula seguido de exatamente 3 dígitos = separador de milhar (não decimal)
-    let sanitized = value;
-    let prev;
-    do { prev = sanitized; sanitized = sanitized.replace(/(\d),(\d{3})(?=\D|$)/g, '$1$2'); } while (sanitized !== prev);
-    do { prev = sanitized; sanitized = sanitized.replace(/(\d)\.(\d{3})(?=\D|$)/g, '$1$2'); } while (sanitized !== prev);
-
-    // Sanitizar "N / 100" → "N%" (GPT às vezes converte "por cento" para "/ 100")
-    sanitized = sanitized.replace(/(\d+)\s*\/\s*100\b/g, '$1%');
+    // Strip thousand separators + normalize percentage (shared with the voice API).
+    let sanitized = sanitizeExpression(value);
 
     // Remove palavras/letras — só permite números, operadores, frações e símbolos de medida
     sanitized = sanitized.replace(/[a-zA-ZÀ-ÿ]+/g, '').replace(/\s{2,}/g, ' ').trim();

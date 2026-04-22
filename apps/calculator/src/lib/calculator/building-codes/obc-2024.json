@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "_meta": {
+    "code": "Ontario Building Code 2024",
+    "scope": "Residential private stairs — OBC Division B, 9.8.4 & 9.8.5",
+    "_reference": "https://www.ontario.ca/laws/regulation/120332 (consult primary source for commercial/egress)",
+    "_note": "Values reflect the 2024 OBC update. All limits in millimeters; convert to inches on display. This file is versioned so updates don't require code changes.",
+    "last_verified": "2026-04-22"
+  },
+  "stairs": {
+    "rise": {
+      "min_mm": 125,
+      "max_mm": 200,
+      "min_in": 4.92,
+      "max_in": 7.87,
+      "message_en": "Stair rise must be between 125mm (4.92 in) and 200mm (7.87 in).",
+      "message_pt": "Altura do espelho deve estar entre 125mm (4.92 in) e 200mm (7.87 in)."
+    },
+    "run": {
+      "min_mm": 255,
+      "max_mm": 355,
+      "min_in": 10.04,
+      "max_in": 13.98,
+      "message_en": "Tread run must be at least 255mm (10 in) and no more than 355mm (14 in).",
+      "message_pt": "Profundidade do piso deve ser entre 255mm (10 in) e 355mm (14 in)."
+    },
+    "nosing": {
+      "max_mm": 25,
+      "max_in": 0.98,
+      "message_en": "Tread nosing projection cannot exceed 25mm (1 in).",
+      "message_pt": "Saliência do piso não pode passar de 25mm (1 in)."
+    },
+    "headroom": {
+      "min_mm": 1950,
+      "min_in": 76.77,
+      "message_en": "Headroom must be at least 1950mm (77 in) above the leading edge of the tread.",
+      "message_pt": "Pé-direito sobre a escada deve ser no mínimo 1950mm (77 in)."
+    },
+    "uniformity": {
+      "rise_variance_max_mm": 5,
+      "run_variance_max_mm": 5,
+      "message_en": "Successive risers and treads must be uniform within 5mm.",
+      "message_pt": "Espelhos e pisos consecutivos não podem variar mais de 5mm."
+    }
+  }
+}

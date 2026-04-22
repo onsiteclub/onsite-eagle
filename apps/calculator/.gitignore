@@ -62,3 +62,9 @@ nul
 # Keystore (security)
 *.keystore
 *.jks
+
+# Generated CSS vars (output of scripts/generate-css-vars.ts)
+src/styles/tokens.generated.css
+
+# Voice regression run output (expensive — per-run, not committed)
+tests/voice-regression/report/

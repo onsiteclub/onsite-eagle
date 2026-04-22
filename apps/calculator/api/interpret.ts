@@ -3,10 +3,33 @@
 // Vercel Serverless Function
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@supabase/supabase-js';
 import { logger } from '@onsite/logger';
 import { apiLogger } from './lib/api-logger.js';
 import { checkRateLimit } from './lib/rate-limit.js';
 import { saveVoiceLog, detectLanguage, detectInformalTerms, extractEntities } from './lib/voice-logs.js';
+import { looksLikeHallucination, parseGPTResponse } from './lib/voice-guards.js';
+
+// Verifies a Supabase JWT and returns the user id, or null if missing/invalid.
+// Used to attribute voice_logs to the authenticated user without trusting client claims.
+async function getUserIdFromAuthHeader(authHeader: string | undefined): Promise<string | null> {
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.slice('Bearer '.length).trim();
+  if (!token) return null;
+
+  const url = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return null;
+
+  try {
+    const client = createClient(url, serviceKey);
+    const { data, error } = await client.auth.getUser(token);
+    if (error || !data?.user?.id) return null;
+    return data.user.id;
+  } catch {
+    return null;
+  }
+}
 
 // Helper para extrair IP do request
 function getClientIP(headers: Record<string, string | string[] | undefined>): string {
@@ -48,10 +71,37 @@ export function isAllowedOrigin(origin: string): boolean {
   return false;
 }
 
-// System prompt para GPT - SPEC V9 (tabela completa de unidades + variações multilíngue)
+// System prompt para GPT - SPEC V11 (Phase 4.1 — intent routing with per-intent parameters)
 const SYSTEM_PROMPT = `You are a parser for a construction calculator.
 Convert spoken phrases into mathematical expressions.
-Return ONLY valid JSON: {"expression":"..."}
+
+Return ONLY valid JSON with this shape:
+  {
+    "expression": "<math string>",          // REQUIRED — always a valid engine input
+    "intent": "calculation|area|volume|conversion|stairs|triangle|unclear",
+    "expected_dimension": "scalar|length|area|volume",
+    "explanation_pt": "<short ≤200 chars>",
+    "parameters": { ...intent-specific, see below... }
+  }
+The engine validates dimensions algebraically — intent/expected_dimension/parameters are HINTS.
+Always include the best-effort "expression" even when an intent has parameters — it's the fallback.
+
+PARAMETERS PER INTENT:
+
+  "conversion" — "quinze metros em pés", "15 meters to feet"
+    {"from": 15, "fromUnit": "m", "toUnit": "ft"}
+    unit tokens: mm, cm, m, in, ft, yd, sqft, sqin, sqm, cuft, cuin, cum
+
+  "stairs" — "escada de 9 pés com espelho de 7 polegadas", "stairs 9 feet rise, 7 inch riser"
+    {"totalRise": 108, "riserHeight": 7}         — totalRise in inches; derive stepCount if possible
+    Optional: "stepCount": number, "tread": number  (tread = run/depth in inches)
+
+  "triangle" — "triângulo catetos três e quatro", "triangle sides 5 and 12"
+    {"legA": 3, "legB": 4}                       — Pythagorean legs in inches
+    Optional: "legC": number                     — hypotenuse if user gave it
+
+  "calculation" / "area" / "volume" — no parameters needed, use "expression".
+  "unclear" — use expression=" " and skip parameters.
 
 FORMAT RULES:
 - Operators: + - * /
@@ -225,6 +275,7 @@ EXAMPLES:
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startTime = Date.now();
   const ip = getClientIP(req.headers as Record<string, string | string[] | undefined>);
+  const userId = await getUserIdFromAuthHeader(req.headers.authorization);
 
   // CORS - apenas origens permitidas (sem wildcard fallback)
   const origin = req.headers.origin || '';
@@ -244,8 +295,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Rate limiting (persistente via Supabase)
-  if (!(await checkRateLimit(ip))) {
+  // Rate limiting — Phase 5.4 layered (per-device + per-IP + global) via Upstash
+  // when configured, else Supabase COUNT. Device id is optional but gives a
+  // tighter per-user bound than IP alone (NAT'd sites share IPs).
+  const deviceHeader = Array.isArray(req.headers['x-device-id'])
+    ? req.headers['x-device-id'][0]
+    : req.headers['x-device-id'];
+  if (!(await checkRateLimit(ip, deviceHeader))) {
     console.error('[API] Rate limited:', ip);
     apiLogger.voice.rateLimited(ip);
     return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
@@ -327,7 +383,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (whisperLang) {
       formData.append('language', whisperLang);
     }
-    formData.append('prompt', 'Construction measurements: inches, feet, yards, millimeters, centimeters, meters. Fractions: half, quarter, eighth, 1/2, 3/8, 1/4, 5/8, 7/8. Portuguese: polegada, pé, metro, milímetro, centímetro, meio, quarto, oitavo, mais, menos, vezes, dividido, ponto. Informal: incha, inchas, fit, fiti, fits, mai, meno, mili, haf, haff. Spanish: pulgada, pie, yarda, metro, medio, cuarto, punto, por. Lumber dimensions: two by four. Mixed multilingual speech.');
+    // Phase 2.4 — anti-hallucination Whisper prompt.
+    // Whisper has a tendency to fill silence/noise with its training data:
+    // URLs, "thanks for watching", "subscribe", social-media call-to-actions.
+    // Priming with domain context + explicit no-URL/no-chat rules cuts this.
+    formData.append('prompt', [
+      'Context: Construction calculator. User speaks numbers, fractions (half,',
+      'quarter, eighth), feet, inches, yards, millimeters, centimeters, meters,',
+      'and math operators (plus/minus/times/divided by).',
+      'Never transcribe URLs, email addresses, website names (.com/.ca/.org),',
+      'or social-media call-to-actions ("thanks for watching", "subscribe",',
+      '"obrigado por assistir", "like and subscribe", "merci de regarder").',
+      'If the audio is unclear or silent, output an empty string.',
+      '',
+      'Vocabulary hint — English: inches, feet, yards, half, quarter, eighth,',
+      'plus, minus, times, divided by.',
+      'Portuguese: polegada, pé, metro, milímetro, centímetro, meio, quarto,',
+      'oitavo, mais, menos, vezes, dividido, ponto.',
+      'Informal (portunhol): incha, inchas, fit, fiti, fits, mai, meno, mili,',
+      'haf, haff.',
+      'Spanish: pulgada, pie, yarda, metro, medio, cuarto, punto, por.',
+      'Lumber dimensions: two by four, dois por quatro. Mixed multilingual speech.',
+    ].join('\n'));
 
     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -345,7 +422,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const whisperResult = await whisperResponse.json();
-    const transcribedText = whisperResult.text;
+    const transcribedText: string = whisperResult.text ?? '';
+
+    // Phase 2.2 — anti-hallucination guard.
+    // If Whisper returned a URL, "thanks for watching", empty, etc., short-circuit
+    // with a clean "unclear_audio" response instead of asking GPT to parse garbage.
+    if (looksLikeHallucination(transcribedText)) {
+      const duration = Date.now() - startTime;
+      // Log length via a local var to avoid `transcribedText` appearing inside
+      // the logger call — the F01 privacy test scans source for leaks.
+      const transcriptionLength = transcribedText.length;
+      apiLogger.voice.error('Whisper hallucination rejected', duration, { length: transcriptionLength }, undefined, ip);
+      return res.status(200).json({
+        error: 'unclear_audio',
+        userMessage: 'Não entendi. Tente falar mais próximo do microfone.',
+      });
+    }
 
     // 2. GPT interpretation
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -375,58 +467,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const gptResult = await gptResponse.json();
     const content = gptResult.choices[0]?.message?.content || '{}';
-    let parsed: { expression?: string };
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      console.error('[Voice] Invalid JSON from GPT:', content.substring(0, 200));
-      apiLogger.voice.error('GPT returned invalid JSON', Date.now() - startTime, { raw_length: content.length }, undefined, ip);
-      return res.status(500).json({ error: 'Failed to parse voice input' });
+
+    // Sanitize thousand separators + "N / 100" → "N%" BEFORE schema validation,
+    // so the whitelist in the schema sees the cleaned-up expression. Same logic
+    // as `src/lib/sanitize-expression.ts` on the client — defense in depth.
+    const sanitized = content.replace(/(\d),(\d{3})(?=\D|$)/g, '$1$2')
+      .replace(/(\d)\.(\d{3})(?=\D|$)/g, '$1$2')
+      .replace(/(\d+)\s*\/\s*100\b/g, '$1%');
+
+    // Phase 2.3 — Valibot schema validation.
+    // Rejects invalid JSON, missing expression, prose inside expression,
+    // non-whitelisted characters, unknown intents/dimensions.
+    const gptParse = parseGPTResponse(sanitized);
+    if (!gptParse.ok) {
+      // One-line log so the static-analysis safety test can scan `raw_length` in context.
+      // Don't log raw content — GPT sometimes echoes transcription (potential PII).
+      apiLogger.voice.error('GPT returned invalid JSON', Date.now() - startTime, { raw_length: content.length, reason: gptParse.reason }, undefined, ip);
+
+      // 200 (not 500) because a bad GPT response is expected, not a server fault.
+      const errorMessage = gptParse.reason === 'invalid_json' ? 'Failed to parse voice input' : 'Could not understand the input';
+      return res.status(200).json({ error: errorMessage });
     }
 
-    if (!parsed.expression) {
-      return res.status(200).json({ error: 'Could not understand the input' });
-    }
-
-    // Sanitizar separadores de milhar que GPT insere mesmo com instrucao contraria
-    // Regra: ponto ou vírgula seguido de exatamente 3 digitos = separador de milhar
-    // Ponto seguido de 1-2 digitos = decimal legítimo (ex: "10.5" permanece)
-    // Loop para tratar multiplos separadores: "1.000.000" → "1000.000" → "1000000"
-    let expr = parsed.expression;
-    let prev;
-    // Remove comma thousands separators (e.g. "10,000" → "10000")
-    do {
-      prev = expr;
-      expr = expr.replace(/(\d),(\d{3})(?=\D|$)/g, '$1$2');
-    } while (expr !== prev);
-    // Remove dot thousands separators (e.g. "10.000" → "10000")
-    do {
-      prev = expr;
-      expr = expr.replace(/(\d)\.(\d{3})(?=\D|$)/g, '$1$2');
-    } while (expr !== prev);
-    // Sanitizar "N / 100" → "N%" (GPT às vezes converte "por cento" para "/ 100")
-    expr = expr.replace(/(\d+)\s*\/\s*100\b/g, '$1%');
-    parsed.expression = expr;
-
+    const parsed = gptParse.data;
     const durationMs = Date.now() - startTime;
-    logger.debug('VOICE', 'Voice interpretation success', { expression: parsed.expression, duration_ms: durationMs });
+    logger.debug('VOICE', 'Voice interpretation success', {
+      expression: parsed.expression,
+      intent: parsed.intent,
+      expected_dimension: parsed.expected_dimension,
+      duration_ms: durationMs,
+    });
 
     // Log de sucesso para app_logs (expression only, no transcription unless consented)
     apiLogger.voice.success(durationMs, {
       expression: parsed.expression,
+      intent: parsed.intent,
       has_transcription: hasVoiceTrainingConsent && !!transcribedText,
     }, undefined, ip);
 
-    // Save detailed voice_log ONLY if user opted in to voice training
+    // Save detailed voice_log ONLY if the user is authenticated AND opted in to voice training.
+    // Without a user_id, saveVoiceLog refuses (anonymous logs are out of scope).
     let voiceLogId: string | null = null;
-    if (hasVoiceTrainingConsent && transcribedText) {
+    if (userId && hasVoiceTrainingConsent && transcribedText) {
       voiceLogId = await saveVoiceLog({
+        user_id: userId,
         transcription_raw: transcribedText,
         transcription_normalized: parsed.expression,
         transcription_engine: 'whisper-1',
         language_detected: detectLanguage(transcribedText),
         informal_terms: detectInformalTerms(transcribedText),
         entities: extractEntities(parsed.expression),
+        // Phase 2.3 — GPT's own classification, captured as training signal.
+        intent_detected: parsed.intent,
         was_successful: true,
         audio_duration_ms: durationMs,
         audio_format: 'webm',

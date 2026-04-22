@@ -1,6 +1,300 @@
+# Monorepo Codemagic pipelines.
+# One file at the repo root is authoritative for Codemagic — per-app yaml files
+# inside apps/*/codemagic.yaml are NOT picked up; they exist as reference only.
+#
+# Env var groups (configure in Codemagic UI → App settings → Environment variables):
+#   supabase_credentials       → VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+#   google_play_credentials    → GCLOUD_SERVICE_ACCOUNT_CREDENTIALS (JSON service account)
+#   expo_credentials           → EXPO_TOKEN (for Expo/EAS builds)
+#
+# Code signing groups (Codemagic UI → Code signing):
+#   onsite_calculator_keystore → .keystore file + passwords for ca.onsiteclub.calculator
+#   App Store Connect integration named "OnSite Calculator" (linked to ca.onsiteclub.calculator)
+
 workflows:
+
+  # =============================================================================
+  # CALCULATOR — Android Google Play Release (AAB + APK)
+  # Triggers on push to main or on `calculator-v*` tags.
+  # =============================================================================
+  calculator-android-release:
+    name: Calculator · Android Release
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      android_signing:
+        - onsite_calculator_keystore
+      groups:
+        - supabase_credentials
+        - google_play_credentials
+      vars:
+        PACKAGE_NAME: "ca.onsiteclub.calculator"
+      node: 20
+      java: 17
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      tag_patterns:
+        - pattern: 'calculator-v*'
+          include: true
+
+    scripts:
+      # Monorepo install — picks up calculator's deps + workspace packages.
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      # Scoped unit tests — fails the build if they fail.
+      - name: Run calculator tests
+        script: |
+          npm run test --workspace=@onsite/calculator -- --run
+
+      # Vite build + prebuild tokens script (runs automatically via npm's `prebuild` hook).
+      - name: Build web bundle
+        script: |
+          cd apps/calculator
+          npm run build
+
+      - name: Sync Capacitor Android
+        script: |
+          cd apps/calculator
+          npx cap sync android
+
+      # Gradle picks up the release signingConfig automatically once
+      # CM_KEYSTORE_PATH + CM_KEYSTORE_PASSWORD + CM_KEY_PASSWORD are set by
+      # the android_signing group above (see apps/calculator/android/app/build.gradle).
+      - name: Build Android AAB (release)
+        script: |
+          cd apps/calculator/android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+
+      - name: Build Android APK (release)
+        script: |
+          cd apps/calculator/android
+          ./gradlew assembleRelease
+
+    artifacts:
+      - apps/calculator/android/app/build/outputs/bundle/release/*.aab
+      - apps/calculator/android/app/build/outputs/apk/release/*.apk
+      - apps/calculator/android/app/build/outputs/mapping/release/mapping.txt
+
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+
+  # =============================================================================
+  # CALCULATOR — Android Debug (on PR to any branch)
+  # =============================================================================
+  calculator-android-debug:
+    name: Calculator · Android Debug (PR)
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      groups:
+        - supabase_credentials
+      vars:
+        PACKAGE_NAME: "ca.onsiteclub.calculator"
+      node: 20
+      java: 17
+
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Run calculator tests
+        script: |
+          npm run test --workspace=@onsite/calculator -- --run
+
+      - name: Build web bundle
+        script: |
+          cd apps/calculator
+          npm run build
+
+      - name: Sync Capacitor Android
+        script: |
+          cd apps/calculator
+          npx cap sync android
+
+      - name: Build Android APK (debug)
+        script: |
+          cd apps/calculator/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+    artifacts:
+      - apps/calculator/android/app/build/outputs/apk/debug/*.apk
+
+  # =============================================================================
+  # CALCULATOR — iOS TestFlight (push to main or calculator-v* tag)
+  # =============================================================================
+  calculator-ios-testflight:
+    name: Calculator · iOS TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    integrations:
+      app_store_connect: OnSite Calculator
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: ca.onsiteclub.calculator
+      groups:
+        - supabase_credentials
+      vars:
+        XCODE_WORKSPACE: "apps/calculator/ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 20
+      xcode: latest
+      cocoapods: default
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      tag_patterns:
+        - pattern: 'calculator-v*'
+          include: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Build web bundle
+        script: |
+          cd apps/calculator
+          npm run build
+
+      - name: Sync Capacitor iOS
+        script: |
+          cd apps/calculator
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        script: |
+          cd apps/calculator/ios/App
+          pod install
+
+      - name: Set up iOS code signing
+        script: |
+          xcode-project use-profiles
+
+      # Auto-increment CFBundleVersion based on the latest TestFlight build + 2
+      # so we always stay ahead of pending reviews. APP_STORE_APP_ID is injected
+      # by the App Store Connect integration.
+      - name: Increment build number
+        script: |
+          cd apps/calculator/ios/App
+          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" || echo 0)
+          NEW_BUILD=$((LATEST_BUILD + 2))
+          echo "Latest TestFlight build: $LATEST_BUILD → New build: $NEW_BUILD"
+          agvtool new-version -all $NEW_BUILD
+
+      - name: Build iOS app (Release)
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --config Release
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+
+  # =============================================================================
+  # CALCULATOR — iOS Debug (on PR)
+  # =============================================================================
+  calculator-ios-debug:
+    name: Calculator · iOS Debug (PR)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      groups:
+        - supabase_credentials
+      vars:
+        XCODE_WORKSPACE: "apps/calculator/ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 20
+      xcode: latest
+      cocoapods: default
+
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Build web bundle
+        script: |
+          cd apps/calculator
+          npm run build
+
+      - name: Sync Capacitor iOS
+        script: |
+          cd apps/calculator
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        script: |
+          cd apps/calculator/ios/App
+          pod install
+
+      - name: Build iOS (Debug, Simulator)
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --config Debug \
+            --archive-flags="-destination 'generic/platform=iOS Simulator'"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+  # =============================================================================
+  # TIMEKEEPER — iOS Build (EAS). Manual trigger only.
+  # =============================================================================
   ios-build:
-    name: iOS Build (EAS)
+    name: iOS Build (EAS) — Timekeeper
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:

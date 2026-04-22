@@ -11,36 +11,40 @@ const interpretSource = readFileSync(
 );
 
 describe('F09 - JSON.parse safety', () => {
-  it('JSON.parse is wrapped in try/catch', () => {
-    // Find the JSON.parse call and verify it's inside a try block
-    const lines = interpretSource.split('\n');
-    const jsonParseLineIndex = lines.findIndex(l => l.includes('parsed = JSON.parse(content)'));
-    expect(jsonParseLineIndex).toBeGreaterThan(-1);
+  // Phase 2.3 — GPT response parsing was moved into `api/lib/voice-guards.ts`
+  // (`parseGPTResponse`), which does the JSON.parse + Valibot shape validation
+  // inside a try/catch and returns `{ ok: false, reason }` on any failure.
+  // These regressions check that interpret.ts actually USES that safe wrapper,
+  // handles its failure path, and doesn't leak raw content in logs.
 
-    // Look backwards for 'try {' before the JSON.parse
-    const precedingLines = lines.slice(Math.max(0, jsonParseLineIndex - 5), jsonParseLineIndex);
-    const hasTry = precedingLines.some(l => l.includes('try'));
-    expect(hasTry).toBe(true);
+  it('delegates parsing to parseGPTResponse (no raw JSON.parse on GPT content)', () => {
+    // The only direct JSON.parse on GPT output would be unsafe; the guarded call is:
+    expect(interpretSource).toContain('parseGPTResponse(sanitized)');
+    // And interpret.ts must NOT directly call JSON.parse on `content` — it delegates.
+    expect(interpretSource).not.toMatch(/JSON\.parse\(\s*content\s*\)/);
   });
 
-  it('has catch block that returns error response for invalid JSON', () => {
-    // Verify there's a catch handling the JSON.parse failure
+  it('handles the ok=false branch explicitly', () => {
+    // The rejection branch must return a clean error shape.
+    expect(interpretSource).toContain('if (!gptParse.ok)');
+    // Both user-facing error messages still appear (routing on reason).
+    expect(interpretSource).toContain("'Failed to parse voice input'");
+    expect(interpretSource).toContain("'Could not understand the input'");
+  });
+
+  it('has a dedicated error log line for GPT parse failure', () => {
+    // Keeps the "GPT returned invalid JSON" signature so existing dashboards keep working.
     expect(interpretSource).toContain('GPT returned invalid JSON');
-    expect(interpretSource).toContain("error: 'Failed to parse voice input'");
-  });
-
-  it('validates expression field exists before proceeding', () => {
-    expect(interpretSource).toContain('if (!parsed.expression)');
-    expect(interpretSource).toContain("error: 'Could not understand the input'");
   });
 
   it('does not log raw GPT content (could contain PII from transcription)', () => {
-    // Find the line with the GPT invalid JSON error log
-    const line = interpretSource.split('\n').find(l => l.includes('GPT returned invalid JSON'));
+    // Find the apiLogger.voice.error call for the GPT rejection.
+    const line = interpretSource.split('\n').find((l) => l.includes('GPT returned invalid JSON'));
     expect(line).toBeTruthy();
-    // Should log raw_length, not raw_content or the full content string
+    // Should log raw_length / reason only — never the full content or a preview.
     expect(line!).toContain('raw_length');
     expect(line!).not.toContain('raw_content');
+    expect(line!).not.toContain('content_preview');
   });
 });
 

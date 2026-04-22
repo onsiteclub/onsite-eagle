@@ -34,8 +34,9 @@ describe('F01 - Privacy: Transcription not logged', () => {
     }
   });
 
-  it('console.log success line does NOT contain transcription', () => {
-    const successLogs = interpretSource.match(/console\.log\(\s*'\[Voice\] Success:.*\)/g) || [];
+  it('logger.debug success call does NOT contain transcription', () => {
+    // Code was migrated from console.log('[Voice] Success:...') to logger.debug('VOICE', 'Voice interpretation success', ...)
+    const successLogs = interpretSource.match(/logger\.debug\(\s*'VOICE'\s*,\s*'Voice interpretation success'[^)]*\)/g) || [];
     expect(successLogs.length).toBeGreaterThan(0);
 
     for (const log of successLogs) {

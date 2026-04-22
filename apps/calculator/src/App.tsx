@@ -4,10 +4,11 @@
 
 import { useState, useCallback } from 'react';
 import { AuthProvider, useAuth } from '@onsite/auth';
-import Calculator from './components/Calculator';
+import ConversationalCalculator from './components/ConversationalCalculator';
 import TabNavigation, { type TabType } from './components/TabNavigation';
 import UnitConverter from './components/UnitConverter';
 import TriangleCalculator from './components/TriangleCalculator';
+import StairsCalculator from './components/StairsCalculator';
 import HamburgerMenu from './components/HamburgerMenu';
 import AuthGate from './components/AuthGate';
 import { useOnlineStatus } from './hooks';
@@ -109,16 +110,17 @@ function AppContent() {
       {/* Tab Content */}
       <div className="tab-content">
         {activeTab === 'calculator' && (
-          <Calculator
+          <ConversationalCalculator
             voiceState={voiceState}
             setVoiceState={setVoiceState}
             hasVoiceAccess={!!user}
             onVoiceUpgradeClick={handleVoiceUpgradeClick}
+            onIntentRouted={setActiveTab}
           />
         )}
 
-        {activeTab === 'converter' && (
-          <UnitConverter
+        {activeTab === 'stairs' && (
+          <StairsCalculator
             voiceEnabled={!!user}
             isRecording={voiceState === 'recording'}
           />
@@ -126,6 +128,13 @@ function AppContent() {
 
         {activeTab === 'triangle' && (
           <TriangleCalculator
+            voiceEnabled={!!user}
+            isRecording={voiceState === 'recording'}
+          />
+        )}
+
+        {activeTab === 'converter' && (
+          <UnitConverter
             voiceEnabled={!!user}
             isRecording={voiceState === 'recording'}
           />

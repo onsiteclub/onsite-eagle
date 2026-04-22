@@ -7,6 +7,7 @@ import { useCalculator, useOnlineStatus, useVoiceRecorder, useCalculatorHistory 
 import { logger } from '../lib/logger';
 import { logger as pkgLogger } from '@onsite/logger';
 import { getLocalConsentStatus } from '../lib/consent';
+import { supabase } from '../lib/supabase';
 import { HistoryModal } from './HistoryModal';
 import VoiceConsentModal from './VoiceConsentModal';
 import Toast from './Toast';
@@ -112,6 +113,16 @@ export default function Calculator({
     formData.append('file', audioBlob, 'recording.webm');
     formData.append('voice_training_consent', hasVoiceTrainingConsent ? '1' : '0');
 
+    // Forward the user's JWT so the server can attribute voice_logs to the user.
+    // Missing token = anonymous request; server skips saveVoiceLog.
+    const headers: HeadersInit = {};
+    if (supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
 
@@ -119,6 +130,7 @@ export default function Calculator({
       const response = await fetch(API_ENDPOINT, {
         method: 'POST',
         body: formData,
+        headers,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);

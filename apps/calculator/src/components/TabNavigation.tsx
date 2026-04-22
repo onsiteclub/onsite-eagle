@@ -1,7 +1,8 @@
 // src/components/TabNavigation.tsx
-// Navegação por abas para Calculator, Converter, Triangle
+// Navegação por abas para Calculator, Stairs, Triangle, Converter
+// Phase 4.2: stairs tab added, order: most-used first.
 
-export type TabType = 'calculator' | 'converter' | 'triangle';
+export type TabType = 'calculator' | 'stairs' | 'triangle' | 'converter';
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -44,11 +45,19 @@ const TriangleIcon = () => (
   </svg>
 );
 
+// Escada — lintel-like stepped pattern.
+const StairsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 20, 8 20, 8 15, 13 15, 13 10, 18 10, 18 5, 21 5" />
+  </svg>
+);
+
 export default function TabNavigation({ activeTab, onTabChange }: TabNavigationProps) {
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'calculator', label: 'Calculator', icon: <CalculatorIcon /> },
-    { id: 'converter', label: 'Converter', icon: <ConverterIcon /> },
+    { id: 'stairs', label: 'Stairs', icon: <StairsIcon /> },
     { id: 'triangle', label: 'Triangle', icon: <TriangleIcon /> },
+    { id: 'converter', label: 'Converter', icon: <ConverterIcon /> },
   ];
 
   return (
