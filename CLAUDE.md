@@ -623,6 +623,7 @@ Tables with shared access via access_grants RLS:
 | `log_` | Observabilidade e eventos | `log_errors`, `log_events` |
 | `agg_` | Agregacoes pre-calculadas | `agg_platform_daily` |
 | `int_` | Intelligence/ML patterns | `int_behavior_patterns` |
+| `ops_` | OnSite Ops (invoice/ledger) | `ops_invoices`, `ops_ledger_entries` |
 | `v_` | Views analiticas | `v_churn_risk`, `v_mrr` |
 
 ### 7.2 Table Ownership
@@ -636,6 +637,7 @@ Tables with shared access via access_grants RLS:
 | **Billing** | `bil_products`, `bil_subscriptions`, `bil_payments`, `bil_checkout_codes` | — |
 | **Admin** | `core_admin_users`, `core_admin_logs` | — |
 | **Intelligence** | `agg_*`, `int_behavior_patterns`, `int_voice_patterns`, `int_worker_profiles`, `int_lot_profiles`, `int_delay_attributions`, `int_ai_reports`, `int_ai_contestations` | `v_delay_summary` |
+| **Ops** | `ops_operators`, `ops_companies`, `ops_clients`, `ops_client_company_access`, `ops_gcs`, `ops_invoices`, `ops_invoice_versions`, `ops_ledger_entries`, `ops_accountant_contacts`, `ops_export_logs`, `ops_inbox_blocklist` | — |
 | **Shared** | `core_profiles`, `core_devices`, `core_consents`, `core_access_grants`, `core_pending_tokens` | — |
 | **AI** | `core_ai_conversations` | — |
 | **Reference** | `ref_trades`, `ref_provinces`, `ref_units`, `ref_eagle_phases`, `ref_eagle_phase_items`, `ref_schedule_templates` | — |
@@ -651,6 +653,7 @@ Convencao de nomes para buckets de storage multi-tenant:
 | `tmk-exports` | Timekeeper | Exports de horas (CSV, PDF) | Private |
 | `ccl-audio` | Calculator | Gravacoes de voz para training | Private |
 | `shp-products` | Shop | Imagens de produtos | Public |
+| `ops-invoices` | Ops | PDFs de invoices recebidas + ZIPs de export ao contador | Private (signed URL) |
 | `core-avatars` | Shared | Avatares de usuarios | Public |
 
 **Estrutura de path (multi-tenant):**
@@ -1510,6 +1513,7 @@ SELECT check_email_exists('user@email.com'); -- returns boolean
 | `ccl_` | Calculator | `ccl_calculations`, `ccl_templates` |
 | `egl_` | Eagle | `egl_sites`, `egl_houses`, `egl_photos`, `egl_issues` |
 | `shp_` | Shop | `shp_products`, `shp_orders`, `shp_carts` |
+| `ops_` | OnSite Ops | `ops_operators`, `ops_invoices`, `ops_ledger_entries`, `ops_clients` |
 
 #### Prefixos Compartilhados (+1 dono)
 
@@ -1659,6 +1663,55 @@ minimo que o Eagle precisa atingir para substituir o Excel no canteiro.
 | `egl_phase_rates` | P1 | Rate por sqft por fase |
 | `egl_documents` | P2 | Plantas, RSO, red lines por lote |
 | `egl_crews` + `egl_crew_members` | P2 | Equipes de campo |
+
+### [DIRECTIVE 2026-04-21] OnSite Ops — Sistema isolado de invoices/ledger
+
+**Migration:** `023_onsite_ops.sql`
+**App:** `apps/ops/` (Next.js 16, port 3008)
+**Dono:** OnSite Ops (sub-sub-contratantes gerenciando clientes e invoices)
+
+**Escopo:** dashboard web onde operador (sub-sub-contratante) recebe invoices de
+clientes autonomos por email (`{username}@onsiteclub.ca` via Postmark),
+reconcilia contra pagamentos de General Contractors (Mattamy, Minto, Tamarack),
+paga cash aos clientes descontando porcentagem, e envia fechamento ao contador.
+
+**11 tabelas criadas (todas com RLS):**
+
+| Tabela | Proposito |
+|---|---|
+| `ops_operators` | User 1:1 com `auth.users` — `inbox_username` unico |
+| `ops_companies` | Empresas legais do operador (JK, Maple, Redwood…) |
+| `ops_clients` | Clientes do operador, PK logica `(operator_id, email)` |
+| `ops_client_company_access` | N:N: quais empresas cada cliente pode usar |
+| `ops_gcs` | General Contractors |
+| `ops_invoices` | Invoices recebidas por email (append-only quando `locked`) |
+| `ops_invoice_versions` | Historico se mesma invoice chegar duas vezes |
+| `ops_ledger_entries` | Extrato append-only (6 entry_types) |
+| `ops_accountant_contacts` | Email do contador |
+| `ops_export_logs` | Historico de fechamentos enviados |
+| `ops_inbox_blocklist` | Emails bloqueados |
+
+**Decisoes arquiteturais (EXCECOES ao padrao CERBERO):**
+
+1. **Sem `organization_id`** (viola DIRECTIVE 2026-02-02). Cada operador e seu
+   proprio tenant — nao ha conceito de empresa-multi-user. RLS e por
+   `operator_id → user_id = auth.uid()`.
+
+2. **Nunca faz query cross-app.** Nao le `core_profiles`, `tmk_*` nem nada fora
+   de `ops_*`. Comunicacao com outros apps (Timekeeper) e exclusivamente via
+   email inbound (`MFMailComposeViewController`/`Intent.ACTION_SEND`).
+
+3. **Imutabilidade fiscal:** sem policy DELETE em `ops_invoices` e
+   `ops_ledger_entries`. Invoices em status `locked` nao podem ser editadas
+   (policy UPDATE filtra `status != 'locked'`). Correcoes viram
+   `entry_type = 'adjustment'`.
+
+4. **Storage bucket `ops-invoices`** (privado, signed URLs). Path:
+   `{operator_id}/{sha256}.pdf`. Upload apenas via service_role (webhook
+   `/api/inbox`).
+
+**Fontes:** `apps/ops/DIRECTIVE.md` (plano de execucao v2.0),
+`apps/ops/BRIEFING.md` (spec tecnica v1.0, superseded para fins de execucao).
 
 ---
 

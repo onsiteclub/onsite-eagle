@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg: #FAFAF7;
+  --color-paper: #FFFFFF;
+  --color-paper-2: #F5F5F0;
+  --color-ink: #0A0A0A;
+  --color-ink-2: #52525B;
+  --color-ink-3: #A1A1AA;
+  --color-line: #E8E8E4;
+  --color-yellow: #FFCD11;
+  --color-yellow-soft: #FFF6D1;
+  --color-green: #16A34A;
+  --color-green-soft: #DCFCE7;
+  --color-red: #DC2626;
+  --color-red-soft: #FEE2E2;
+  --color-blue: #2563EB;
+
+  --font-sans: var(--font-archivo);
+  --font-mono: var(--font-jetbrains);
+
+  --shadow-hard: 4px 4px 0 #0A0A0A;
+  --shadow-hard-lg: 6px 6px 0 #0A0A0A;
+}
+
+html,
+body {
+  background: #FAFAF7;
+  color: #0A0A0A;
+  font-family: var(--font-archivo), sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center font-sans font-bold uppercase tracking-[0.06em] text-[11px] px-3.5 py-2.5 border-[1.5px] border-ink bg-paper text-ink cursor-pointer transition-colors;
+  }
+  .btn:hover {
+    @apply bg-ink text-paper;
+  }
+  .btn-primary {
+    @apply bg-ink text-yellow;
+  }
+  .btn-primary:hover {
+    @apply bg-yellow text-ink border-yellow;
+  }
+  .btn-danger {
+    @apply bg-red text-white border-red;
+  }
+  .btn-danger:hover {
+    background-color: #B91C1C;
+    border-color: #B91C1C;
+  }
+  .btn-ghost {
+    @apply border-line text-ink-2;
+  }
+  .btn-ghost:hover {
+    @apply border-ink bg-ink text-paper;
+  }
+
+  .form-label {
+    @apply block font-mono text-[10px] uppercase tracking-[0.08em] text-ink-2 mb-1.5 font-semibold;
+  }
+  .form-input {
+    @apply w-full px-3 py-2.5 border-[1.5px] border-line font-sans text-[14px] font-medium outline-none transition-colors bg-paper;
+  }
+  .form-input:focus {
+    @apply border-ink;
+  }
+
+  .section-label {
+    @apply block font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3 pt-5 pb-2;
+  }
+}

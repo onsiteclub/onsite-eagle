@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OnSite Ops</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #FAFAF7;
+    --paper: #FFFFFF;
+    --paper-2: #F5F5F0;
+    --ink: #0A0A0A;
+    --ink-2: #52525B;
+    --ink-3: #A1A1AA;
+    --line: #E8E8E4;
+    --yellow: #FFCD11;
+    --yellow-soft: #FFF6D1;
+    --green: #16A34A;
+    --green-soft: #DCFCE7;
+    --red: #DC2626;
+    --red-soft: #FEE2E2;
+    --blue: #2563EB;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Archivo', sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .topbar-left { display: flex; align-items: center; gap: 20px; }
+
+  .logo { font-weight: 900; font-size: 14px; letter-spacing: -0.02em; text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+  .logo-mark { width: 22px; height: 22px; background: var(--ink); display: grid; place-items: center; color: var(--yellow); font-weight: 900; font-size: 10px; }
+
+  .inbox-address {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-2);
+    padding: 6px 10px;
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .inbox-address::before {
+    content: '✉';
+    color: var(--yellow);
+  }
+
+  .inbox-address .copy { color: var(--ink-3); cursor: pointer; font-size: 10px; margin-left: 4px; }
+  .inbox-address .copy:hover { color: var(--ink); }
+
+  .avatar { width: 28px; height: 28px; background: var(--ink); color: var(--yellow); display: grid; place-items: center; font-weight: 900; font-size: 11px; }
+
+  /* NAVIGATION TABS */
+  .nav-tabs {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 28px;
+    display: flex;
+    gap: 4px;
+    padding-top: 36px;
+    padding-bottom: 24px;
+  }
+
+  .nav-tab {
+    padding: 10px 16px;
+    font-family: 'Archivo', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.12s;
+  }
+
+  .nav-tab:hover { color: var(--ink-2); }
+
+  .nav-tab.active {
+    color: var(--ink);
+    border-bottom-color: var(--yellow);
+  }
+
+  .nav-tab .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-3);
+    margin-left: 4px;
+  }
+
+  .nav-tab.active .count { color: var(--yellow); font-weight: 700; }
+
+  /* INBOX VIEW */
+  .view {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 28px 60px;
+    display: none;
+  }
+
+  .view.active { display: block; }
+
+  /* NEW CLIENT REQUEST CARD */
+  .new-client-card {
+    border: 2px solid var(--ink);
+    background: var(--yellow-soft);
+    box-shadow: 4px 4px 0 var(--ink);
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+
+  .new-client-head {
+    display: flex; justify-content: space-between; align-items: start;
+    margin-bottom: 14px;
+  }
+
+  .new-client-title {
+    font-weight: 900;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .new-client-title::before {
+    content: '📬';
+    font-size: 16px;
+  }
+
+  .new-client-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+
+  .new-client-body {
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
+
+  .new-client-body strong { font-weight: 700; }
+
+  .new-client-email {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 4px;
+  }
+
+  .new-client-invoice {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  .new-client-invoice .val {
+    font-family: 'Archivo', sans-serif;
+    font-weight: 900;
+    font-size: 16px;
+  }
+
+  .new-client-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  /* SEARCH */
+  .search-box {
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    margin-bottom: 30px;
+  }
+
+  .search-box svg { color: var(--ink-3); flex-shrink: 0; }
+
+  .search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 18px 14px;
+    font-family: 'Archivo', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    background: transparent;
+    letter-spacing: -0.01em;
+  }
+
+  /* CLIENT HEADER */
+  .client-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 0 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .client-name { font-weight: 900; font-size: 30px; letter-spacing: -0.03em; line-height: 1; text-transform: uppercase; }
+
+  .client-email-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 6px;
+  }
+
+  .balance-value { font-weight: 900; font-size: 36px; letter-spacing: -0.03em; line-height: 1; color: var(--red); text-align: right; }
+  .balance-value .currency { font-size: 14px; vertical-align: top; margin-right: 3px; color: var(--ink-3); }
+
+  /* STATEMENT */
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-3);
+    padding: 20px 0 8px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 24px 70px 1fr 120px 110px;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+    cursor: pointer;
+    transition: opacity 0.12s;
+  }
+
+  .row:hover .invoice-num { text-decoration: underline; }
+
+  .row.paid { opacity: 0.4; }
+  .row.paid .value,
+  .row.paid .balance-col,
+  .row.paid .invoice-num {
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+  }
+
+  .row.alerted .invoice-num::after {
+    content: '⚠';
+    margin-left: 6px;
+    color: var(--ink);
+    background: var(--yellow);
+    padding: 1px 4px;
+    font-size: 10px;
+    border-radius: 2px;
+    vertical-align: 1px;
+  }
+
+  .checkbox {
+    width: 20px; height: 20px;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+
+  .checkbox.checked { background: var(--ink); }
+  .checkbox.checked::after { content: '✓'; color: var(--yellow); font-weight: 900; font-size: 12px; line-height: 1; }
+  .checkbox.locked { border-color: var(--ink-3); background: var(--paper-2); cursor: default; }
+  .checkbox.locked::after { content: '×'; color: var(--ink-3); font-weight: 900; font-size: 14px; line-height: 1; }
+
+  .date { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.05em; }
+  .invoice-num { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .invoice-num.text { font-family: 'Archivo', sans-serif; font-weight: 600; color: var(--ink-2); }
+  .value { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; text-align: right; }
+  .value.debit { color: var(--red); }
+  .value.credit { color: var(--green); }
+  .balance-col { font-weight: 800; font-size: 14px; text-align: right; letter-spacing: -0.01em; color: var(--ink); }
+
+  /* INBOX FEED (all incoming emails view) */
+  .inbox-row {
+    display: grid;
+    grid-template-columns: 80px 1fr auto auto;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .inbox-row:hover { background: var(--paper-2); padding-left: 12px; padding-right: 12px; margin: 0 -12px; }
+
+  .inbox-from {
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .inbox-from-email {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+
+  .inbox-subject {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 3px;
+  }
+
+  .inbox-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+
+  .inbox-status.pending { background: var(--yellow-soft); color: var(--ink); border: 1px solid var(--yellow); }
+  .inbox-status.accepted { background: var(--green-soft); color: var(--green); border: 1px solid var(--green); }
+  .inbox-status.unknown { background: var(--paper-2); color: var(--ink-2); border: 1px solid var(--line); }
+
+  /* SETUP CARD (first time inbox setup) */
+  .setup-card {
+    border: 2px dashed var(--ink);
+    background: var(--paper);
+    padding: 24px 28px;
+    margin-bottom: 30px;
+  }
+
+  .setup-title {
+    font-weight: 900;
+    font-size: 16px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .setup-body {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+
+  .setup-email {
+    background: var(--ink);
+    color: var(--yellow);
+    padding: 14px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* MODALS */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(10, 10, 10, 0.4); display: grid; place-items: center; padding: 20px; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.18s; }
+  .modal-overlay.active { opacity: 1; pointer-events: auto; }
+  .modal { background: var(--paper); border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); width: 100%; max-width: 440px; transform: translateY(8px); transition: transform 0.22s; }
+  .modal-overlay.active .modal { transform: translateY(0); }
+  .modal-head { padding: 18px 24px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; }
+  .modal-title { font-weight: 900; font-size: 16px; text-transform: uppercase; letter-spacing: -0.01em; }
+  .modal-close { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--ink-3); line-height: 1; }
+  .modal-close:hover { color: var(--ink); }
+  .modal-body { padding: 20px 24px; }
+  .modal-foot { padding: 14px 24px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; background: var(--paper-2); }
+
+  .btn { font-family: 'Archivo', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 9px 14px; border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); cursor: pointer; transition: background 0.12s; }
+  .btn:hover { background: var(--ink); color: var(--paper); }
+  .btn.primary { background: var(--ink); color: var(--yellow); }
+  .btn.primary:hover { background: var(--yellow); color: var(--ink); border-color: var(--yellow); }
+  .btn.danger { background: var(--red); color: white; border-color: var(--red); }
+  .btn.danger:hover { background: #B91C1C; border-color: #B91C1C; }
+  .btn.ghost { border-color: var(--line); color: var(--ink-2); }
+  .btn.ghost:hover { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); margin-bottom: 5px; font-weight: 600; }
+  .form-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); font-family: 'Archivo', sans-serif; font-size: 14px; font-weight: 500; outline: none; transition: border-color 0.15s; }
+  .form-input:focus { border-color: var(--ink); }
+
+  .form-row { display: grid; grid-template-columns: 1fr 80px; gap: 10px; }
+
+  .company-checkbox {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    cursor: pointer;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .company-checkbox.selected { background: var(--yellow-soft); border-color: var(--ink); }
+
+  .company-checkbox-box { width: 14px; height: 14px; border: 1.5px solid var(--ink); display: grid; place-items: center; }
+  .company-checkbox.selected .company-checkbox-box { background: var(--ink); }
+  .company-checkbox.selected .company-checkbox-box::after { content: '✓'; color: var(--yellow); font-size: 10px; font-weight: 900; line-height: 1; }
+
+  .amount-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .amount-row:last-child { border-bottom: none; }
+  .amount-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .amount-value { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
+  .amount-value.big { font-size: 28px; font-weight: 900; }
+
+  .amount-input-wrap { position: relative; width: 160px; }
+  .amount-input-wrap::before { content: '$'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--ink-3); font-weight: 600; }
+  .amount-input { width: 100%; padding: 10px 10px 10px 26px; border: 2px solid var(--ink); font-family: 'Archivo', sans-serif; font-size: 18px; font-weight: 800; text-align: right; letter-spacing: -0.01em; outline: none; background: var(--yellow-soft); }
+  .amount-input:focus { background: var(--yellow); }
+
+  .diff-banner { margin-top: 12px; padding: 10px 14px; background: var(--red-soft); border-left: 3px solid var(--red); font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--red); font-weight: 600; display: none; }
+  .diff-banner.active { display: block; }
+
+  .breakdown-row { display: flex; justify-content: space-between; padding: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink-2); }
+  .breakdown-row.total { border-top: 2px solid var(--ink); margin-top: 8px; padding-top: 14px; font-family: 'Archivo', sans-serif; font-weight: 900; font-size: 22px; color: var(--ink); letter-spacing: -0.02em; }
+  .breakdown-row strong { color: var(--ink); }
+
+  .success-icon { width: 48px; height: 48px; background: var(--green); color: white; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 12px; font-size: 24px; font-weight: 900; }
+
+  .helper-voice {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--yellow);
+    font-size: 13px;
+    color: var(--ink-2);
+    line-height: 1.5;
+  }
+
+  .helper-voice strong { color: var(--ink); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="logo">
+      <div class="logo-mark">OS</div>
+      OnSite Ops
+    </div>
+    <div class="inbox-address">
+      paulo@onsiteclub.ca
+      <span class="copy">copiar</span>
+    </div>
+  </div>
+  <div class="avatar">PR</div>
+</header>
+
+<nav class="nav-tabs">
+  <div class="nav-tab active" onclick="switchView('inbox', this)">Caixa de Entrada <span class="count">2</span></div>
+  <div class="nav-tab" onclick="switchView('statement', this)">Extrato</div>
+  <div class="nav-tab" onclick="switchView('clients', this)">Clientes <span class="count">12</span></div>
+  <div class="nav-tab" onclick="switchView('export', this)">Enviar ao contador</div>
+</nav>
+
+
+<!-- ================================
+     INBOX VIEW (default)
+================================= -->
+<div class="view active" id="inbox-view">
+
+  <!-- NEW CLIENT REQUEST -->
+  <div class="new-client-card">
+    <div class="new-client-head">
+      <div class="new-client-title">Novo remetente</div>
+      <div class="new-client-time">há 23 min</div>
+    </div>
+    <div class="new-client-body">
+      <strong>João Silva</strong> enviou um invoice pela primeira vez.
+      <div class="new-client-email">joao.silva@gmail.com</div>
+    </div>
+    <div class="new-client-invoice">
+      <span>JK-A-0047.pdf · Mattamy · Barrhaven</span>
+      <span class="val">$2.840</span>
+    </div>
+    <div class="new-client-actions">
+      <button class="btn ghost" onclick="rejectNewClient()">Recusar</button>
+      <button class="btn primary" onclick="openAddClientModal()">Adicionar cliente</button>
+    </div>
+    <div class="helper-voice">
+      <strong>Antes de adicionar:</strong> confirme por WhatsApp ou ligação. Combine a porcentagem, quais empresas ele pode usar. O app só registra — a combinação é verbal.
+    </div>
+  </div>
+
+  <!-- REGULAR INBOX FEED -->
+  <div class="section-label">Emails recebidos · últimos 7 dias</div>
+
+  <div class="inbox-row" onclick="switchView('statement', document.querySelector('.nav-tab:nth-child(2)'))">
+    <div class="date">18 ABR<br><span style="color: var(--ink-3);">09:23</span></div>
+    <div>
+      <div class="inbox-from">Carlos Pereira</div>
+      <div class="inbox-from-email">carlos.p@outlook.com</div>
+      <div class="inbox-subject">Invoice JK-A-0048 · Minto · Kanata</div>
+    </div>
+    <div class="invoice-num">$3.200</div>
+    <div class="inbox-status accepted">Aceito</div>
+  </div>
+
+  <div class="inbox-row">
+    <div class="date">18 ABR<br><span style="color: var(--ink-3);">08:15</span></div>
+    <div>
+      <div class="inbox-from">João Silva</div>
+      <div class="inbox-from-email">joao.silva@gmail.com</div>
+      <div class="inbox-subject">Invoice JK-A-0047 · Mattamy · Barrhaven</div>
+    </div>
+    <div class="invoice-num">$2.840</div>
+    <div class="inbox-status pending">Pendente</div>
+  </div>
+
+  <div class="inbox-row">
+    <div class="date">17 ABR<br><span style="color: var(--ink-3);">14:42</span></div>
+    <div>
+      <div class="inbox-from">desconhecido@spam.com</div>
+      <div class="inbox-from-email">desconhecido@spam.com</div>
+      <div class="inbox-subject">Ganhe R$ 5000 trabalhando em casa</div>
+    </div>
+    <div class="invoice-num" style="color: var(--ink-3);">—</div>
+    <div class="inbox-status unknown">Ignorado</div>
+  </div>
+
+  <div class="inbox-row">
+    <div class="date">15 ABR<br><span style="color: var(--ink-3);">11:08</span></div>
+    <div>
+      <div class="inbox-from">Miguel Santos</div>
+      <div class="inbox-from-email">miguel@tamarack.com</div>
+      <div class="inbox-subject">Invoice JK-B-0023 · Tamarack · Orléans</div>
+    </div>
+    <div class="invoice-num">$5.280</div>
+    <div class="inbox-status accepted">Aceito</div>
+  </div>
+
+</div>
+
+
+<!-- ================================
+     STATEMENT VIEW
+================================= -->
+<div class="view" id="statement-view">
+
+  <div class="search-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" class="search-input" value="João da Silva">
+  </div>
+
+  <div class="client-header">
+    <div>
+      <div class="client-name">João da Silva</div>
+      <div class="client-email-tag">joao.silva@gmail.com</div>
+    </div>
+    <div class="balance-value"><span class="currency">$</span>6.540</div>
+  </div>
+
+  <div class="section-label">Em aberto</div>
+
+  <div class="row" data-invoice="JK-A-0047">
+    <div class="checkbox" onclick="event.stopPropagation(); openRecon('JK-A-0047', 2840)"></div>
+    <div class="date">18 ABR</div>
+    <div class="invoice-num">JK-A-0047</div>
+    <div class="value debit">− $2.840,00</div>
+    <div class="balance-col">$6.540,00</div>
+  </div>
+
+  <div class="row alerted" data-invoice="JK-A-0048">
+    <div class="checkbox" onclick="event.stopPropagation(); openRecon('JK-A-0048', 3200)"></div>
+    <div class="date">15 ABR</div>
+    <div class="invoice-num">JK-A-0048</div>
+    <div class="value debit">− $3.200,00</div>
+    <div class="balance-col">$3.700,00</div>
+  </div>
+
+  <div class="row">
+    <div class="checkbox"></div>
+    <div class="date">12 ABR</div>
+    <div class="invoice-num text">Adiantamento</div>
+    <div class="value credit">+ $800,00</div>
+    <div class="balance-col">$500,00</div>
+  </div>
+
+  <div class="section-label">Quitados · Abril</div>
+
+  <div class="row paid">
+    <div class="checkbox locked"></div>
+    <div class="date">08 ABR</div>
+    <div class="invoice-num text">Pagamento cash</div>
+    <div class="value credit">+ $4.120,00</div>
+    <div class="balance-col">$1.300,00</div>
+  </div>
+
+  <div class="row paid">
+    <div class="checkbox locked"></div>
+    <div class="date">01 ABR</div>
+    <div class="invoice-num">JK-A-0042</div>
+    <div class="value debit">− $4.120,00</div>
+    <div class="balance-col">$5.420,00</div>
+  </div>
+
+</div>
+
+
+<!-- ================================
+     CLIENTS VIEW
+================================= -->
+<div class="view" id="clients-view">
+
+  <div class="section-label">Clientes ativos · 12</div>
+
+  <div class="inbox-row">
+    <div class="invoice-num">JS</div>
+    <div>
+      <div class="inbox-from">João Silva</div>
+      <div class="inbox-from-email">joao.silva@gmail.com</div>
+    </div>
+    <div class="invoice-num">15%</div>
+    <div class="inbox-status accepted">$6.540 devidos</div>
+  </div>
+
+  <div class="inbox-row">
+    <div class="invoice-num">CP</div>
+    <div>
+      <div class="inbox-from">Carlos Pereira</div>
+      <div class="inbox-from-email">carlos.p@outlook.com</div>
+    </div>
+    <div class="invoice-num">15%</div>
+    <div class="inbox-status accepted">$3.200 devidos</div>
+  </div>
+
+  <div class="inbox-row">
+    <div class="invoice-num">MS</div>
+    <div>
+      <div class="inbox-from">Miguel Santos</div>
+      <div class="inbox-from-email">miguel@tamarack.com</div>
+    </div>
+    <div class="invoice-num">12%</div>
+    <div class="inbox-status accepted">quitado</div>
+  </div>
+
+</div>
+
+
+<!-- ================================
+     EXPORT TO ACCOUNTANT VIEW
+================================= -->
+<div class="view" id="export-view">
+
+  <div style="max-width: 600px;">
+    <h2 style="font-weight: 900; font-size: 24px; text-transform: uppercase; letter-spacing: -0.02em; margin-bottom: 20px;">Enviar ao contador</h2>
+
+    <div class="form-group">
+      <label class="form-label">Empresa</label>
+      <select class="form-input">
+        <option>JK Construction Ltd</option>
+        <option>Maple Framing Inc</option>
+        <option>Redwood Finishing Ltd</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">De</label>
+        <input type="date" class="form-input" value="2026-04-01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Até</label>
+        <input type="date" class="form-input" value="2026-04-30">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Email do contador</label>
+      <input type="email" class="form-input" value="contador@fiscal.ca">
+    </div>
+
+    <div style="margin-top: 24px; padding: 18px 20px; background: var(--paper); border: 1px solid var(--line);">
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin-bottom: 12px;">O envio conterá:</div>
+
+      <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px;"><span>Invoices emitidas no período</span><strong class="mono">14</strong></div>
+      <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px;"><span>PDFs individuais</span><strong class="mono">14 arquivos</strong></div>
+      <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px;"><span>Planilha CSV (contábil)</span><strong class="mono">1 arquivo</strong></div>
+      <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px;"><span>Relatório resumido PDF</span><strong class="mono">1 arquivo</strong></div>
+      <div style="display: flex; justify-content: space-between; padding: 10px 0 4px; border-top: 1px solid var(--line); margin-top: 8px; font-weight: 700;"><span>Total faturado</span><strong class="mono">$89.500,00</strong></div>
+      <div style="display: flex; justify-content: space-between; padding: 4px 0; font-weight: 700;"><span>HST coletado</span><strong class="mono">$10.297,35</strong></div>
+    </div>
+
+    <div style="margin-top: 20px; display: flex; gap: 8px;">
+      <button class="btn ghost">Pré-visualizar</button>
+      <button class="btn primary">Enviar ZIP por email</button>
+    </div>
+
+    <div class="helper-voice" style="margin-top: 20px;">
+      <strong>Dica:</strong> avisa o contador pelo WhatsApp antes — "vou te mandar o fechamento de abril por email". Assim ele não perde no meio de outros emails.
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ================================
+     MODAL: ADD CLIENT
+================================= -->
+<div class="modal-overlay" id="addClientModal">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-head">
+      <div class="modal-title">Adicionar cliente</div>
+      <button class="modal-close" onclick="closeAll()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nome</label>
+        <input type="text" class="form-input" value="João Silva">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-input" value="joao.silva@gmail.com" disabled style="background: var(--paper-2); color: var(--ink-3);">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Porcentagem do operador</label>
+        <div class="form-row">
+          <input type="number" class="form-input" value="15">
+          <div style="display: grid; place-items: center; color: var(--ink-2); font-weight: 700;">%</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Empresas autorizadas</label>
+        <div class="company-checkbox selected" onclick="this.classList.toggle('selected')">
+          <div class="company-checkbox-box"></div>
+          <span>JK Construction Ltd</span>
+        </div>
+        <div class="company-checkbox" onclick="this.classList.toggle('selected')">
+          <div class="company-checkbox-box"></div>
+          <span>Maple Framing Inc</span>
+        </div>
+        <div class="company-checkbox selected" onclick="this.classList.toggle('selected')">
+          <div class="company-checkbox-box"></div>
+          <span>Redwood Finishing Ltd</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeAll()">Cancelar</button>
+      <button class="btn primary" onclick="confirmAddClient()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================
+     MODAL: RECONCILIATION
+================================= -->
+<div class="modal-overlay" id="reconModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="reconTitle">JK-A-0047</div>
+      <button class="modal-close" onclick="closeAll()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="amount-row">
+        <div class="amount-label">Invoice</div>
+        <div class="amount-value big" id="reconExpected">$2.840</div>
+      </div>
+      <div class="amount-row">
+        <div class="amount-label">Recebido</div>
+        <div class="amount-input-wrap">
+          <input type="text" class="amount-input" id="reconInput" oninput="checkDiff()" autocomplete="off">
+        </div>
+      </div>
+      <div class="diff-banner" id="diffBanner">
+        <span id="diffText">+ $360 · NÃO CONFERE</span>
+      </div>
+      <div class="helper-voice" style="margin-top: 14px;">
+        <strong>Atenção:</strong> confirme o valor do cheque/depósito no banco. Se divergir, ligue pro cliente antes de pagar cash.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeAll()">Cancelar</button>
+      <button class="btn primary" id="reconConfirm" onclick="confirmRecon()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================
+     MODAL: CASH
+================================= -->
+<div class="modal-overlay" id="cashModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="cashTitle">Pagar cash</div>
+      <button class="modal-close" onclick="closeAll()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="breakdown-row"><span>Recebido</span><strong id="bRec">$2.840,00</strong></div>
+      <div class="breakdown-row"><span>− Operador 15%</span><strong id="bFee">− $426,00</strong></div>
+      <div class="breakdown-row"><span>− Adiantamento</span><strong id="bAdv">− $800,00</strong></div>
+      <div class="breakdown-row total"><span>Cash ao cliente</span><strong id="bTotal">$1.614,00</strong></div>
+
+      <div class="helper-voice" style="margin-top: 14px;">
+        Encontre João pessoalmente, <strong>mostre esse cálculo</strong>, entregue o cash. O pagamento fica registrado aqui só quando você confirmar.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeAll()">Depois</button>
+      <button class="btn primary" onclick="markPaid()">Paguei · Marcar quitado</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================
+     SUCCESS MODAL
+================================= -->
+<div class="modal-overlay" id="successModal">
+  <div class="modal" style="max-width: 340px;">
+    <div class="modal-body" style="text-align: center; padding: 32px 24px;">
+      <div class="success-icon">✓</div>
+      <div class="modal-title" id="successMsg">Pronto</div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  let current = null;
+
+  function switchView(name, tab) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(name + '-view').classList.add('active');
+    if (tab) tab.classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function openAddClientModal() { show('addClientModal'); }
+
+  function confirmAddClient() {
+    closeAll();
+    setTimeout(() => {
+      document.getElementById('successMsg').textContent = 'Cliente adicionado';
+      show('successModal');
+      setTimeout(() => closeAll(), 1200);
+    }, 200);
+    // Remove the new client card
+    document.querySelector('.new-client-card').style.display = 'none';
+  }
+
+  function rejectNewClient() {
+    if (confirm('Recusar este remetente? Todos os emails futuros dele serão ignorados.')) {
+      document.querySelector('.new-client-card').style.display = 'none';
+    }
+  }
+
+  function openRecon(id, expected) {
+    current = { id, expected };
+    document.getElementById('reconTitle').textContent = id;
+    document.getElementById('reconExpected').textContent = formatCurrency(expected).replace(',00', '');
+    document.getElementById('reconInput').value = '';
+    document.getElementById('diffBanner').classList.remove('active');
+    document.getElementById('reconConfirm').className = 'btn primary';
+    document.getElementById('reconConfirm').textContent = 'Confirmar';
+    show('reconModal');
+    setTimeout(() => document.getElementById('reconInput').focus(), 150);
+  }
+
+  function checkDiff() {
+    const raw = document.getElementById('reconInput').value.replace(/[^\d,.-]/g, '').replace(',', '.');
+    const received = parseFloat(raw) || 0;
+    const banner = document.getElementById('diffBanner');
+    const btn = document.getElementById('reconConfirm');
+    const diffText = document.getElementById('diffText');
+
+    if (received === 0) {
+      banner.classList.remove('active');
+      btn.className = 'btn primary';
+      btn.textContent = 'Confirmar';
+      return;
+    }
+
+    const diff = received - current.expected;
+    if (Math.abs(diff) > 0.5) {
+      banner.classList.add('active');
+      const sign = diff > 0 ? '+ ' : '− ';
+      diffText.textContent = sign + '$' + Math.abs(diff).toFixed(2).replace('.', ',') + ' · NÃO CONFERE';
+      btn.className = 'btn danger';
+      btn.textContent = 'Usar mesmo assim';
+    } else {
+      banner.classList.remove('active');
+      btn.className = 'btn primary';
+      btn.textContent = 'Confirmar';
+    }
+  }
+
+  function confirmRecon() {
+    const raw = document.getElementById('reconInput').value.replace(/[^\d,.-]/g, '').replace(',', '.');
+    const received = parseFloat(raw) || current.expected;
+    current.received = received;
+
+    closeAll();
+    setTimeout(() => {
+      const fee = received * 0.15;
+      const advance = current.id === 'JK-A-0047' ? 800 : 0;
+      const total = received - fee - advance;
+      document.getElementById('cashTitle').textContent = 'Pagar cash · ' + current.id;
+      document.getElementById('bRec').textContent = formatCurrency(received);
+      document.getElementById('bFee').textContent = '− ' + formatCurrency(fee);
+      document.getElementById('bAdv').textContent = advance ? '− ' + formatCurrency(advance) : '$0,00';
+      document.getElementById('bTotal').textContent = formatCurrency(total);
+      show('cashModal');
+    }, 200);
+  }
+
+  function markPaid() {
+    closeAll();
+    const row = document.querySelector(`[data-invoice="${current.id}"]`);
+    if (row) {
+      row.classList.add('paid');
+      row.classList.remove('alerted');
+      const cb = row.querySelector('.checkbox');
+      cb.classList.add('locked');
+      cb.onclick = null;
+    }
+    setTimeout(() => {
+      document.getElementById('successMsg').textContent = 'Quitado';
+      show('successModal');
+      setTimeout(() => closeAll(), 1200);
+    }, 200);
+  }
+
+  function show(id) { document.getElementById(id).classList.add('active'); }
+  function closeAll() { document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active')); }
+  function formatCurrency(n) { return '$' + n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
+  document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeAll(); }));
+</script>
+
+</body>
+</html>
