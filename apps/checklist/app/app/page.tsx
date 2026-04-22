@@ -1,16 +1,26 @@
-import { createClient } from '@onsite/supabase/server'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@onsite/supabase/client'
 import { listJobsites } from '@onsite/framing'
+import type { FrmJobsite } from '@onsite/framing'
 import LotSearchClient from './LotSearchClient'
 
-export const metadata = { title: 'Select Lot' }
+export default function AppPage() {
+  const [jobsites, setJobsites] = useState<FrmJobsite[] | null>(null)
 
-export default async function AppPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/')
+  useEffect(() => {
+    const supabase = createClient()
+    listJobsites(supabase).then((data) => setJobsites(data ?? []))
+  }, [])
 
-  const jobsites = await listJobsites(supabase)
+  if (!jobsites) {
+    return (
+      <div className="py-8 text-center text-[15px] text-[#888884]">
+        Loading jobsites...
+      </div>
+    )
+  }
 
   return <LotSearchClient jobsites={jobsites} />
 }

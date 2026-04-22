@@ -35,7 +35,7 @@ export default function SelfServiceLanding() {
       startedAt: new Date().toISOString(),
     }))
 
-    router.push(`/self/check/${transition}`)
+    router.push(`/self/check?t=${transition}`)
   }
 
   return (

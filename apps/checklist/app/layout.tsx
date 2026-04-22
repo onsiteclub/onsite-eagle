@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import NativeBridge from '@/components/NativeBridge'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
@@ -24,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased bg-[#F5F5F4] min-h-screen">
+        <NativeBridge />
         {children}
       </body>
     </html>

@@ -1,22 +1,33 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { createClient } from '@onsite/supabase/client'
-import { startGateCheck, TRANSITION_LABELS } from '@onsite/framing'
-import type { FrmGateCheck, FrmGateCheckItem, GateCheckTransition } from '@onsite/framing'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { TRANSITION_LABELS } from '@onsite/framing'
+import type { GateCheckTransition } from '@onsite/framing'
+import { startNewGateCheck, type GateCheckData } from '@/lib/data/gate-checks'
 
 interface Props {
   lotId: string
+  lotNumber?: string | null
+  lotAddress?: string | null
+  jobsiteName?: string | null
   transition: GateCheckTransition
-  gateCheck: (FrmGateCheck & { items: FrmGateCheckItem[] }) | null
+  gateCheck: GateCheckData | null
   userId: string
   organizationId: string | null
 }
 
-export default function TransitionCard({ lotId, transition, gateCheck, userId, organizationId }: Props) {
+export default function TransitionCard({
+  lotId,
+  lotNumber,
+  lotAddress,
+  jobsiteName,
+  transition,
+  gateCheck,
+  userId,
+  organizationId,
+}: Props) {
   const router = useRouter()
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
 
   const label = TRANSITION_LABELS[transition]
@@ -25,34 +36,50 @@ export default function TransitionCard({ lotId, transition, gateCheck, userId, o
   const checked = items.filter(i => i.result !== 'pending').length
   const total = items.length
 
-  const statusColor = status === 'passed' ? '#16A34A' : status === 'failed' ? '#DC2626' : '#C58B1B'
-  const statusLabel = status === 'passed' ? 'Passed' : status === 'failed' ? 'Failed' : status === 'in_progress' ? `In Progress (${checked}/${total})` : 'Not Started'
+  const statusColor =
+    status === 'passed' ? '#16A34A' : status === 'failed' ? '#DC2626' : '#C58B1B'
+  const statusLabel =
+    status === 'passed'
+      ? 'Passed'
+      : status === 'failed'
+      ? 'Failed'
+      : status === 'in_progress'
+      ? `In Progress (${checked}/${total})`
+      : 'Not Started'
 
   async function handleTap() {
     if (loading) return
 
     if (status === 'in_progress' && gateCheck) {
-      router.push(`/app/lot/${lotId}/check/${transition}?gcId=${gateCheck.id}`)
+      router.push(`/app/check?lotId=${lotId}&t=${transition}&gcId=${gateCheck.id}`)
       return
     }
 
     if (status === 'passed' || status === 'failed') {
-      router.push(`/app/lot/${lotId}/check/${transition}/complete?gcId=${gateCheck!.id}`)
+      router.push(`/app/check/complete?lotId=${lotId}&t=${transition}&gcId=${gateCheck!.id}`)
       return
     }
 
-    // Start new gate check
     setLoading(true)
     try {
-      const { gateCheck: newGc } = await startGateCheck(supabase, lotId, transition, userId, organizationId ?? undefined)
-      router.push(`/app/lot/${lotId}/check/${transition}?gcId=${newGc.id}`)
+      const newGc = await startNewGateCheck({
+        lotId,
+        lotNumber,
+        lotAddress,
+        jobsiteName,
+        organizationId,
+        transition,
+        userId,
+      })
+      router.push(`/app/check?lotId=${lotId}&t=${transition}&gcId=${newGc.id}`)
     } catch (err) {
       console.error('Failed to start gate check:', err)
       setLoading(false)
     }
   }
 
-  const ctaLabel = status === 'in_progress' ? 'Continue' : status === 'passed' || status === 'failed' ? 'View' : 'Start'
+  const ctaLabel =
+    status === 'in_progress' ? 'Continue' : status === 'passed' || status === 'failed' ? 'View' : 'Start'
 
   return (
     <button
@@ -64,7 +91,10 @@ export default function TransitionCard({ lotId, transition, gateCheck, userId, o
         <span className="font-semibold text-[#1A1A1A] text-[15px]">{label}</span>
         <span
           className="text-xs font-medium px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: status ? statusColor + '20' : '#E5E5E3', color: status ? statusColor : '#B0AFA9' }}
+          style={{
+            backgroundColor: status ? statusColor + '20' : '#E5E5E3',
+            color: status ? statusColor : '#B0AFA9',
+          }}
         >
           {loading ? 'Starting...' : statusLabel}
         </span>

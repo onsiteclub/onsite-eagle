@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">OnSite Checklist</string>
+    <string name="title_activity_main">OnSite Checklist</string>
+    <string name="package_name">ca.onsiteclub.checklist</string>
+    <string name="custom_url_scheme">ca.onsiteclub.checklist</string>
+</resources>

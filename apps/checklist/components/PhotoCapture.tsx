@@ -1,69 +1,110 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { createClient } from '@onsite/supabase/client'
 import { compressImage } from '@/lib/compress'
-import { STORAGE_BUCKET, STORAGE_PREFIX } from '@/lib/constants'
+import { isNativePlatform, convertFileSrc } from '@/lib/native/platform'
+import { capturePhotoBase64, requestCameraPermissions } from '@/lib/native/camera'
+import { addItemPhoto } from '@/lib/data/gate-checks'
+import type { GateCheckResult } from '@onsite/framing'
 
 interface Props {
+  itemId: string
   gateCheckId: string
   itemCode: string
   existingUrl: string | null
+  currentResult: GateCheckResult
+  currentNotes: string | null
   onPhotoUploaded: (url: string) => void
   onPhotoRemoved: () => void
   disabled?: boolean
 }
 
 export default function PhotoCapture({
+  itemId,
   gateCheckId,
   itemCode,
   existingUrl,
+  currentResult,
+  currentNotes,
   onPhotoUploaded,
   onPhotoRemoved,
   disabled,
 }: Props) {
-  const supabase = createClient()
   const inputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [localUrl, setLocalUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const displayUrl = localUrl ?? existingUrl
+  const native = isNativePlatform()
+  const rawUrl = localUrl ?? existingUrl
+  const displayUrl = rawUrl ? convertFileSrc(rawUrl) : null
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function saveBlob(blob: Blob) {
+    const result = await addItemPhoto({
+      itemId,
+      gateCheckId,
+      itemCode,
+      blob,
+      currentResult,
+      currentNotes,
+    })
+    setLocalUrl(result.displayUrl)
+    onPhotoUploaded(result.displayUrl)
+  }
+
+  async function handleWebFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setUploading(true)
+    setSaving(true)
     setError(null)
 
     try {
       const compressed = await compressImage(file)
-      const timestamp = Date.now()
-      const path = `${STORAGE_PREFIX}/${gateCheckId}/${itemCode}_${timestamp}.jpg`
-
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' })
-
-      if (uploadError) throw uploadError
-
-      const { data } = supabase.storage
-        .from(STORAGE_BUCKET)
-        .getPublicUrl(path)
-
-      setLocalUrl(data.publicUrl)
-      onPhotoUploaded(data.publicUrl)
+      await saveBlob(compressed)
     } catch (err) {
-      console.error('Upload failed:', err)
-      setError('Upload failed')
+      console.error('Save failed:', err)
+      setError('Failed to save photo')
     } finally {
-      setUploading(false)
+      setSaving(false)
       if (inputRef.current) inputRef.current.value = ''
     }
   }
 
-  async function handleRemove() {
+  async function handleNativeCapture() {
+    if (saving) return
+    setSaving(true)
+    setError(null)
+
+    try {
+      const granted = await requestCameraPermissions()
+      if (!granted) {
+        setError('Camera permission denied')
+        return
+      }
+
+      const dataUrl = await capturePhotoBase64({ prefix: itemCode })
+      const match = dataUrl.match(/^data:image\/\w+;base64,(.+)$/)
+      if (!match) throw new Error('Invalid photo data')
+
+      const binary = atob(match[1])
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      const blob = new Blob([bytes], { type: 'image/jpeg' })
+
+      await saveBlob(blob)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Save failed'
+      if (!message.toLowerCase().includes('cancel')) {
+        console.error('Save failed:', err)
+        setError('Failed to save photo')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleRemove() {
     setLocalUrl(null)
     onPhotoRemoved()
   }
@@ -85,16 +126,10 @@ export default function PhotoCapture({
     )
   }
 
-  return (
-    <label className={`
-      w-20 h-20 rounded-[10px] border-2 border-dashed border-[#D1D0CE]
-      flex flex-col items-center justify-center cursor-pointer
-      hover:border-brand-500 transition-colors
-      ${uploading ? 'opacity-50 pointer-events-none' : ''}
-      ${disabled ? 'opacity-30 pointer-events-none' : ''}
-    `}>
-      {uploading ? (
-        <span className="text-[10px] text-[#888884]">Uploading...</span>
+  const placeholder = (
+    <>
+      {saving ? (
+        <span className="text-[10px] text-[#888884]">Saving...</span>
       ) : (
         <>
           <span className="text-lg text-[#B0AFA9]">+</span>
@@ -102,13 +137,39 @@ export default function PhotoCapture({
         </>
       )}
       {error && <span className="text-[9px] text-[#DC2626]">{error}</span>}
+    </>
+  )
+
+  const baseClass = `
+    w-20 h-20 rounded-[10px] border-2 border-dashed border-[#D1D0CE]
+    flex flex-col items-center justify-center cursor-pointer
+    hover:border-brand-500 transition-colors
+    ${saving ? 'opacity-50 pointer-events-none' : ''}
+    ${disabled ? 'opacity-30 pointer-events-none' : ''}
+  `
+
+  if (native) {
+    return (
+      <button
+        onClick={handleNativeCapture}
+        disabled={disabled || saving}
+        className={baseClass}
+      >
+        {placeholder}
+      </button>
+    )
+  }
+
+  return (
+    <label className={baseClass}>
+      {placeholder}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={handleFile}
-        disabled={disabled || uploading}
+        onChange={handleWebFile}
+        disabled={disabled || saving}
         className="hidden"
       />
     </label>

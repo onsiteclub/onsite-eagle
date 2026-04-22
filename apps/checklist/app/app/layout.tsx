@@ -1,30 +1,58 @@
-import { createClient } from '@onsite/supabase/server'
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
+'use client'
 
-export default async function AppLayout({
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@onsite/supabase/client'
+import AuthGuard from '@/components/AuthGuard'
+import SyncBadge from '@/components/SyncBadge'
+
+export default function AppLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  return (
+    <AuthGuard>
+      {(user) => <AuthedLayout userId={user.id} userEmail={user.email ?? ''}>{children}</AuthedLayout>}
+    </AuthGuard>
+  )
+}
 
-  if (!user) {
-    redirect('/')
+function AuthedLayout({
+  userId,
+  userEmail,
+  children,
+}: {
+  userId: string
+  userEmail: string
+  children: React.ReactNode
+}) {
+  const router = useRouter()
+  const [displayName, setDisplayName] = useState<string>(userEmail || 'Worker')
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('core_profiles')
+      .select('full_name, first_name')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setDisplayName(data.first_name || data.full_name || userEmail || 'Worker')
+        }
+      })
+  }, [userId, userEmail])
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.replace('/')
   }
-
-  const { data: profile } = await supabase
-    .from('core_profiles')
-    .select('full_name, first_name')
-    .eq('id', user.id)
-    .single()
-
-  const displayName = profile?.first_name || profile?.full_name || user.email || 'Worker'
 
   return (
     <div className="min-h-screen bg-[#F5F5F4]">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-[#1A1A1A] px-4 py-3">
         <div className="max-w-[480px] mx-auto flex items-center justify-between">
           <Link href="/app" className="flex items-center gap-2">
@@ -34,20 +62,18 @@ export default async function AppLayout({
             <span className="font-semibold text-white text-[15px]">Gate Check</span>
           </Link>
           <div className="flex items-center gap-3">
+            <SyncBadge />
             <span className="text-xs text-[#B0AFA9]">{displayName}</span>
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="text-xs text-[#B0AFA9] hover:text-white transition-colors"
-              >
-                Sair
-              </button>
-            </form>
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-[#B0AFA9] hover:text-white transition-colors"
+            >
+              Sair
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-[480px] mx-auto px-4 py-4">
         {children}
       </main>

@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'export',
+  trailingSlash: true,
   transpilePackages: [
     '@onsite/supabase',
     '@onsite/auth',
@@ -10,6 +12,7 @@ const nextConfig = {
     '@onsite/tokens',
   ],
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

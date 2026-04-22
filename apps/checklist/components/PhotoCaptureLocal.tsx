@@ -2,6 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { compressImage } from '@/lib/compress'
+import { isNativePlatform } from '@/lib/native/platform'
+import { capturePhotoBase64, requestCameraPermissions } from '@/lib/native/camera'
 
 interface Props {
   itemCode: string
@@ -23,8 +25,9 @@ export default function PhotoCaptureLocal({
   const [error, setError] = useState<string | null>(null)
 
   const canAdd = photos.length < maxPhotos && !disabled
+  const native = isNativePlatform()
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleWebFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -52,6 +55,31 @@ export default function PhotoCaptureLocal({
     }
   }
 
+  async function handleNativeCapture() {
+    if (processing || !canAdd) return
+    setProcessing(true)
+    setError(null)
+
+    try {
+      const granted = await requestCameraPermissions()
+      if (!granted) {
+        setError('Camera permission denied')
+        return
+      }
+
+      const base64 = await capturePhotoBase64({ prefix: itemCode })
+      onPhotosChanged([...photos, base64])
+    } catch (err) {
+      // User cancelled or plugin error
+      const message = err instanceof Error ? err.message : 'Capture failed'
+      if (!message.toLowerCase().includes('cancel')) {
+        setError(message)
+      }
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   function removePhoto(index: number) {
     const updated = photos.filter((_, i) => i !== index)
     onPhotosChanged(updated)
@@ -59,16 +87,15 @@ export default function PhotoCaptureLocal({
 
   return (
     <div className="space-y-1">
-      {/* Photo grid — inline row */}
       <div className="flex flex-wrap gap-2">
-        {photos.map((base64, index) => (
+        {photos.map((src, index) => (
           <div
             key={index}
             className="relative w-16 h-16 rounded-[10px] overflow-hidden border border-[#D1D0CE] flex-shrink-0"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={base64}
+              src={src}
               alt={`${itemCode} photo ${index + 1}`}
               className="w-full h-full object-cover"
             />
@@ -86,7 +113,6 @@ export default function PhotoCaptureLocal({
           </div>
         ))}
 
-        {/* Processing placeholder — shows while compressing */}
         {processing && (
           <div className="w-16 h-16 rounded-[10px] border-2 border-[#C58B1B] bg-[#FFF3D6] flex-shrink-0 flex flex-col items-center justify-center animate-pulse">
             <svg className="w-5 h-5 text-[#C58B1B] animate-spin" viewBox="0 0 24 24" fill="none">
@@ -97,29 +123,38 @@ export default function PhotoCaptureLocal({
           </div>
         )}
 
-        {/* Add photo button — hidden while processing */}
         {canAdd && !processing && (
-          <label
-            className="w-16 h-16 rounded-[10px] border-2 border-dashed border-[#D1D0CE] flex-shrink-0 flex flex-col items-center justify-center cursor-pointer hover:border-[#C58B1B] transition-colors"
-          >
-            <span className="text-lg text-[#B0AFA9] leading-none">+</span>
-            <span className="text-[9px] text-[#B0AFA9]">
-              {photos.length}/{maxPhotos}
-            </span>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFile}
-              disabled={disabled || processing}
-              className="hidden"
-            />
-          </label>
+          native ? (
+            <button
+              onClick={handleNativeCapture}
+              disabled={disabled}
+              className="w-16 h-16 rounded-[10px] border-2 border-dashed border-[#D1D0CE] flex-shrink-0 flex flex-col items-center justify-center cursor-pointer hover:border-[#C58B1B] transition-colors"
+            >
+              <span className="text-lg text-[#B0AFA9] leading-none">+</span>
+              <span className="text-[9px] text-[#B0AFA9]">
+                {photos.length}/{maxPhotos}
+              </span>
+            </button>
+          ) : (
+            <label className="w-16 h-16 rounded-[10px] border-2 border-dashed border-[#D1D0CE] flex-shrink-0 flex flex-col items-center justify-center cursor-pointer hover:border-[#C58B1B] transition-colors">
+              <span className="text-lg text-[#B0AFA9] leading-none">+</span>
+              <span className="text-[9px] text-[#B0AFA9]">
+                {photos.length}/{maxPhotos}
+              </span>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleWebFile}
+                disabled={disabled || processing}
+                className="hidden"
+              />
+            </label>
+          )
         )}
       </div>
 
-      {/* Status text */}
       {processing && (
         <p className="text-[11px] text-[#C58B1B] font-medium">
           Processing photo...

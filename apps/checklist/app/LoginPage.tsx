@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@onsite/supabase/client'
 import { AuthProvider, useAuth } from '@onsite/auth'
@@ -10,8 +10,10 @@ export default function LoginPage() {
   const [supabase] = useState(() => createClient())
 
   return (
-    <AuthProvider supabase={supabase} emailRedirectTo={`${window.location.origin}/auth/callback`}>
-      <AuthFlowWrapper supabase={supabase} />
+    <AuthProvider supabase={supabase} emailRedirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : undefined}>
+      <Suspense fallback={<div className="min-h-screen bg-[#F5F5F4] flex items-center justify-center"><div className="text-[#888884]">Loading...</div></div>}>
+        <AuthFlowWrapper supabase={supabase} />
+      </Suspense>
     </AuthProvider>
   )
 }

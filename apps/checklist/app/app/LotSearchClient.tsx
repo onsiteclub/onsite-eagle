@@ -78,7 +78,7 @@ export default function LotSearchClient({ jobsites }: Props) {
             return (
               <button
                 key={lot.id}
-                onClick={() => router.push(`/app/lot/${lot.id}`)}
+                onClick={() => router.push(`/app/lot?id=${lot.id}`)}
                 className="w-full text-left bg-white rounded-[14px] border border-[#D1D0CE] p-4 hover:border-brand-500 transition-colors"
               >
                 <div className="flex items-center justify-between">

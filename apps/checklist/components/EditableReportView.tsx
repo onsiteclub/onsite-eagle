@@ -3,6 +3,8 @@
 import { useState, useCallback } from 'react'
 import PhotoLightbox from './PhotoLightbox'
 import PhotoCaptureLocal from './PhotoCaptureLocal'
+import { createClient } from '@onsite/supabase/client'
+import { updateSharedReport } from '@/lib/client/reports'
 
 interface ReportItem {
   id: string
@@ -118,18 +120,21 @@ export default function EditableReportView({ report: initialReport }: EditableRe
         return
       }
 
-      const res = await fetch(`/api/reports/${report.token}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updatedBy: editorName.trim(), items: changedItems }),
-      })
+      await updateSharedReport(report.token, editorName.trim(), changedItems)
 
-      if (!res.ok) throw new Error('Save failed')
-
-      const refreshRes = await fetch(`/api/reports/${report.token}`)
-      if (refreshRes.ok) {
-        const updated = await refreshRes.json()
-        setReport(updated)
+      const supabase = createClient()
+      const { data: refreshedReport } = await supabase
+        .from('frm_shared_reports')
+        .select('*')
+        .eq('token', report.token)
+        .single()
+      const { data: refreshedItems } = await supabase
+        .from('frm_shared_report_items')
+        .select('*')
+        .eq('report_id', refreshedReport?.id)
+        .order('sort_order', { ascending: true })
+      if (refreshedReport) {
+        setReport({ ...refreshedReport, items: refreshedItems ?? [] } as Report)
       }
 
       setEditing(false)
@@ -144,7 +149,7 @@ export default function EditableReportView({ report: initialReport }: EditableRe
   }
 
   const copyLink = async () => {
-    const url = `${window.location.origin}/report/${report.token}`
+    const url = `${window.location.origin}/report?token=${report.token}`
     await navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -506,7 +511,7 @@ export default function EditableReportView({ report: initialReport }: EditableRe
                 navigator.share({
                   title: `${report.transition_label} — ${report.lot_number}`,
                   text: `Gate check ${report.passed ? 'PASSED' : 'FAILED'}: ${report.reference}`,
-                  url: `${window.location.origin}/report/${report.token}`,
+                  url: `${window.location.origin}/report?token=${report.token}`,
                 })
               } else {
                 copyLink()

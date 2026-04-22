@@ -1,12 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import type { FrmGateCheckItem, GateCheckResult } from '@onsite/framing'
+import type { GateCheckResult } from '@onsite/framing'
 import PhotoCapture from './PhotoCapture'
+import { hapticTap } from '@/lib/native/haptics'
+
+export interface ChecklistItemData {
+  id: string
+  item_code: string
+  item_label: string
+  result: GateCheckResult
+  notes: string | null
+  photo_url: string | null
+}
 
 interface Props {
   index: number
-  item: FrmGateCheckItem
+  item: ChecklistItemData
   isBlocking: boolean
   gateCheckId: string
   saving: boolean
@@ -41,7 +51,6 @@ export default function ChecklistItem({
       ${result === 'na' ? 'border-[#B0AFA9]/30' : ''}
       ${result === 'pending' ? 'border-[#D1D0CE]' : ''}
     `}>
-      {/* Header */}
       <div className="p-4">
         <div className="flex items-start gap-3">
           <span className={`
@@ -63,10 +72,12 @@ export default function ChecklistItem({
           </div>
         </div>
 
-        {/* Result Buttons */}
         <div className="flex gap-2 mt-3 ml-9">
           <button
-            onClick={() => onResultChange(item.id, 'pass')}
+            onClick={() => {
+              void hapticTap()
+              onResultChange(item.id, 'pass')
+            }}
             disabled={saving}
             className={`
               flex-1 h-[52px] rounded-[14px] text-xs font-semibold transition-all border
@@ -78,7 +89,10 @@ export default function ChecklistItem({
             &#10003; Pass
           </button>
           <button
-            onClick={() => onResultChange(item.id, 'fail')}
+            onClick={() => {
+              void hapticTap()
+              onResultChange(item.id, 'fail')
+            }}
             disabled={saving}
             className={`
               flex-1 h-[52px] rounded-[14px] text-xs font-semibold transition-all border
@@ -90,7 +104,10 @@ export default function ChecklistItem({
             &#10005; Fail
           </button>
           <button
-            onClick={() => onResultChange(item.id, 'na')}
+            onClick={() => {
+              void hapticTap()
+              onResultChange(item.id, 'na')
+            }}
             disabled={saving}
             className={`
               flex-1 h-[52px] rounded-[14px] text-xs font-semibold transition-all border
@@ -104,15 +121,16 @@ export default function ChecklistItem({
         </div>
       </div>
 
-      {/* Expanded: Photo + Notes (always show when fail, toggle for others) */}
       {showExpanded && (
         <div className="px-4 pb-4 ml-9 space-y-3 border-t border-[#E5E5E3] pt-3">
-          {/* Photo */}
           <div className="flex items-center gap-2">
             <PhotoCapture
+              itemId={item.id}
               gateCheckId={gateCheckId}
               itemCode={item.item_code}
               existingUrl={item.photo_url}
+              currentResult={item.result}
+              currentNotes={item.notes}
               onPhotoUploaded={(url) => onPhotoUploaded(item.id, url)}
               onPhotoRemoved={() => onPhotoRemoved(item.id)}
             />
@@ -121,7 +139,6 @@ export default function ChecklistItem({
             )}
           </div>
 
-          {/* Notes */}
           <textarea
             placeholder="Notes (optional)..."
             defaultValue={item.notes ?? ''}
@@ -132,7 +149,6 @@ export default function ChecklistItem({
         </div>
       )}
 
-      {/* Toggle expand for non-fail results */}
       {isChecked && result !== 'fail' && (
         <button
           onClick={() => setExpanded(!expanded)}
