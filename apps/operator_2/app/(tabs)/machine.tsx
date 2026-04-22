@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, withOpacity, spacing, borderRadius, typography } from '@onsite/tokens';
 import { useOperatorStore } from '../../src/store/operator';
 import { supabase } from '../../src/lib/supabase';
+import { OperatorNumberCard } from '../../src/components/OperatorNumberCard';
 
 const OFFLINE_REASONS = ['Broken', 'Low fuel', 'Maintenance', 'Shift end'];
 
@@ -83,6 +84,9 @@ export default function MachineScreen() {
       </View>
 
       <View style={styles.content}>
+        {/* Operator's receiving number */}
+        <OperatorNumberCard />
+
         {/* Status Card */}
         <View style={[styles.statusCard, store.isOnline ? styles.statusOnline : styles.statusOffline]}>
           <View style={styles.statusLeft}>
