@@ -26,6 +26,7 @@ export function StatementView({
   openRows,
   closedRows,
   rowInvoiceId,
+  rowPdfUrls,
   pendingAdvancesTotal,
 }: {
   client: ClientHeader
@@ -33,6 +34,7 @@ export function StatementView({
   openRows: LedgerRowType[]
   closedRows: LedgerRowType[]
   rowInvoiceId: Record<string, string | null>
+  rowPdfUrls: Record<string, string | null>
   pendingAdvancesTotal: number
 }) {
   const router = useRouter()
@@ -126,6 +128,7 @@ export function StatementView({
             <LedgerRow
               key={row.id}
               row={row}
+              pdfUrl={rowPdfUrls[row.id] ?? null}
               onCheckClick={row.expected ? () => startRecon(row) : undefined}
             />
           ))}
@@ -136,7 +139,11 @@ export function StatementView({
         <>
           <div className="section-label">Quitados</div>
           {closedRows.map((row) => (
-            <LedgerRow key={row.id} row={row} />
+            <LedgerRow
+              key={row.id}
+              row={row}
+              pdfUrl={rowPdfUrls[row.id] ?? null}
+            />
           ))}
         </>
       )}

@@ -5,9 +5,11 @@ import type { LedgerRow as LedgerRowType } from '@/types'
 
 export function LedgerRow({
   row,
+  pdfUrl,
   onCheckClick,
 }: {
   row: LedgerRowType
+  pdfUrl?: string | null
   onCheckClick?: () => void
 }) {
   const locked = row.paid
@@ -20,7 +22,7 @@ export function LedgerRow({
         'grid gap-4 py-4 border-b border-line items-center transition-opacity',
         locked ? 'opacity-40' : '',
       ].join(' ')}
-      style={{ gridTemplateColumns: '24px 70px 1fr 120px 110px' }}
+      style={{ gridTemplateColumns: '24px 70px 1fr auto 120px 110px' }}
     >
       <div
         onClick={!locked && onCheckClick ? onCheckClick : undefined}
@@ -57,6 +59,19 @@ export function LedgerRow({
           </span>
         )}
       </div>
+      {pdfUrl ? (
+        <a
+          href={pdfUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Abrir PDF"
+          className="font-mono text-[11px] text-ink-2 hover:text-ink underline whitespace-nowrap"
+        >
+          PDF
+        </a>
+      ) : (
+        <span />
+      )}
       <div
         className={[
           'font-mono text-[14px] font-bold text-right',

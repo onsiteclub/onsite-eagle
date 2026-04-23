@@ -25,12 +25,14 @@ export function InboxView({
   newSenders,
   rows,
   rowInvoiceIds,
+  rowPdfUrls,
   companies,
   defaultFeePercent,
 }: {
   newSenders: NewSenderData[]
   rows: InboxRowType[]
   rowInvoiceIds: Record<string, string | null>
+  rowPdfUrls: Record<string, string | null>
   companies: AddClientCompany[]
   defaultFeePercent: number
 }) {
@@ -114,6 +116,7 @@ export function InboxView({
             <InboxRow
               key={row.id}
               row={row}
+              pdfUrl={rowPdfUrls[row.id] ?? null}
               onClick={row.status === 'accepted' ? () => onRowClick(row.id) : undefined}
             />
           ))}

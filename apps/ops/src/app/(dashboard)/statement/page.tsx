@@ -2,6 +2,7 @@ import { StatementView } from '@/components/statement/statement-view'
 import { requireOperator } from '@/lib/auth'
 import { formatDateShortPt } from '@/lib/format-date'
 import { createClient } from '@/lib/supabase/server'
+import { getInvoicePdfUrls } from '@/lib/supabase/storage'
 import Link from 'next/link'
 import type { LedgerRow as LedgerRowType } from '@/types'
 
@@ -20,6 +21,7 @@ type LedgerEntryFromDb = {
     amount_gross: number
     invoice_number: string | null
     divergence_flagged: boolean
+    pdf_url: string | null
   } | null
 }
 
@@ -89,7 +91,7 @@ export default async function StatementPage({
       .select(`
         id, entry_type, amount, balance_after, entry_date, description,
         invoice_id, settled_by_invoice_id,
-        invoice:ops_invoices(id, status, amount_gross, invoice_number, divergence_flagged)
+        invoice:ops_invoices(id, status, amount_gross, invoice_number, divergence_flagged, pdf_url)
       `)
       .eq('client_id', clientId)
       .eq('operator_id', operator.id)
@@ -113,9 +115,20 @@ export default async function StatementPage({
 
   const balance = normalized.length > 0 ? normalized[0].balance_after : 0
 
+  // Batch sign all distinct PDF paths from the invoice join
+  const pdfPaths = Array.from(
+    new Set(
+      normalized
+        .map((e) => e.invoice?.pdf_url)
+        .filter((p): p is string => !!p),
+    ),
+  )
+  const pdfUrls = await getInvoicePdfUrls(pdfPaths)
+
   const openRows: LedgerRowType[] = []
   const closedRows: LedgerRowType[] = []
   const rowInvoiceId: Record<string, string | null> = {}
+  const rowPdfUrls: Record<string, string | null> = {}
 
   for (const e of normalized) {
     const { label, labelKind } = labelFor(e)
@@ -138,6 +151,7 @@ export default async function StatementPage({
     }
 
     rowInvoiceId[e.id] = e.invoice_id
+    rowPdfUrls[e.id] = e.invoice?.pdf_url ? (pdfUrls[e.invoice.pdf_url] ?? null) : null
 
     if (isLocked) closedRows.push(row)
     else openRows.push(row)
@@ -160,6 +174,7 @@ export default async function StatementPage({
       openRows={openRows}
       closedRows={closedRows}
       rowInvoiceId={rowInvoiceId}
+      rowPdfUrls={rowPdfUrls}
       pendingAdvancesTotal={pendingAdvancesTotal}
     />
   )

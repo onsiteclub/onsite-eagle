@@ -37,7 +37,7 @@ export default async function InboxPage() {
       .order('received_at', { ascending: false }),
     supabase
       .from('ops_invoices')
-      .select('id, client_id, from_name, from_email, subject, amount_gross, received_at, status')
+      .select('id, client_id, from_name, from_email, subject, amount_gross, received_at, status, pdf_url')
       .eq('operator_id', operator.id)
       .gte('received_at', daysAgoISO(7))
       .order('received_at', { ascending: false })
@@ -50,8 +50,12 @@ export default async function InboxPage() {
       .order('legal_name'),
   ])
 
-  const pdfPaths = (newSendersResp.data ?? []).map((i) => i.pdf_url).filter(Boolean)
-  const pdfUrls = await getInvoicePdfUrls(pdfPaths)
+  // Sign all PDFs in one batch (new_senders + recent invoices)
+  const pdfPaths = [
+    ...(newSendersResp.data ?? []).map((i) => i.pdf_url),
+    ...(recentResp.data ?? []).map((i) => i.pdf_url),
+  ].filter((p): p is string => !!p)
+  const pdfUrls = await getInvoicePdfUrls(Array.from(new Set(pdfPaths)))
 
   const newSenders: NewSenderData[] = (newSendersResp.data ?? []).map((i) => ({
     invoiceId: i.id,
@@ -84,11 +88,19 @@ export default async function InboxPage() {
     (recentResp.data ?? []).map((inv) => [inv.id, inv.client_id]),
   )
 
+  const rowPdfUrls: Record<string, string | null> = Object.fromEntries(
+    (recentResp.data ?? []).map((inv) => [
+      inv.id,
+      inv.pdf_url ? (pdfUrls[inv.pdf_url] ?? null) : null,
+    ]),
+  )
+
   return (
     <InboxView
       newSenders={newSenders}
       rows={rows}
       rowInvoiceIds={rowInvoiceIds}
+      rowPdfUrls={rowPdfUrls}
       companies={companiesResp.data ?? []}
       defaultFeePercent={operator.default_fee_percent}
     />
