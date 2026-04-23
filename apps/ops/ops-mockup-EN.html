@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OnSite — Ops</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #FAFAF7; --paper: #FFFFFF; --paper-2: #F5F5F0; --paper-3: #EEEEE8;
+    --ink: #0A0A0A; --ink-2: #3F3F46; --ink-3: #71717A; --ink-4: #A1A1AA;
+    --line: #E4E4DF; --line-strong: #C4C4BE;
+    --yellow: #FFCD11; --yellow-soft: #FFF6D1; --yellow-bg: #FEF9E7;
+    --green: #16A34A; --green-soft: #DCFCE7;
+    --red: #DC2626; --red-soft: #FEE2E2; --red-bg: #FEF2F2;
+    --blue: #2563EB; --orange: #EA580C;
+    --sidebar-w: 240px;
+  }
+  html, body { background: var(--bg); color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 14px; line-height: 1.4; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+  .shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+
+  .sidebar { background: var(--paper); border-right: 1px solid var(--line); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+  .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .brand-mark { width: 26px; height: 26px; background: var(--ink); color: var(--yellow); display: grid; place-items: center; font-weight: 900; font-size: 11px; letter-spacing: -0.04em; }
+  .brand-name { font-weight: 900; font-size: 15px; letter-spacing: -0.02em; text-transform: uppercase; }
+  .sidebar-body { flex: 1; overflow-y: auto; padding: 12px 8px; }
+
+  .nav-group { margin-bottom: 4px; }
+  .nav-group-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-3); transition: color 0.1s, background 0.1s; user-select: none; }
+  .nav-group-head:hover { color: var(--ink); background: var(--paper-2); }
+  .nav-group.active .nav-group-head { color: var(--ink); }
+  .nav-icon { width: 20px; height: 20px; display: grid; place-items: center; flex-shrink: 0; color: var(--ink-3); }
+  .nav-group.active .nav-icon { color: var(--ink); }
+  .nav-group-head .caret { margin-left: auto; transition: transform 0.15s; opacity: 0.5; font-size: 10px; }
+  .nav-group.expanded .caret { transform: rotate(90deg); }
+
+  .nav-children { display: none; padding: 2px 0 6px 30px; }
+  .nav-group.expanded .nav-children { display: block; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 12px; font-size: 13px; color: var(--ink-2); cursor: pointer; font-weight: 500; border-left: 2px solid transparent; transition: all 0.1s; }
+  .nav-item:hover { color: var(--ink); background: var(--paper-2); }
+  .nav-item.active { color: var(--ink); background: var(--yellow-soft); border-left-color: var(--ink); font-weight: 700; }
+  .nav-badge { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; padding: 1px 6px; background: var(--yellow); color: var(--ink); }
+
+  .nav-group.coming-soon { opacity: 0.5; }
+  .nav-group.coming-soon .nav-group-head { cursor: default; }
+  .nav-group.coming-soon .nav-group-head:hover { background: transparent; color: var(--ink-3); }
+  .soon-badge { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; padding: 1px 6px; background: var(--paper-3); color: var(--ink-3); border: 1px solid var(--line); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .sidebar-divider { margin: 14px 12px; border-top: 1px solid var(--line); }
+  .sidebar-foot { border-top: 1px solid var(--line); padding: 12px; }
+  .user-chip { display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; transition: background 0.1s; }
+  .user-chip:hover { background: var(--paper-2); }
+  .user-avatar { width: 28px; height: 28px; background: var(--ink); color: var(--yellow); display: grid; place-items: center; font-weight: 900; font-size: 11px; flex-shrink: 0; }
+  .user-info { min-width: 0; }
+  .user-name { font-weight: 700; font-size: 13px; line-height: 1.2; }
+  .user-email { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .main { min-width: 0; background: var(--bg); }
+  .main-head { padding: 18px 32px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; background: var(--paper); }
+  .breadcrumb { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+  .breadcrumb strong { color: var(--ink); font-weight: 700; }
+  .main-head-actions { display: flex; gap: 8px; align-items: center; }
+  .health-indicator { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .health-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; box-shadow: 0 0 0 3px var(--green-soft); }
+
+  .view { display: none; max-width: 1000px; margin: 0 auto; padding: 32px 32px 80px; }
+  .view.active { display: block; }
+  .page-title { font-weight: 900; font-size: 28px; letter-spacing: -0.02em; text-transform: uppercase; margin-bottom: 4px; }
+  .page-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 24px; }
+
+  .btn { font-family: 'Archivo', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 9px 14px; border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); cursor: pointer; transition: all 0.12s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { background: var(--ink); color: var(--paper); }
+  .btn.primary { background: var(--ink); color: var(--yellow); }
+  .btn.primary:hover { background: var(--yellow); color: var(--ink); border-color: var(--yellow); }
+  .btn.ghost { border-color: var(--line-strong); color: var(--ink-2); }
+  .btn.ghost:hover { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .btn.danger { background: var(--paper); border-color: var(--red); color: var(--red); }
+  .btn.danger:hover { background: var(--red); color: white; }
+  .btn.small { padding: 6px 10px; font-size: 10px; }
+
+  /* INBOX */
+  .inbox-list { border: 1px solid var(--line); background: var(--paper); }
+  .inbox-row { display: grid; grid-template-columns: 90px 1fr auto 140px; gap: 18px; padding: 16px 20px; border-bottom: 1px solid var(--line); align-items: center; transition: background 0.1s; }
+  .inbox-row:last-child { border-bottom: none; }
+  .inbox-row:hover { background: var(--paper-2); }
+  .inbox-row.state-new-sender { background: var(--yellow-bg); border-left: 3px solid var(--yellow); }
+  .inbox-row.state-conflict { background: var(--red-bg); border-left: 3px solid var(--red); }
+
+  .inbox-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; }
+  .inbox-date-time { display: block; color: var(--ink-4); margin-top: 2px; font-size: 10px; }
+  .inbox-main { min-width: 0; }
+  .inbox-state-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+  .inbox-state-row.normal { color: var(--green); }
+  .inbox-state-row.new-sender { color: #B45309; }
+  .inbox-state-row.conflict { color: var(--red); }
+  .inbox-state-icon { width: 14px; height: 14px; display: grid; place-items: center; font-size: 10px; }
+
+  .inbox-from { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .inbox-from-email { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-4); font-weight: 400; }
+  .inbox-subject { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-2); margin-top: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .inbox-company { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 1px 6px; background: var(--paper-2); border: 1px solid var(--line); color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; }
+  .delta-hint { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--red); margin-top: 4px; font-weight: 600; }
+  .delta-hint .was { color: var(--ink-4); text-decoration: line-through; }
+
+  .inbox-value { font-family: 'Archivo', sans-serif; font-weight: 900; font-size: 20px; letter-spacing: -0.02em; text-align: right; }
+  .inbox-value .currency { font-size: 12px; color: var(--ink-3); margin-right: 2px; }
+
+  .inbox-action { font-family: 'Archivo', sans-serif; font-size: 11px; font-weight: 700; padding: 10px 14px; border: 1px solid var(--line-strong); transition: all 0.12s; cursor: pointer; background: var(--paper); text-align: center; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); }
+  .inbox-action:hover { background: var(--ink); color: var(--yellow); border-color: var(--ink); }
+
+  .sender-actions { grid-column: 1 / -1; display: flex; gap: 8px; padding-top: 12px; border-top: 1px dashed rgba(0,0,0,0.1); margin-top: 4px; }
+
+  /* LEDGERS LIST */
+  .search-wrap { margin-bottom: 22px; }
+  .search { border: 2px solid var(--ink); background: var(--paper); display: flex; align-items: center; padding: 0 16px; }
+  .search svg { color: var(--ink-3); flex-shrink: 0; }
+  .search input { flex: 1; border: none; outline: none; padding: 16px 12px; font-family: 'Archivo', sans-serif; font-size: 18px; font-weight: 700; background: transparent; letter-spacing: -0.01em; }
+  .search input::placeholder { color: var(--ink-4); font-weight: 500; }
+
+  .list-section-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin: 24px 0 8px; font-weight: 700; }
+  .list-section-label:first-child { margin-top: 8px; }
+
+  .ledger-list { background: transparent; }
+  .ledger-card { display: grid; grid-template-columns: 42px 1fr auto auto; gap: 14px; padding: 16px 18px; border: 1px solid var(--line); background: var(--paper); margin-bottom: -1px; cursor: pointer; transition: background 0.1s; align-items: center; }
+  .ledger-card:hover { background: var(--paper-2); }
+
+  .ledger-avatar { width: 42px; height: 42px; background: var(--ink); color: var(--yellow); display: grid; place-items: center; font-weight: 900; font-size: 13px; }
+  .ledger-info { min-width: 0; }
+  .ledger-name { font-weight: 700; font-size: 15px; }
+  .ledger-email { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-4); margin-top: 2px; }
+  .ledger-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; gap: 12px; }
+
+  .ledger-status { text-align: right; }
+  .ledger-balance { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; color: var(--red); }
+  .ledger-balance.zero { color: var(--ink-4); }
+  .ledger-balance-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; }
+  .ledger-pendencies { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--red-soft); color: var(--red); font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .ledger-pendencies.zero { background: var(--paper-3); color: var(--ink-3); }
+
+  /* LEDGER DETAIL */
+  .ledger-wrap { display: none; }
+  .ledger-wrap.show { display: block; }
+  .back-link { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; margin-bottom: 20px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 0; }
+  .back-link:hover { color: var(--ink); }
+
+  .ledger-header { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .ledger-header-left { min-width: 0; }
+  .ledger-person-name { font-weight: 900; font-size: 34px; letter-spacing: -0.03em; line-height: 1; text-transform: uppercase; }
+  .ledger-person-email { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+  .ledger-person-meta { margin-top: 12px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .ledger-meta-item { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .ledger-meta-item .label { color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 3px; }
+  .ledger-meta-item .value { color: var(--ink); font-weight: 700; }
+
+  .ledger-header-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  .balance-display { display: flex; flex-direction: column; align-items: flex-end; }
+  .balance-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .balance-amount { font-weight: 900; font-size: 36px; letter-spacing: -0.03em; line-height: 1; color: var(--red); }
+  .balance-amount .currency { font-size: 16px; color: var(--ink-3); margin-right: 3px; }
+  .balance-amount.zero { color: var(--ink-4); }
+
+  .ledger-actions { margin: 20px 0 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .ledger-table-head { display: grid; grid-template-columns: 90px 1fr 140px 140px 160px; gap: 14px; padding: 10px 14px; background: var(--paper-3); border: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+  .ledger-table-head .col-amount { text-align: right; }
+
+  .ledger-row { display: grid; grid-template-columns: 90px 1fr 140px 140px 160px; gap: 14px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-top: none; align-items: center; transition: background 0.1s; }
+  .ledger-row.clickable { cursor: pointer; }
+  .ledger-row.clickable:hover { background: var(--paper-2); }
+  .ledger-row .col-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.3; }
+  .ledger-row .col-date small { color: var(--ink-4); display: block; margin-top: 2px; font-size: 10px; }
+
+  .col-movement { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .move-icon { width: 28px; height: 28px; display: grid; place-items: center; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; border: 1.5px solid; }
+  .move-icon.invoice { border-color: var(--red); color: var(--red); background: var(--red-soft); }
+  .move-icon.payment { border-color: var(--green); color: var(--green); background: var(--green-soft); }
+  .move-icon.advance { border-color: var(--ink); color: var(--ink); background: var(--yellow-soft); }
+  .move-icon.correction { border-color: var(--orange); color: var(--orange); background: #FFF7ED; }
+  .move-icon.reversal { border-color: var(--ink-3); color: var(--ink-3); background: var(--paper-2); }
+
+  .move-details { min-width: 0; }
+  .move-type { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+  .move-desc { font-weight: 600; font-size: 14px; margin-top: 2px; }
+  .move-desc .ref { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--blue); font-weight: 600; cursor: pointer; }
+  .move-desc .ref:hover { text-decoration: underline; }
+  .move-note { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-4); margin-top: 3px; }
+
+  .col-amount { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; text-align: right; }
+  .col-amount.debit { color: var(--red); }
+  .col-amount.credit { color: var(--green); }
+  .col-amount.empty { color: var(--ink-4); font-weight: 400; }
+
+  .col-running { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 800; text-align: right; color: var(--ink); }
+  .col-running.negative { color: var(--red); }
+  .col-running.zero { color: var(--ink-4); }
+
+  .col-action { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-4); text-align: right; text-transform: uppercase; letter-spacing: 0.06em; }
+  .ledger-row.clickable:hover .col-action { color: var(--ink); font-weight: 700; }
+
+  .ledger-footer-actions { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .ledger-audit { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* CLOSING */
+  .step-bar { display: flex; gap: 0; margin-bottom: 28px; border: 1px solid var(--line); background: var(--paper); }
+  .step { flex: 1; padding: 14px 18px; border-right: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+  .step:last-child { border-right: none; }
+  .step.active { background: var(--yellow-soft); }
+  .step.done { background: var(--green-soft); }
+  .step-num { width: 24px; height: 24px; background: var(--paper-3); color: var(--ink-3); display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; }
+  .step.active .step-num { background: var(--ink); color: var(--yellow); }
+  .step.done .step-num { background: var(--green); color: white; }
+  .step-label { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .step.active .step-label { color: var(--ink); }
+  .step:not(.active):not(.done) .step-label { color: var(--ink-3); }
+
+  .form-group { margin-bottom: 20px; }
+  .form-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); margin-bottom: 6px; font-weight: 600; }
+  .form-input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--line); font-family: 'Archivo', sans-serif; font-size: 14px; font-weight: 500; outline: none; background: var(--paper); }
+  .form-input:focus { border-color: var(--ink); }
+  .form-row-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .package-preview { padding: 20px 22px; background: var(--paper); border: 1px solid var(--line); margin-top: 12px; }
+  .package-preview-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .package-preview-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); font-weight: 700; }
+  .package-lot { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink); font-weight: 700; }
+  .preview-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+  .preview-row strong { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+  .preview-row.total { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 8px; font-weight: 800; }
+
+  .warning-box { margin-top: 14px; padding: 12px 14px; background: var(--yellow-bg); border-left: 3px solid var(--yellow); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink); }
+  .warning-box ul { list-style: none; padding: 0; margin: 6px 0 0; }
+  .warning-box li { padding: 2px 0; }
+  .warning-box strong { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+
+  .history-section { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--line); }
+  .history-title { font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: -0.01em; margin-bottom: 14px; }
+  .history-item { display: grid; grid-template-columns: 110px 1fr auto; gap: 14px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); margin-bottom: -1px; align-items: center; }
+  .history-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-2); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .history-info { min-width: 0; }
+  .history-info strong { font-size: 13px; }
+  .history-lot { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+  .history-action { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; }
+  .history-action:hover { color: var(--ink); text-decoration: underline; }
+
+  /* SETTINGS */
+  .settings-section { padding: 24px 0; border-bottom: 1px solid var(--line); }
+  .settings-section:last-child { border-bottom: none; }
+  .settings-title { font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: -0.01em; margin-bottom: 4px; }
+  .settings-desc { font-size: 13px; color: var(--ink-3); margin-bottom: 14px; }
+
+  .inbox-status-card { padding: 16px 18px; background: var(--paper); border: 1px solid var(--line); }
+  .inbox-status-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .inbox-status-email { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; }
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--green-soft); color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  .inbox-status-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding-top: 12px; border-top: 1px solid var(--line); margin-top: 8px; }
+  .status-meta-item { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .status-meta-item .label { color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+  .status-meta-item .value { color: var(--ink); font-weight: 600; }
+  .inbox-status-actions { display: flex; gap: 8px; margin-top: 14px; }
+
+  .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: var(--paper); border: 1px solid var(--line); margin-bottom: 8px; }
+  .list-item-info { min-width: 0; }
+  .list-item-name { font-weight: 700; font-size: 13px; }
+  .list-item-sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+  .list-item-action { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-2); cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; }
+  .list-item-action:hover { color: var(--ink); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,0.5); display: grid; place-items: center; padding: 20px; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.active { opacity: 1; pointer-events: auto; }
+  .modal { background: var(--paper); border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); width: 100%; max-width: 480px; max-height: 85vh; display: flex; flex-direction: column; }
+  .modal.wide { max-width: 640px; }
+  .modal-head { padding: 18px 22px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .modal-title { font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: -0.01em; }
+  .modal-close { background: none; border: none; cursor: pointer; font-size: 20px; color: var(--ink-3); line-height: 1; }
+  .modal-body { padding: 22px; overflow-y: auto; flex: 1; }
+  .modal-foot { padding: 14px 22px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; background: var(--paper-2); }
+
+  .pdf-preview { background: var(--paper-2); border: 1px dashed var(--line); padding: 60px 30px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .amount-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .amount-row:last-child { border: none; }
+  .amount-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; color: var(--ink-3); letter-spacing: 0.06em; }
+  .amount-value { font-weight: 800; font-size: 22px; letter-spacing: -0.02em; }
+
+  .confirm-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .confirm-btn { padding: 18px 12px; font-family: 'Archivo', sans-serif; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; transition: all 0.12s; text-align: center; border: 2px solid; }
+  .confirm-btn.yes { background: var(--green); color: white; border-color: var(--green); }
+  .confirm-btn.yes:hover { background: #15803D; border-color: #15803D; }
+  .confirm-btn.no { background: var(--paper); color: var(--red); border-color: var(--red); }
+  .confirm-btn.no:hover { background: var(--red); color: white; }
+
+  .custom-amount-wrap { display: none; margin-top: 14px; }
+  .custom-amount-wrap.show { display: block; }
+  .custom-amount-input { width: 100%; padding: 14px 16px; border: 2px solid var(--ink); background: var(--yellow-soft); font-family: 'Archivo', sans-serif; font-size: 22px; font-weight: 800; text-align: center; outline: none; }
+
+  .breakdown-row { display: flex; justify-content: space-between; padding: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink-2); }
+  .breakdown-row.total { border-top: 2px solid var(--ink); margin-top: 8px; padding-top: 14px; font-family: 'Archivo', sans-serif; font-weight: 900; font-size: 22px; color: var(--ink); letter-spacing: -0.02em; }
+  .breakdown-hint { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-3); padding: 10px 12px; background: var(--paper-2); border-left: 2px solid var(--yellow); margin-top: 14px; }
+  .breakdown-hint strong { color: var(--ink); }
+
+  .compare-grid { display: grid; grid-template-columns: 1fr 24px 1fr; gap: 12px; align-items: center; margin: 16px 0; }
+  .compare-col { background: var(--paper-2); border: 1px solid var(--line); padding: 14px; }
+  .compare-col.old { opacity: 0.6; }
+  .compare-col.new { border-color: var(--orange); background: #FFF7ED; }
+  .compare-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); margin-bottom: 8px; }
+  .compare-value { font-family: 'Archivo', sans-serif; font-weight: 900; font-size: 20px; letter-spacing: -0.02em; line-height: 1; }
+  .compare-ref { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--blue); margin-top: 6px; cursor: pointer; }
+  .compare-ref:hover { text-decoration: underline; }
+  .compare-arrow { text-align: center; color: var(--ink-3); font-size: 18px; }
+  .compare-delta { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--red); text-align: center; margin-top: 6px; padding: 8px; background: var(--red-bg); }
+
+  .three-options { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .option-btn { padding: 14px 16px; background: var(--paper); border: 1.5px solid var(--line-strong); text-align: left; cursor: pointer; transition: all 0.12s; font-family: 'Archivo', sans-serif; }
+  .option-btn:hover { border-color: var(--ink); background: var(--paper-2); }
+  .option-btn strong { display: block; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+  .option-btn span { font-size: 12px; color: var(--ink-3); }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: var(--paper); padding: 14px 22px; display: flex; align-items: center; gap: 16px; font-size: 13px; box-shadow: 4px 4px 0 var(--yellow); z-index: 200; transition: transform 0.3s, opacity 0.3s; opacity: 0; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast-undo { font-family: 'Archivo', sans-serif; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--yellow); cursor: pointer; padding-left: 16px; border-left: 1px solid #3F3F46; }
+  .toast-undo:hover { color: white; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">OS</div>
+      <div class="brand-name">OnSite</div>
+    </div>
+
+    <div class="sidebar-body">
+
+      <div class="nav-group expanded active" id="group-ops">
+        <div class="nav-group-head" onclick="toggleGroup('ops')">
+          <div class="nav-icon">📥</div>
+          <span>Ops</span>
+          <span class="caret">▶</span>
+        </div>
+        <div class="nav-children">
+          <div class="nav-item active" onclick="switchView('inbox', this)">
+            Inbox
+            <span class="nav-badge">2</span>
+          </div>
+          <div class="nav-item" onclick="switchView('ledgers', this)">Ledgers</div>
+          <div class="nav-item" onclick="switchView('closing', this)">Closing</div>
+          <div class="nav-item" onclick="switchView('settings', this)">Settings</div>
+        </div>
+      </div>
+
+      <div class="nav-group coming-soon">
+        <div class="nav-group-head">
+          <div class="nav-icon">✓</div>
+          <span>Checklist</span>
+          <span class="soon-badge">beta</span>
+        </div>
+      </div>
+
+      <div class="nav-group coming-soon">
+        <div class="nav-group-head">
+          <div class="nav-icon">👷</div>
+          <span>Operator</span>
+          <span class="soon-badge">beta</span>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="nav-group">
+        <div class="nav-group-head">
+          <div class="nav-icon">⚙</div>
+          <span>Account</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="user-chip">
+        <div class="user-avatar">PR</div>
+        <div class="user-info">
+          <div class="user-name">Paul Ribeiro</div>
+          <div class="user-email">paul@onsiteclub.ca</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-head">
+      <div class="breadcrumb">Ops · <strong id="breadcrumbPage">Inbox</strong></div>
+      <div class="main-head-actions">
+        <div class="health-indicator">
+          <div class="health-dot"></div>
+          <span>Inbound active · 18 min ago</span>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- INBOX -->
+    <div class="view active" id="inbox-view">
+      <h1 class="page-title">Inbox</h1>
+      <div class="page-subtitle">6 messages · 2 need action</div>
+
+      <div class="inbox-list">
+
+        <div class="inbox-row state-new-sender" id="new-sender-row">
+          <div class="inbox-date">APR 22<span class="inbox-date-time">10:42</span></div>
+          <div class="inbox-main">
+            <div class="inbox-state-row new-sender">
+              <div class="inbox-state-icon">⚠</div>
+              <span>NEW SENDER — not recognized</span>
+            </div>
+            <div class="inbox-from">Richard Almeida <span class="inbox-from-email">richard.a@gmail.com</span></div>
+            <div class="inbox-subject">MF-B-0024 <span class="inbox-company">Maple Framing</span></div>
+          </div>
+          <div class="inbox-value"><span class="currency">$</span>3,450</div>
+          <div class="inbox-action" onclick="openPdfModal('MF-B-0024')">Review PDF</div>
+          <div class="sender-actions">
+            <button class="btn primary" onclick="openSenderDecision()">Decide</button>
+          </div>
+        </div>
+
+        <div class="inbox-row state-conflict" id="version-row">
+          <div class="inbox-date">APR 22<span class="inbox-date-time">09:18</span></div>
+          <div class="inbox-main">
+            <div class="inbox-state-row conflict">
+              <div class="inbox-state-icon">⚡</div>
+              <span>CONFLICT — same invoice, new version</span>
+            </div>
+            <div class="inbox-from">John Silva <span class="inbox-from-email">john.silva@gmail.com</span></div>
+            <div class="inbox-subject">JK-A-0047 v2 <span class="inbox-company">JK Construction</span></div>
+            <div class="delta-hint">$3,200 <span class="was">(was $2,840)</span> &nbsp;+$360</div>
+          </div>
+          <div class="inbox-value"><span class="currency">$</span>3,200</div>
+          <div class="inbox-action" onclick="openVersionModal()">Compare versions</div>
+        </div>
+
+        <div class="inbox-row" onclick="gotoLedger('John Silva', 'john.silva@gmail.com', 'JS', 6540)">
+          <div class="inbox-date">APR 18<span class="inbox-date-time">09:23</span></div>
+          <div class="inbox-main">
+            <div class="inbox-state-row normal">
+              <div class="inbox-state-icon">✓</div>
+              <span>TIMEKEEPER — data auto-filled</span>
+            </div>
+            <div class="inbox-from">John Silva <span class="inbox-from-email">john.silva@gmail.com</span></div>
+            <div class="inbox-subject">JK-A-0047 <span class="inbox-company">JK Construction</span></div>
+          </div>
+          <div class="inbox-value"><span class="currency">$</span>2,840</div>
+          <div class="inbox-action" onclick="event.stopPropagation(); openPdfModal('JK-A-0047')">Open ledger</div>
+        </div>
+
+        <div class="inbox-row" onclick="gotoLedger('Carl Pereira', 'carl.p@outlook.com', 'CP', 3200)">
+          <div class="inbox-date">APR 18<span class="inbox-date-time">08:15</span></div>
+          <div class="inbox-main">
+            <div class="inbox-state-row normal">
+              <div class="inbox-state-icon">✓</div>
+              <span>TIMEKEEPER — data auto-filled</span>
+            </div>
+            <div class="inbox-from">Carl Pereira <span class="inbox-from-email">carl.p@outlook.com</span></div>
+            <div class="inbox-subject">JK-A-0048 <span class="inbox-company">JK Construction</span></div>
+          </div>
+          <div class="inbox-value"><span class="currency">$</span>3,200</div>
+          <div class="inbox-action" onclick="event.stopPropagation(); openPdfModal('JK-A-0048')">Open ledger</div>
+        </div>
+
+        <div class="inbox-row" onclick="gotoLedger('Michael Santos', 'michael@tamarack.com', 'MS', 0)">
+          <div class="inbox-date">APR 17<span class="inbox-date-time">14:42</span></div>
+          <div class="inbox-main">
+            <div class="inbox-state-row" style="color: var(--ink-3);">
+              <div class="inbox-state-icon">📄</div>
+              <span>EXTERNAL PDF — manual entry</span>
+            </div>
+            <div class="inbox-from">Michael Santos <span class="inbox-from-email">michael@tamarack.com</span></div>
+            <div class="inbox-subject">MF-B-0019 <span class="inbox-company">Maple Framing</span></div>
+          </div>
+          <div class="inbox-value"><span class="currency">$</span>5,280</div>
+          <div class="inbox-action" onclick="event.stopPropagation(); openPdfModal('MF-B-0019')">Review PDF</div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- LEDGERS LIST -->
+    <div class="view" id="ledgers-view">
+
+      <div id="ledgers-search">
+        <h1 class="page-title">Ledgers</h1>
+        <div class="page-subtitle">5 people · 3 with open balance</div>
+
+        <div class="search-wrap">
+          <div class="search">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" id="searchInput" placeholder="Search by name or email..." oninput="filterSearch(this.value)">
+          </div>
+        </div>
+
+        <div class="list-section-label">Open balance</div>
+        <div class="ledger-list" id="listOpen">
+          <div class="ledger-card" onclick="gotoLedger('John Silva', 'john.silva@gmail.com', 'JS', 6540)">
+            <div class="ledger-avatar">JS</div>
+            <div class="ledger-info">
+              <div class="ledger-name">John Silva</div>
+              <div class="ledger-email">john.silva@gmail.com</div>
+              <div class="ledger-meta">
+                <span>JK Construction</span>
+                <span>Last activity · Apr 18</span>
+              </div>
+            </div>
+            <div class="ledger-pendencies">2 open invoices</div>
+            <div class="ledger-status">
+              <div class="ledger-balance">− $6,540.00</div>
+              <div class="ledger-balance-label">Open balance</div>
+            </div>
+          </div>
+
+          <div class="ledger-card" onclick="gotoLedger('Carl Pereira', 'carl.p@outlook.com', 'CP', 3200)">
+            <div class="ledger-avatar">CP</div>
+            <div class="ledger-info">
+              <div class="ledger-name">Carl Pereira</div>
+              <div class="ledger-email">carl.p@outlook.com</div>
+              <div class="ledger-meta">
+                <span>JK Construction</span>
+                <span>Last activity · Apr 18</span>
+              </div>
+            </div>
+            <div class="ledger-pendencies">1 open invoice</div>
+            <div class="ledger-status">
+              <div class="ledger-balance">− $3,200.00</div>
+              <div class="ledger-balance-label">Open balance</div>
+            </div>
+          </div>
+
+          <div class="ledger-card" onclick="gotoLedger('Peter Fernandes', 'peter@gmail.com', 'PF', 2610)">
+            <div class="ledger-avatar">PF</div>
+            <div class="ledger-info">
+              <div class="ledger-name">Peter Fernandes</div>
+              <div class="ledger-email">peter@gmail.com</div>
+              <div class="ledger-meta">
+                <span>Maple Framing</span>
+                <span>Last activity · Apr 15</span>
+              </div>
+            </div>
+            <div class="ledger-pendencies">1 open invoice</div>
+            <div class="ledger-status">
+              <div class="ledger-balance">− $2,610.00</div>
+              <div class="ledger-balance-label">Open balance</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="list-section-label">Settled</div>
+        <div class="ledger-list" id="listClosed">
+          <div class="ledger-card" onclick="gotoLedger('Michael Santos', 'michael@tamarack.com', 'MS', 0)">
+            <div class="ledger-avatar">MS</div>
+            <div class="ledger-info">
+              <div class="ledger-name">Michael Santos</div>
+              <div class="ledger-email">michael@tamarack.com</div>
+              <div class="ledger-meta">
+                <span>Maple Framing</span>
+                <span>Settled on Apr 17</span>
+              </div>
+            </div>
+            <div class="ledger-pendencies zero">No pending</div>
+            <div class="ledger-status">
+              <div class="ledger-balance zero">$0.00</div>
+              <div class="ledger-balance-label">Last payment · Apr 17</div>
+            </div>
+          </div>
+
+          <div class="ledger-card" onclick="gotoLedger('Edward Lima', 'edward.l@gmail.com', 'EL', 0)">
+            <div class="ledger-avatar">EL</div>
+            <div class="ledger-info">
+              <div class="ledger-name">Edward Lima</div>
+              <div class="ledger-email">edward.l@gmail.com</div>
+              <div class="ledger-meta">
+                <span>JK Construction</span>
+                <span>Settled on Apr 10</span>
+              </div>
+            </div>
+            <div class="ledger-pendencies zero">No pending</div>
+            <div class="ledger-status">
+              <div class="ledger-balance zero">$0.00</div>
+              <div class="ledger-balance-label">Last payment · Apr 10</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEDGER DETAIL -->
+      <div id="ledger-detail" class="ledger-wrap">
+        <a class="back-link" onclick="backToLedgers()">← Back to ledgers</a>
+
+        <div class="ledger-header">
+          <div class="ledger-header-left">
+            <div class="ledger-person-name" id="personName">John Silva</div>
+            <div class="ledger-person-email" id="personEmail">john.silva@gmail.com</div>
+            <div class="ledger-person-meta">
+              <div class="ledger-meta-item">
+                <span class="label">Company</span>
+                <span class="value">JK Construction</span>
+              </div>
+              <div class="ledger-meta-item">
+                <span class="label">Default fee</span>
+                <span class="value">15%</span>
+              </div>
+              <div class="ledger-meta-item">
+                <span class="label">Last payment</span>
+                <span class="value">Apr 8, 2026</span>
+              </div>
+              <div class="ledger-meta-item">
+                <span class="label">Open invoices</span>
+                <span class="value">2</span>
+              </div>
+            </div>
+          </div>
+          <div class="ledger-header-right">
+            <div class="balance-display">
+              <div class="balance-label">Balance owed</div>
+              <div class="balance-amount" id="personBalance"><span class="currency">$</span>6,540.00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ledger-actions">
+          <button class="btn primary" onclick="openReconcile('JK-A-0048', 3200)">Record payment</button>
+          <button class="btn" onclick="openAdvance()">+ Record advance</button>
+          <button class="btn ghost">Edit person</button>
+        </div>
+
+        <div class="ledger-table-head">
+          <div>Date</div>
+          <div>Movement</div>
+          <div class="col-amount">Debit / Credit</div>
+          <div class="col-amount">Running balance</div>
+          <div></div>
+        </div>
+
+        <div class="ledger-row">
+          <div class="col-date">APR 1<small>09:12</small></div>
+          <div class="col-movement">
+            <div class="move-icon invoice">I</div>
+            <div class="move-details">
+              <div class="move-type">Invoice received</div>
+              <div class="move-desc"><span class="ref" onclick="openPdfModal('JK-A-0042')">JK-A-0042</span> · JK Construction</div>
+              <div class="move-note">Timekeeper · auto-filled</div>
+            </div>
+          </div>
+          <div class="col-amount debit">− $4,120.00</div>
+          <div class="col-running negative">− $4,120.00</div>
+          <div class="col-action">Open</div>
+        </div>
+
+        <div class="ledger-row">
+          <div class="col-date">APR 8<small>14:30</small></div>
+          <div class="col-movement">
+            <div class="move-icon payment">P</div>
+            <div class="move-details">
+              <div class="move-type">Cash payment</div>
+              <div class="move-desc">Settled JK-A-0042</div>
+              <div class="move-note">$3,502 cash · $618 your fee (15%)</div>
+            </div>
+          </div>
+          <div class="col-amount credit">+ $4,120.00</div>
+          <div class="col-running zero">$0.00</div>
+          <div class="col-action">Open</div>
+        </div>
+
+        <div class="ledger-row">
+          <div class="col-date">APR 12<small>16:20</small></div>
+          <div class="col-movement">
+            <div class="move-icon advance">A</div>
+            <div class="move-details">
+              <div class="move-type">Advance</div>
+              <div class="move-desc">Unlinked to any invoice</div>
+              <div class="move-note">Will deduct from next payment</div>
+            </div>
+          </div>
+          <div class="col-amount credit">+ $800.00</div>
+          <div class="col-running">+ $800.00</div>
+          <div class="col-action">Open</div>
+        </div>
+
+        <div class="ledger-row clickable" onclick="openReconcile('JK-A-0048', 3200)">
+          <div class="col-date">APR 15<small>11:05</small></div>
+          <div class="col-movement">
+            <div class="move-icon invoice">I</div>
+            <div class="move-details">
+              <div class="move-type">Invoice received — open</div>
+              <div class="move-desc"><span class="ref" onclick="event.stopPropagation(); openPdfModal('JK-A-0048')">JK-A-0048</span> · JK Construction</div>
+              <div class="move-note">Timekeeper · auto-filled</div>
+            </div>
+          </div>
+          <div class="col-amount debit">− $3,200.00</div>
+          <div class="col-running negative">− $2,400.00</div>
+          <div class="col-action">Record payment →</div>
+        </div>
+
+        <div class="ledger-row clickable" onclick="openReconcile('JK-A-0047', 2840)">
+          <div class="col-date">APR 18<small>09:23</small></div>
+          <div class="col-movement">
+            <div class="move-icon invoice">I</div>
+            <div class="move-details">
+              <div class="move-type">Invoice received — open</div>
+              <div class="move-desc"><span class="ref" onclick="event.stopPropagation(); openPdfModal('JK-A-0047')">JK-A-0047</span> · JK Construction</div>
+              <div class="move-note">Timekeeper · auto-filled</div>
+            </div>
+          </div>
+          <div class="col-amount debit">− $2,840.00</div>
+          <div class="col-running negative">− $5,240.00</div>
+          <div class="col-action">Record payment →</div>
+        </div>
+
+        <div class="ledger-footer-actions">
+          <div class="ledger-audit">Append-only · 5 movements · nothing deleted</div>
+          <div class="balance-display" style="align-items: flex-end;">
+            <div class="balance-label">Current balance</div>
+            <div class="balance-amount"><span class="currency">$</span>6,540.00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- CLOSING -->
+    <div class="view" id="closing-view">
+      <h1 class="page-title">Closing</h1>
+      <div class="page-subtitle">Generate package and send to accountant</div>
+
+      <div class="step-bar">
+        <div class="step active">
+          <div class="step-num">1</div>
+          <div class="step-label">Configure</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-label">Generate package</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-label">Send batch</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Company</label>
+        <select class="form-input">
+          <option>JK Construction Ltd</option>
+          <option>Maple Framing Inc</option>
+        </select>
+      </div>
+
+      <div class="form-row-grid">
+        <div class="form-group"><label class="form-label">From</label><input type="date" class="form-input" value="2026-04-01"></div>
+        <div class="form-group"><label class="form-label">To</label><input type="date" class="form-input" value="2026-04-30"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Accountant email</label>
+        <input type="email" class="form-input" value="accountant@fiscal.ca">
+      </div>
+
+      <div class="package-preview">
+        <div class="package-preview-head">
+          <div class="package-preview-label">Package preview</div>
+          <div class="package-lot">EXP-2026-04-JK-v1</div>
+        </div>
+        <div class="preview-row"><span>Invoices in period</span><strong>14</strong></div>
+        <div class="preview-row"><span>PDF files</span><strong>14 files</strong></div>
+        <div class="preview-row"><span>CSV spreadsheet</span><strong>1 file</strong></div>
+        <div class="preview-row total"><span>Total billed</span><strong>$89,500.00</strong></div>
+        <div class="preview-row"><span>HST collected</span><strong>$10,297.35</strong></div>
+      </div>
+
+      <div class="warning-box">
+        <strong>Warnings before generating:</strong>
+        <ul>
+          <li>• 1 unresolved version conflict (JK-A-0047)</li>
+          <li>• 2 invoices missing HST declaration</li>
+          <li>• 1 unlinked sender</li>
+        </ul>
+      </div>
+
+      <div style="margin-top: 24px; display: flex; gap: 8px;">
+        <button class="btn primary">Generate package</button>
+        <button class="btn ghost">Resolve warnings first</button>
+      </div>
+
+      <div class="history-section">
+        <div class="history-title">Export history</div>
+
+        <div class="history-item">
+          <div class="history-date">MAR 30, 2026</div>
+          <div class="history-info">
+            <strong>March 2026 · JK Construction</strong>
+            <div class="history-lot">EXP-2026-03-JK-v1 · 12 invoices · $76,200.00 · sent to accountant@fiscal.ca</div>
+          </div>
+          <div class="history-action">Download ZIP</div>
+        </div>
+
+        <div class="history-item">
+          <div class="history-date">MAR 30, 2026</div>
+          <div class="history-info">
+            <strong>March 2026 · Maple Framing</strong>
+            <div class="history-lot">EXP-2026-03-MF-v1 · 8 invoices · $42,800.00 · sent to accountant@fiscal.ca</div>
+          </div>
+          <div class="history-action">Download ZIP</div>
+        </div>
+
+        <div class="history-item">
+          <div class="history-date">FEB 28, 2026</div>
+          <div class="history-info">
+            <strong>February 2026 · JK Construction</strong>
+            <div class="history-lot">EXP-2026-02-JK-v1 · 11 invoices · $68,900.00 · sent to accountant@fiscal.ca</div>
+          </div>
+          <div class="history-action">Download ZIP</div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- SETTINGS -->
+    <div class="view" id="settings-view">
+      <h1 class="page-title">Settings</h1>
+      <div class="page-subtitle">Operational health and records</div>
+
+      <div class="settings-section">
+        <div class="settings-title">Inbound email</div>
+        <div class="settings-desc">Address where workers send invoices.</div>
+        <div class="inbox-status-card">
+          <div class="inbox-status-head">
+            <div class="inbox-status-email">paul@onsiteclub.ca</div>
+            <div class="status-pill"><span class="dot"></span>Active</div>
+          </div>
+          <div class="inbox-status-meta">
+            <div class="status-meta-item">
+              <span class="label">Last invoice received</span>
+              <span class="value">18 minutes ago</span>
+            </div>
+            <div class="status-meta-item">
+              <span class="label">Invoices this month</span>
+              <span class="value">14</span>
+            </div>
+          </div>
+          <div class="inbox-status-actions">
+            <button class="btn small">Copy email</button>
+            <button class="btn ghost small">Test inbound</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Companies</div>
+        <div class="settings-desc">Companies issuing invoices.</div>
+        <div class="list-item">
+          <div class="list-item-info">
+            <div class="list-item-name">JK Construction Ltd</div>
+            <div class="list-item-sub">JK-A · HST 123456789RT0001 · accountant@fiscal.ca · 15%</div>
+          </div>
+          <span class="list-item-action">Edit</span>
+        </div>
+        <div class="list-item">
+          <div class="list-item-info">
+            <div class="list-item-name">Maple Framing Inc</div>
+            <div class="list-item-sub">MF-B · HST 987654321RT0001 · accountant@fiscal.ca · 12%</div>
+          </div>
+          <span class="list-item-action">Edit</span>
+        </div>
+        <div style="margin-top: 14px;"><button class="btn">+ New company</button></div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Blocked senders</div>
+        <div class="settings-desc">Rejected emails do not appear in the inbox.</div>
+        <div class="list-item">
+          <div class="list-item-info">
+            <div class="list-item-name" style="font-family: 'JetBrains Mono', monospace; font-size: 12px;">spam@fake.com</div>
+            <div class="list-item-sub">Blocked on Apr 15, 2026</div>
+          </div>
+          <span class="list-item-action">Unblock</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+
+<!-- MODALS -->
+
+<div class="modal-overlay" id="pdfModal">
+  <div class="modal wide">
+    <div class="modal-head"><div class="modal-title" id="pdfTitle">INVOICE.pdf</div><button class="modal-close" onclick="closeModal('pdfModal')">✕</button></div>
+    <div class="modal-body"><div class="pdf-preview">[ PDF RENDERED HERE ]<br><br>In production: iframe or react-pdf</div></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="senderDecisionModal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">New sender · Richard Almeida</div><button class="modal-close" onclick="closeModal('senderDecisionModal')">✕</button></div>
+    <div class="modal-body">
+      <div style="color: var(--ink-2); font-size: 13px; margin-bottom: 6px;">
+        <strong>richard.a@gmail.com</strong>
+      </div>
+      <div style="color: var(--ink-3); font-size: 13px;">
+        This email has never sent an invoice before. What to do?
+      </div>
+      <div class="three-options">
+        <button class="option-btn" onclick="openLinkExisting()">
+          <strong>Link to existing person</strong>
+          <span>Richard changed emails or has an alias in the records</span>
+        </button>
+        <button class="option-btn" onclick="openAddNew()">
+          <strong>Add as new person</strong>
+          <span>Create a new ledger for Richard Almeida</span>
+        </button>
+        <button class="option-btn" onclick="rejectSender()" style="border-color: var(--red); color: var(--red);">
+          <strong>Block sender</strong>
+          <span>Spam, wrong address, or unrelated to my work</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addClientModal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Add Richard Almeida</div><button class="modal-close" onclick="closeModal('addClientModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" value="Richard Almeida"></div>
+      <div class="form-group"><label class="form-label">Email (not editable)</label><input type="email" class="form-input" value="richard.a@gmail.com" disabled style="background: var(--paper-2);"></div>
+      <div class="form-group"><label class="form-label">Operator fee</label>
+        <div style="display: grid; grid-template-columns: 1fr 60px; gap: 10px; align-items: center;"><input type="number" class="form-input" value="15"><div style="font-weight: 700; text-align: center;">%</div></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal('addClientModal')">Cancel</button><button class="btn primary" onclick="confirmAddClient()">Add person</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reconcileModal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="reconcileTitle">Invoice</div><button class="modal-close" onclick="closeModal('reconcileModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="amount-row"><div class="amount-label">Invoice amount</div><div class="amount-value" id="reconcileAmount">$0.00</div></div>
+      <div style="padding-top: 18px;">
+        <div class="amount-label" style="margin-bottom: 10px;">Did the GC's check match this amount?</div>
+        <div class="confirm-buttons">
+          <button class="confirm-btn yes" onclick="confirmMatch(true)">✓ Exact match</button>
+          <button class="confirm-btn no" onclick="showCustomAmount()">✕ Different amount</button>
+        </div>
+        <div class="custom-amount-wrap" id="customAmountWrap">
+          <div class="amount-label" style="margin-top: 16px; margin-bottom: 8px;">What was the received amount?</div>
+          <input type="text" class="custom-amount-input" id="customAmountInput" placeholder="$ 0.00">
+          <button class="btn primary" style="width: 100%; margin-top: 12px; padding: 14px;" onclick="confirmMatch(false)">Continue with this amount</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cashModal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Record cash payment</div><button class="modal-close" onclick="closeModal('cashModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="breakdown-row"><span>Received from GC</span><strong id="breakdownReceived">$0</strong></div>
+      <div class="breakdown-row"><span>− Your fee (15%)</span><strong id="breakdownFee">− $0</strong></div>
+      <div class="breakdown-row"><span>− Prior advance</span><strong id="breakdownAdvance">− $0</strong></div>
+      <div class="breakdown-row total"><span>Cash to worker</span><strong id="breakdownTotal">$0</strong></div>
+      <div class="breakdown-hint"><strong>Reminder:</strong> confirm with the worker before handing over the money.</div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal('cashModal')">Close</button><button class="btn primary" onclick="confirmCash()">Paid · Mark settled</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="advanceModal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Record advance</div><button class="modal-close" onclick="closeModal('advanceModal')">✕</button></div>
+    <div class="modal-body">
+      <div style="color: var(--ink-3); font-size: 13px; margin-bottom: 16px;">Cash given to the worker before any invoice. Will be deducted from the next paid invoice.</div>
+      <div class="form-group"><label class="form-label">Amount</label><input type="text" class="custom-amount-input" placeholder="$ 0.00"></div>
+      <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" value="2026-04-22"></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal('advanceModal')">Cancel</button><button class="btn primary" onclick="confirmAdvance()">Record advance</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="versionModal">
+  <div class="modal wide">
+    <div class="modal-head"><div class="modal-title">Conflict · same invoice, two versions</div><button class="modal-close" onclick="closeModal('versionModal')">✕</button></div>
+    <div class="modal-body">
+      <div style="color: var(--ink-3); font-size: 13px; margin-bottom: 8px;">John Silva resent JK-A-0047 with a different amount.</div>
+      <div class="compare-grid">
+        <div class="compare-col old"><div class="compare-label">VERSION 1 · APR 18</div><div class="compare-value">$2,840.00</div><div class="compare-ref" onclick="openPdfModal('JK-A-0047 v1')">📄 Review PDF v1</div></div>
+        <div class="compare-arrow">→</div>
+        <div class="compare-col new"><div class="compare-label">VERSION 2 · APR 22</div><div class="compare-value">$3,200.00</div><div class="compare-ref" onclick="openPdfModal('JK-A-0047 v2')">📄 Review PDF v2</div></div>
+      </div>
+      <div class="compare-delta">Difference: + $360.00</div>
+      <div class="breakdown-hint"><strong>Tip:</strong> confirm with John via WhatsApp before accepting v2.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeModal('versionModal')">Decide later</button>
+      <button class="btn" onclick="keepVersion('v1')">Keep v1</button>
+      <button class="btn primary" onclick="keepVersion('v2')">Accept v2</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="toastMsg">Done</span>
+  <span class="toast-undo" onclick="undoAction()">Undo</span>
+</div>
+
+
+<script>
+  let reconcileState = { invoiceId: null, originalAmount: 0, receivedAmount: 0 };
+
+  function toggleGroup(name) { document.getElementById('group-' + name).classList.toggle('expanded'); }
+
+  function switchView(name, navItem) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+    document.getElementById(name + '-view').classList.add('active');
+    if (navItem) navItem.classList.add('active');
+    const crumb = document.getElementById('breadcrumbPage');
+    const labels = { inbox: 'Inbox', ledgers: 'Ledgers', closing: 'Closing', settings: 'Settings' };
+    crumb.textContent = labels[name] || '';
+    if (name === 'ledgers') backToLedgers();
+    window.scrollTo(0, 0);
+  }
+
+  function gotoLedger(name, email, initials, balance) {
+    const ledgersNav = document.querySelectorAll('.nav-item')[1];
+    if (!ledgersNav.classList.contains('active')) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+      document.getElementById('ledgers-view').classList.add('active');
+      ledgersNav.classList.add('active');
+      document.getElementById('breadcrumbPage').textContent = 'Ledgers';
+    }
+    document.getElementById('personName').textContent = name.toUpperCase();
+    document.getElementById('personEmail').textContent = email;
+    const bal = document.getElementById('personBalance');
+    if (balance === 0) { bal.innerHTML = '<span class="currency">$</span>0.00'; bal.classList.add('zero'); }
+    else { bal.innerHTML = `<span class="currency">$</span>${balance.toLocaleString('en-US')}.00`; bal.classList.remove('zero'); }
+    document.getElementById('ledgers-search').style.display = 'none';
+    document.getElementById('ledger-detail').classList.add('show');
+    window.scrollTo(0, 0);
+  }
+
+  function backToLedgers() {
+    document.getElementById('ledgers-search').style.display = 'block';
+    document.getElementById('ledger-detail').classList.remove('show');
+  }
+
+  function filterSearch(q) {
+    const qL = q.toLowerCase().trim();
+    document.querySelectorAll('#listOpen .ledger-card, #listClosed .ledger-card').forEach(r => {
+      r.style.display = r.textContent.toLowerCase().includes(qL) ? 'grid' : 'none';
+    });
+  }
+
+  function openPdfModal(id) { document.getElementById('pdfTitle').textContent = id + '.pdf'; openModal('pdfModal'); }
+  function openSenderDecision() { openModal('senderDecisionModal'); }
+  function openLinkExisting() { closeModal('senderDecisionModal'); showToast('Link-existing screen (not implemented in mockup)'); }
+  function openAddNew() { closeModal('senderDecisionModal'); openModal('addClientModal'); }
+  function confirmAddClient() { closeModal('addClientModal'); document.getElementById('new-sender-row').style.display = 'none'; showToast('Person added · invoice in ledger'); }
+  function rejectSender() { closeModal('senderDecisionModal'); document.getElementById('new-sender-row').style.display = 'none'; showToast('Sender blocked'); }
+
+  function openVersionModal() { openModal('versionModal'); }
+  function keepVersion(which) { closeModal('versionModal'); document.getElementById('version-row').style.display = 'none'; showToast(which === 'v1' ? 'v1 kept · v2 discarded' : 'v2 accepted · balance updated'); }
+
+  function openReconcile(invoiceId, amount) {
+    reconcileState = { invoiceId, originalAmount: amount, receivedAmount: amount };
+    document.getElementById('reconcileTitle').textContent = 'Record payment · ' + invoiceId;
+    document.getElementById('reconcileAmount').textContent = formatCurrency(amount);
+    document.getElementById('customAmountWrap').classList.remove('show');
+    document.getElementById('customAmountInput').value = '';
+    openModal('reconcileModal');
+  }
+  function showCustomAmount() { document.getElementById('customAmountWrap').classList.add('show'); setTimeout(() => document.getElementById('customAmountInput').focus(), 100); }
+  function confirmMatch(exact) {
+    if (!exact) {
+      const raw = document.getElementById('customAmountInput').value;
+      const val = parseFloat(raw.replace(/[^\d.,]/g, '').replace(',', ''));
+      if (!val) return;
+      reconcileState.receivedAmount = val;
+    }
+    closeModal('reconcileModal');
+    setTimeout(openCashModal, 250);
+  }
+
+  function openCashModal() {
+    const received = reconcileState.receivedAmount;
+    const fee = received * 0.15;
+    const advance = 800;
+    const total = received - fee - advance;
+    document.getElementById('breakdownReceived').textContent = formatCurrency(received);
+    document.getElementById('breakdownFee').textContent = '− ' + formatCurrency(fee);
+    document.getElementById('breakdownAdvance').textContent = advance ? '− ' + formatCurrency(advance) : '$0.00';
+    document.getElementById('breakdownTotal').textContent = formatCurrency(total);
+    openModal('cashModal');
+  }
+  function confirmCash() { closeModal('cashModal'); showToast('Settled · ' + reconcileState.invoiceId); }
+  function openAdvance() { openModal('advanceModal'); }
+  function confirmAdvance() { closeModal('advanceModal'); showToast('Advance recorded'); }
+  function undoAction() { hideToast(); }
+  function openModal(id) { document.getElementById(id).classList.add('active'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+  let toastTimer;
+  function showToast(msg) {
+    clearTimeout(toastTimer);
+    document.getElementById('toastMsg').textContent = msg;
+    document.getElementById('toast').classList.add('show');
+    toastTimer = setTimeout(() => document.getElementById('toast').classList.remove('show'), 5000);
+  }
+  function hideToast() { document.getElementById('toast').classList.remove('show'); }
+  function formatCurrency(n) { return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active')); });
+  document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); }));
+</script>
+</body>
+</html>

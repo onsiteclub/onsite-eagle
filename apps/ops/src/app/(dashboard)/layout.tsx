@@ -1,5 +1,5 @@
-import { NavTabs } from '@/components/shared/nav-tabs'
-import { Topbar } from '@/components/shared/topbar'
+import { MainHead } from '@/components/shell/main-head'
+import { Sidebar } from '@/components/shell/sidebar'
 
 export default async function DashboardLayout({
   children,
@@ -7,10 +7,12 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen">
-      <Topbar />
-      <NavTabs />
-      <main className="max-w-[880px] mx-auto px-7 pb-16">{children}</main>
+    <div className="shell">
+      <Sidebar />
+      <main className="main">
+        <MainHead />
+        <div className="view">{children}</div>
+      </main>
     </div>
   )
 }
