@@ -67,7 +67,9 @@ function AppContent() {
 
   return (
     <div className="app">
-      {/* Shared Header */}
+      {/* Shared Header
+          Desktop mockup: "OnSite Calculator" wordmark + ⌘K hint + avatar.
+          Mobile: logo + sign-in + hamburger (current behavior preserved via CSS). */}
       <header className="header">
         <div className="brand">
           <img
@@ -77,22 +79,33 @@ function AppContent() {
             onClick={handleLogoClick}
             style={{ cursor: 'pointer' }}
           />
+          <span className="brand-wordmark">
+            <span className="brand-wordmark__name">OnSite</span>
+            <span className="brand-wordmark__product">Calculator</span>
+          </span>
         </div>
         <div className="header-actions">
           {!isOnline && <div className="offline-badge">Offline</div>}
+          {/* ⌘K / Ctrl+K hint — desktop-only visual placeholder for a future
+              command palette. Button for a11y; no onClick yet. */}
+          <button
+            type="button"
+            className="header-shortcut"
+            aria-label="Command palette (em breve)"
+            title="Atalho em breve"
+          >
+            <kbd>⌘</kbd><kbd>K</kbd>
+          </button>
           {user ? (
             <>
-              <span className="user-name">{user.name}</span>
               <button
-                className="sign-out-btn"
+                type="button"
+                className="header-avatar"
                 onClick={handleSignOut}
-                title="Sign out"
+                title={`${user.name} — sair`}
+                aria-label={`${user.name} — sair`}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
+                {initialsFromName(user.name)}
               </button>
             </>
           ) : supabase ? (
@@ -141,8 +154,13 @@ function AppContent() {
         )}
       </div>
 
-      {/* Tab Navigation - Bottom */}
-      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Tab Navigation - Bottom. `isOnline` + `appVersion` only render on desktop. */}
+      <TabNavigation
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isOnline={isOnline}
+        appVersion={typeof __APP_VERSION__ !== 'undefined' ? `v${__APP_VERSION__}` : undefined}
+      />
 
       {/* Auth Gate Modal */}
       {showAuthGate && supabase && (
@@ -167,4 +185,12 @@ function useOptionalAuth() {
   } catch {
     return null;
   }
+}
+
+/** "Cristony Rocha" → "CR". Fallback "•" when name is empty. */
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '•';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }

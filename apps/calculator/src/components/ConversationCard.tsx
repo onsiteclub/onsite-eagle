@@ -1,8 +1,10 @@
 // src/components/ConversationCard.tsx
 // Single turn in the conversational calculator.
-// Phase 3.2: display mode — transcription (voice only) → expression → result → actions.
-// Phase 3.5: inline edit mode — expression becomes an <input>, Recalcular recomputes
-// via the local engine (no GPT round-trip) and replaces the turn in place.
+// Two visual variants:
+//   - 'chat'  — default. Compact card inside the mobile scroll feed.
+//   - 'focal' — desktop's central "hero" card. Bigger typography, equivalence
+//               line, and an extra "Explicar" action.
+// Inline edit mode works in both variants.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { calculate } from '../lib/calculator';
@@ -13,15 +15,25 @@ interface ConversationCardProps {
   isLatest: boolean;
   onRetry: (entry: HistoryEntry) => void;
   onUpdate: (id: string, result: CalculationResult) => void;
+  /** Visual variant. 'focal' is the desktop hero version; 'chat' the scroll feed. */
+  variant?: 'chat' | 'focal';
+  /** Optional — when provided (focal only today), renders an "Explicar" button. */
+  onExplain?: (entry: HistoryEntry) => void;
 }
 
-export default function ConversationCard({ entry, isLatest, onRetry, onUpdate }: ConversationCardProps) {
+export default function ConversationCard({
+  entry,
+  isLatest,
+  onRetry,
+  onUpdate,
+  variant = 'chat',
+  onExplain,
+}: ConversationCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(entry.expression);
   const [editError, setEditError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus the input the moment edit mode opens — feels like a native inline editor.
   useEffect(() => {
     if (isEditing) {
       inputRef.current?.focus();
@@ -74,36 +86,54 @@ export default function ConversationCard({ entry, isLatest, onRetry, onUpdate }:
 
   const isVoice = entry.inputMethod === 'voice';
   const dimensionLabel = classifyDimension(entry);
-  // Phase 1 — prefer engine-produced display fields; fall back to legacy for old history entries.
   const primary = entry.displayPrimary ?? (entry.isInchMode ? entry.resultFeetInches : formatDecimal(entry.resultDecimal));
   const secondary = entry.displaySecondary ?? (entry.isInchMode ? entry.resultTotalInches : '—');
+  const equivalence = variant === 'focal' ? buildEquivalenceLine(entry) : null;
+
+  // Focal variant splits the primary display into "value" and "unit" so we can
+  // typeset the unit at a smaller size next to the number (see .conv-card--focal).
+  const focalSplit = variant === 'focal' ? splitValueAndUnit(primary) : null;
 
   return (
     <article
-      className={`conv-card ${isLatest ? 'conv-card--latest' : ''} ${isEditing ? 'conv-card--editing' : ''}`}
+      className={[
+        'conv-card',
+        variant === 'focal' && 'conv-card--focal',
+        isLatest && variant !== 'focal' && 'conv-card--latest',
+        isEditing && 'conv-card--editing',
+      ].filter(Boolean).join(' ')}
       aria-current={isLatest || undefined}
     >
-      {/* Header row: input-method chip + semantic dimension chip */}
+      {/* Header — chips */}
       <header className="conv-card__meta">
-        <span className={`conv-chip conv-chip--${isVoice ? 'voice' : 'manual'}`}>
-          {isVoice ? '🎤 voz' : '⌨︎ manual'}
-        </span>
-        {dimensionLabel && (
-          <span className={`conv-chip conv-chip--dim conv-chip--${dimensionLabel.kind}`}>
-            ● {dimensionLabel.label}
+        {variant === 'focal' && dimensionLabel ? (
+          <span className={`conv-chip conv-chip--dim conv-chip--${dimensionLabel.kind} conv-chip--dim-focal`}>
+            ● {dimensionLabel.label.toUpperCase()}
           </span>
+        ) : (
+          <>
+            <span className={`conv-chip conv-chip--${isVoice ? 'voice' : 'manual'}`}>
+              {isVoice ? '🎤 voz' : '⌨︎ manual'}
+            </span>
+            {dimensionLabel && (
+              <span className={`conv-chip conv-chip--dim conv-chip--${dimensionLabel.kind}`}>
+                ● {dimensionLabel.label}
+              </span>
+            )}
+          </>
         )}
         {isEditing && <span className="conv-chip conv-chip--pending">editando…</span>}
       </header>
 
-      {/* Optional: raw transcription — only when voice + consent captured it */}
+      {/* Voice transcription (only when voice + consent captured it) */}
       {!isEditing && isVoice && entry.transcription && (
         <p className="conv-card__transcription">
-          <span className="conv-card__muted">Você disse:</span> “{entry.transcription}”
+          <span className="conv-card__muted">você disse</span>
+          <span className="conv-card__quoted">“{entry.transcription}”</span>
         </p>
       )}
 
-      {/* Expression — either static text or inline editor */}
+      {/* Expression — static or inline editor */}
       {isEditing ? (
         <input
           ref={inputRef}
@@ -118,22 +148,38 @@ export default function ConversationCard({ entry, isLatest, onRetry, onUpdate }:
           autoComplete="off"
         />
       ) : (
-        <p className="conv-card__expression">{entry.expression}</p>
+        <p className="conv-card__expression">
+          {variant === 'focal' && <span className="conv-card__muted">entendi</span>}
+          <span className="conv-card__expression-text">{entry.expression}</span>
+        </p>
       )}
 
       {editError && <p className="conv-card__error">{editError}</p>}
 
-      {/* Result — hidden while editing (would be stale) */}
+      {/* Result */}
       {!isEditing && (
         <>
-          <p className="conv-card__result">{primary}</p>
-          {secondary && secondary !== '—' && (
+          {variant === 'focal' && focalSplit ? (
+            <p className="conv-card__result">
+              <span className="conv-card__muted conv-card__result-label">resultado</span>
+              <span className="conv-card__result-value">
+                {focalSplit.value}
+                {focalSplit.unit && <span className="conv-card__result-unit">{focalSplit.unit}</span>}
+              </span>
+            </p>
+          ) : (
+            <p className="conv-card__result">{primary}</p>
+          )}
+          {variant !== 'focal' && secondary && secondary !== '—' && (
             <p className="conv-card__result-secondary">{secondary}</p>
+          )}
+          {variant === 'focal' && equivalence && (
+            <p className="conv-card__equivalence">{equivalence}</p>
           )}
         </>
       )}
 
-      {/* Action row — changes shape between display and edit modes */}
+      {/* Actions */}
       <footer className="conv-card__actions">
         {isEditing ? (
           <>
@@ -146,15 +192,14 @@ export default function ConversationCard({ entry, isLatest, onRetry, onUpdate }:
           </>
         ) : (
           <>
-            <button type="button" className="conv-action" onClick={copyResult}>
-              Copiar
-            </button>
-            <button type="button" className="conv-action" onClick={startEdit}>
-              Editar
-            </button>
-            <button type="button" className="conv-action" onClick={() => onRetry(entry)}>
-              Refazer
-            </button>
+            <button type="button" className="conv-action" onClick={copyResult}>copiar</button>
+            <button type="button" className="conv-action" onClick={startEdit}>editar</button>
+            <button type="button" className="conv-action" onClick={() => onRetry(entry)}>refazer</button>
+            {variant === 'focal' && onExplain && (
+              <button type="button" className="conv-action" onClick={() => onExplain(entry)}>
+                explicar
+              </button>
+            )}
           </>
         )}
       </footer>
@@ -166,6 +211,64 @@ function formatDecimal(n: number): string {
   if (!isFinite(n)) return 'Error';
   if (Number.isInteger(n)) return String(n);
   return parseFloat(n.toFixed(2)).toString();
+}
+
+/** Split "803.25 sq ft" into { value: "803.25", unit: "sq ft" } for focal typography. */
+function splitValueAndUnit(display: string): { value: string; unit: string } {
+  if (!display) return { value: '', unit: '' };
+  // Match: leading numeric/fraction/feet-inch literal, then whitespace-separated unit text.
+  const match = display.match(/^([\d.'"\s/]+[\d])(\s+.+)?$/);
+  if (!match) return { value: display, unit: '' };
+  return { value: match[1].trim(), unit: (match[2] ?? '').trim() };
+}
+
+/**
+ * Builds the "equivalente a …" line for the focal card.
+ * Length → shows metric (mm/m). Area → m² + total sq in. Volume → m³ + total cu in.
+ * Scalar returns null (nothing to equate).
+ */
+function buildEquivalenceLine(entry: HistoryEntry): string | null {
+  if (!entry.dimension || entry.dimension === 'scalar') return null;
+  // `resultDecimal` mirrors the engine's `valueCanonical` for all dimensions
+  // (inches/sqin/cuin depending on dim) — documented in CalculationResult.
+  const v = entry.resultDecimal;
+  if (!isFinite(v)) return null;
+
+  const fmt = (n: number, digits = 2) => {
+    if (!isFinite(n)) return 'Error';
+    return Number(n.toFixed(digits)).toString();
+  };
+
+  if (entry.dimension === 'length') {
+    // Engine's canonical = inches. Convert to metric.
+    const mm = v * 25.4;
+    const m = mm / 1000;
+    const metric = m >= 1 ? `${fmt(m, 3)} m` : `${fmt(mm, 1)} mm`;
+    const secondary = entry.displaySecondary && entry.displaySecondary !== '—'
+      ? ` · ${entry.displaySecondary}`
+      : '';
+    return `equivalente a ${metric}${secondary}`;
+  }
+
+  if (entry.dimension === 'area') {
+    // sqin → m². 1 m² = 1550.0031 sq in.
+    const m2 = v / 1550.0031;
+    const secondary = entry.displaySecondary && entry.displaySecondary !== '—'
+      ? ` · ${entry.displaySecondary}`
+      : '';
+    return `equivalente a ${fmt(m2, 2)} m²${secondary}`;
+  }
+
+  if (entry.dimension === 'volume') {
+    // cuin → m³. 1 m³ = 61023.7 cu in.
+    const m3 = v / 61023.7;
+    const secondary = entry.displaySecondary && entry.displaySecondary !== '—'
+      ? ` · ${entry.displaySecondary}`
+      : '';
+    return `equivalente a ${fmt(m3, 3)} m³${secondary}`;
+  }
+
+  return null;
 }
 
 /**

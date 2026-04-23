@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase';
 import VoiceConsentModal from './VoiceConsentModal';
 import Toast from './Toast';
 import ConversationCard from './ConversationCard';
+import { HistoryModal } from './HistoryModal';
 import type { HistoryEntry, VoiceState, VoiceResponse } from '../types/calculator';
 import type { TabType } from './TabNavigation';
 
@@ -74,6 +75,9 @@ export default function ConversationalCalculator({
   const [hasVoiceConsent, setHasVoiceConsent] = useState<boolean | null>(null);
   const [hasVoiceTrainingConsent, setHasVoiceTrainingConsent] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'info' | 'success' } | null>(null);
+  // Desktop sidebar's "ver todos →" opens the full-history modal (same component
+  // the classic UI used — we just keep it around for overflow).
+  const [showFullHistory, setShowFullHistory] = useState(false);
   // Live transcription preview — shown while the pipeline is running so the user
   // sees "you said X → we understood Y → result" in real time, not just at the end.
   const [pendingTranscription, setPendingTranscription] = useState<string | null>(null);
@@ -334,6 +338,13 @@ export default function ConversationalCalculator({
     void clearHistory();
   }, [history.length, clearHistory]);
 
+  // Phase 4 placeholder — "explicar" button on the focal card. Real impl
+  // would ask GPT for a plain-language breakdown of the calculation. For now,
+  // surface a toast so the user knows the button is wired but dormant.
+  const handleExplain = useCallback(() => {
+    setToast({ message: 'Explicação em linguagem natural — em breve.', type: 'info' });
+  }, []);
+
   const voiceButtonText = !isOnline
     ? 'Offline'
     : voiceState === 'recording'
@@ -351,27 +362,68 @@ export default function ConversationalCalculator({
     !hasVoiceAccess && 'locked',
   ].filter(Boolean).join(' ');
 
+  // Focal card target — desktop's hero card always shows the most recent turn.
+  const focalEntry = history[0] ?? null;
+  // Sidebar shows a short list of recent turns (compact), plus a "ver todos" affordance.
+  const sidebarEntries = history.slice(0, 4);
+
   return (
     <>
       <main className="conv-main">
-        {/* Utility toolbar — export + clear. Only shown when history exists. */}
-        {history.length > 0 && (
-          <div className="conv-toolbar">
-            <span className="conv-toolbar__count">{history.length} cálculo(s)</span>
-            <div className="conv-toolbar__actions">
-              <button type="button" className="conv-action" onClick={handleExport}>
-                Exportar
-              </button>
-              <button type="button" className="conv-action conv-action--danger" onClick={handleClear}>
-                Limpar
-              </button>
-            </div>
-          </div>
-        )}
+        {/* =================================================================
+            SIDEBAR — desktop only. Compact history cards + overflow link.
+            Hidden via CSS on mobile/tablet (chat feed takes over there).
+            ================================================================= */}
+        <aside className="conv-sidebar" aria-label="Histórico recente">
+          <header className="conv-sidebar__header">
+            <h3 className="conv-sidebar__title">Histórico</h3>
+            {history.length > 0 && (
+              <div className="conv-sidebar__tools">
+                <button type="button" className="conv-sidebar__tool" onClick={handleExport} title="Exportar">
+                  Export
+                </button>
+                <button type="button" className="conv-sidebar__tool conv-sidebar__tool--danger" onClick={handleClear} title="Limpar">
+                  Limpar
+                </button>
+              </div>
+            )}
+          </header>
 
-        {/* Conversation pane — most recent at the BOTTOM (chat style).
-            `history` comes newest-first; we reverse for display. */}
-        <section className="conv-history" ref={conversationRef} aria-live="polite">
+          {sidebarEntries.length === 0 ? (
+            <p className="conv-sidebar__empty">Nenhum cálculo ainda.</p>
+          ) : (
+            <ul className="conv-sidebar__list">
+              {sidebarEntries.map((entry, idx) => (
+                <li key={entry.id}>
+                  <button
+                    type="button"
+                    className={`conv-sidebar-item ${idx === 0 ? 'conv-sidebar-item--latest' : ''}`}
+                    onClick={() => handleRetry(entry)}
+                    title="Refazer com esta expressão"
+                  >
+                    <span className="conv-sidebar-item__meta">
+                      {relativeTime(entry.timestamp)} · {classifySidebarDim(entry)}
+                    </span>
+                    <span className="conv-sidebar-item__expression">{entry.expression}</span>
+                    <span className="conv-sidebar-item__result">{entry.displayPrimary ?? entry.resultFeetInches}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {history.length > sidebarEntries.length && (
+            <button type="button" className="conv-sidebar__all" onClick={() => setShowFullHistory(true)}>
+              ver todos →
+            </button>
+          )}
+        </aside>
+
+        {/* =================================================================
+            FOCUS COLUMN — chat feed (mobile) OR focal card (desktop) + composer.
+            ================================================================= */}
+        <section className="conv-focus">
+          {/* Empty state (both viewports) */}
           {history.length === 0 && voiceState === 'idle' && (
             <div className="conv-empty">
               <p className="conv-empty__title">Pronto pra calcular</p>
@@ -382,51 +434,75 @@ export default function ConversationalCalculator({
             </div>
           )}
 
-          {/* Past turns, newest last */}
-          {[...history].reverse().map((entry, idx, arr) => (
-            <ConversationCard
-              key={entry.id}
-              entry={entry}
-              isLatest={idx === arr.length - 1}
-              onRetry={handleRetry}
-              onUpdate={updateEntry}
-            />
-          ))}
+          {/* Mobile/tablet: full chat feed scroll with all turns + ghost. */}
+          <div className="conv-history" ref={conversationRef} aria-live="polite">
+            {[...history].reverse().map((entry, idx, arr) => (
+              <ConversationCard
+                key={entry.id}
+                entry={entry}
+                isLatest={idx === arr.length - 1}
+                onRetry={handleRetry}
+                onUpdate={updateEntry}
+              />
+            ))}
 
-          {/* Live "ghost" card while a voice turn is in flight.
-              During `recording`, Web Speech interim text flows here as the user speaks;
-              during `processing`, Whisper is running and the text is the final Web Speech
-              transcript (may or may not match Whisper's — last-one-wins is fine here). */}
-          {voiceState !== 'idle' && (
-            <div className="conv-card conv-card--pending">
-              <header className="conv-card__meta">
-                <span className="conv-chip conv-chip--voice">🎤 voz</span>
-                <span className="conv-chip conv-chip--pending">
-                  {voiceState === 'recording' ? 'ouvindo…' : 'processando…'}
-                </span>
-              </header>
-              {pendingTranscription && pendingTranscription !== '…' && (
-                <p className="conv-card__transcription">
-                  <span className="conv-card__muted">
-                    {voiceState === 'recording' ? 'Você:' : 'Entendi:'}
-                  </span>{' '}
-                  “{pendingTranscription}”
-                </p>
-              )}
-            </div>
-          )}
-        </section>
-
-        {/* Composer — persistent bottom bar */}
-        <section className="conv-composer">
-          <div className="expression-wrapper">
-            <div className="expression-input" role="textbox" aria-label="Expressão">
-              <span className={`expression-text ${!expression ? 'placeholder' : ''}`}>
-                {expression || 'Digite ou fale: 5 1/2 + 3 1/4'}
-              </span>
-            </div>
+            {voiceState !== 'idle' && (
+              <div className="conv-card conv-card--pending">
+                <header className="conv-card__meta">
+                  <span className="conv-chip conv-chip--voice">🎤 voz</span>
+                  <span className="conv-chip conv-chip--pending">
+                    {voiceState === 'recording' ? 'ouvindo…' : 'processando…'}
+                  </span>
+                </header>
+                {pendingTranscription && pendingTranscription !== '…' && (
+                  <p className="conv-card__transcription">
+                    <span className="conv-card__muted">
+                      {voiceState === 'recording' ? 'Você:' : 'Entendi:'}
+                    </span>{' '}
+                    “{pendingTranscription}”
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
+          {/* Desktop: hero card showing only the most recent turn. */}
+          {focalEntry && (
+            <div className="conv-focal-wrapper">
+              <ConversationCard
+                key={`focal-${focalEntry.id}`}
+                entry={focalEntry}
+                isLatest
+                variant="focal"
+                onRetry={handleRetry}
+                onUpdate={updateEntry}
+                onExplain={handleExplain}
+              />
+            </div>
+          )}
+
+          {/* Composer — expression input. On mobile the keypad+voice follow in
+              `.conv-controls` below (same DOM order, flex-column stack). On
+              desktop the keypad goes to the right column via grid placement. */}
+          <div className="conv-composer-input">
+            <div className="expression-wrapper">
+              <div className="expression-input" role="textbox" aria-label="Expressão">
+                <span className="conv-composer-input__dot" aria-hidden="true" />
+                <span className={`expression-text ${!expression ? 'placeholder' : ''}`}>
+                  {expression || 'Digite ou fale: 5 1/2 + 3 1/4'}
+                </span>
+                <span className="conv-composer-input__hint" aria-hidden="true">space</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================================
+            CONTROLS — fraction pad + keypad + voice button.
+            Mobile: stacks vertically below the composer input.
+            Desktop: becomes the right column of the grid.
+            ================================================================= */}
+        <aside className="conv-controls" aria-label="Teclado">
           <div className="fraction-container">
             <div className="fraction-pad">
               {FRACTION_PAD.flat().map((frac, i) => (
@@ -492,11 +568,47 @@ export default function ConversationalCalculator({
             </span>
             <span className="voice-text">{voiceButtonText}</span>
           </button>
-        </section>
+        </aside>
       </main>
 
       {showConsentModal && <VoiceConsentModal onConsent={handleConsentResponse} />}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* Full-history modal — opened via sidebar's "ver todos →". Clicking
+          an entry rehydrates the composer (same behavior as "refazer"). */}
+      <HistoryModal
+        history={history}
+        isOpen={showFullHistory}
+        onClose={() => setShowFullHistory(false)}
+        onEntryClick={(entry) => {
+          handleRetry(entry as HistoryEntry);
+          setShowFullHistory(false);
+        }}
+      />
     </>
   );
+}
+
+/** Relative time string matching the mockup's sidebar ("Agora", "2 min atrás", "3h atrás"...). */
+function relativeTime(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return 'Agora';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min atrás`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h atrás`;
+  const days = Math.floor(hr / 24);
+  return `${days}d atrás`;
+}
+
+/** Sidebar-friendly dimension label. Short words to fit the compact layout. */
+function classifySidebarDim(entry: HistoryEntry): string {
+  switch (entry.dimension) {
+    case 'area':   return 'Área';
+    case 'volume': return 'Volume';
+    case 'length': return 'Comprimento';
+    case 'scalar': return 'Número';
+    default:       return entry.isInchMode ? 'Comprimento' : 'Número';
+  }
 }

@@ -1,15 +1,19 @@
 // src/components/TabNavigation.tsx
-// Navegação por abas para Calculator, Stairs, Triangle, Converter
-// Phase 4.2: stairs tab added, order: most-used first.
+// Bottom navigation — Calculator, Stairs, Triangle, Converter.
+// Mobile: icon-forward, tight. Desktop: icon + text label inline + version/online
+// indicator on the far right (per mockup).
 
 export type TabType = 'calculator' | 'stairs' | 'triangle' | 'converter';
 
 interface TabNavigationProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  /** Online state surfaces as an indicator dot in the desktop footer. */
+  isOnline?: boolean;
+  /** App version string shown next to the indicator. Optional — hidden if absent. */
+  appVersion?: string;
 }
 
-// Ícones monocromáticos SVG
 const CalculatorIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="4" y="2" width="16" height="20" rx="2" />
@@ -26,7 +30,6 @@ const CalculatorIcon = () => (
   </svg>
 );
 
-// Ícone de régua/escala para conversor
 const ConverterIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="6" width="20" height="12" rx="1" />
@@ -37,7 +40,6 @@ const ConverterIcon = () => (
   </svg>
 );
 
-// Ícone de esquadro (carpenter's square) para triângulo
 const TriangleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 21V3H21" />
@@ -45,33 +47,48 @@ const TriangleIcon = () => (
   </svg>
 );
 
-// Escada — lintel-like stepped pattern.
 const StairsIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="3 20, 8 20, 8 15, 13 15, 13 10, 18 10, 18 5, 21 5" />
   </svg>
 );
 
-export default function TabNavigation({ activeTab, onTabChange }: TabNavigationProps) {
+export default function TabNavigation({ activeTab, onTabChange, isOnline, appVersion }: TabNavigationProps) {
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'calculator', label: 'Calculator', icon: <CalculatorIcon /> },
-    { id: 'stairs', label: 'Stairs', icon: <StairsIcon /> },
-    { id: 'triangle', label: 'Triangle', icon: <TriangleIcon /> },
-    { id: 'converter', label: 'Converter', icon: <ConverterIcon /> },
+    { id: 'calculator', label: 'Cálculo',  icon: <CalculatorIcon /> },
+    { id: 'stairs',     label: 'Escada',   icon: <StairsIcon /> },
+    { id: 'triangle',   label: 'Esquadro', icon: <TriangleIcon /> },
+    { id: 'converter',  label: 'Conversão',icon: <ConverterIcon /> },
   ];
 
   return (
     <nav className="tab-navigation">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-          onClick={() => onTabChange(tab.id)}
-        >
-          <span className="tab-icon">{tab.icon}</span>
-          <span className="tab-label">{tab.label}</span>
-        </button>
-      ))}
+      <div className="tab-navigation__tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => onTabChange(tab.id)}
+          >
+            <span className="tab-icon">{tab.icon}</span>
+            <span className="tab-label">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Right-side status cluster — visible only on desktop (CSS). */}
+      {(appVersion || isOnline !== undefined) && (
+        <div className="tab-navigation__status" aria-live="polite">
+          {appVersion && <span className="tab-navigation__version">{appVersion}</span>}
+          {isOnline !== undefined && (
+            <span className={`tab-navigation__online ${isOnline ? 'tab-navigation__online--yes' : 'tab-navigation__online--no'}`}>
+              <span className="tab-navigation__dot" aria-hidden="true" />
+              {isOnline ? 'online' : 'offline'}
+            </span>
+          )}
+        </div>
+      )}
     </nav>
   );
 }

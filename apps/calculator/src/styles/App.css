@@ -2882,3 +2882,635 @@
   }
 }
 
+/* ============================================================================
+   CONVERSATIONAL CALCULATOR · UI v2 layout
+   Mobile/tablet: single-column chat feed (preserved via existing rules above).
+   Desktop (≥1024px): three-column grid — sidebar | focus | controls.
+   ============================================================================ */
+
+/* ---- Mobile defaults (≤1023px): hide desktop-only blocks ---- */
+
+.conv-sidebar,
+.conv-focal-wrapper {
+  display: none;
+}
+
+/* New composer-input wrapper — mobile just styles it like the old composer block. */
+.conv-composer-input {
+  flex-shrink: 0;
+  background: var(--gradient-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--spacing-card-padding, 14px);
+  margin-bottom: 8px;
+}
+
+.conv-composer-input .expression-wrapper {
+  margin-bottom: 0;
+}
+
+.conv-composer-input__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-brand-amber);
+  flex-shrink: 0;
+  margin-right: 10px;
+}
+
+.conv-composer-input__hint {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-canvas-warm);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.conv-composer-input .expression-input {
+  gap: 0;
+}
+
+.conv-composer-input .expression-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Controls block — keypad+frac+voice wrapper. Mobile: just a card below composer. */
+.conv-controls {
+  flex-shrink: 0;
+  background: var(--gradient-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--spacing-card-padding, 14px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---- Desktop layout (≥1024px): 3-col grid ---- */
+
+@media (min-width: 1024px) {
+  .conv-main {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr) 340px;
+    grid-template-rows: 1fr;
+    gap: 16px;
+    padding: 20px 24px;
+    max-width: 1280px;
+    margin: 0 auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  /* --- Sidebar (left column) --- */
+  .conv-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    background: var(--gradient-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    min-height: 0;
+  }
+
+  .conv-sidebar__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .conv-sidebar__title {
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    color: var(--color-text-tertiary);
+    margin: 0;
+  }
+
+  .conv-sidebar__tools {
+    display: flex;
+    gap: 4px;
+  }
+
+  .conv-sidebar__tool {
+    background: transparent;
+    border: none;
+    padding: 2px 6px;
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+    transition: color var(--transition-fast), background var(--transition-fast);
+  }
+
+  .conv-sidebar__tool:hover {
+    color: var(--color-text-strong);
+    background: var(--color-surface-canvas-warm);
+  }
+
+  .conv-sidebar__tool--danger:hover {
+    color: var(--color-semantic-danger-text);
+  }
+
+  .conv-sidebar__empty {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    color: var(--color-text-tertiary);
+    padding: 12px 4px;
+    margin: 0;
+  }
+
+  .conv-sidebar__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .conv-sidebar-item {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: var(--color-surface-card-top);
+    border: none;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-mini-key);
+    text-align: left;
+    cursor: pointer;
+    transition: box-shadow var(--transition-base), transform var(--transition-base);
+  }
+
+  .conv-sidebar-item:hover {
+    box-shadow: var(--shadow-card);
+  }
+
+  .conv-sidebar-item:active {
+    box-shadow: var(--shadow-key-pressed);
+    transform: translateY(0.5px);
+  }
+
+  .conv-sidebar-item--latest {
+    /* Amber edge marks the entry currently in the focal card. */
+    box-shadow: inset 3px 0 0 var(--color-brand-amber), var(--shadow-mini-key);
+  }
+
+  .conv-sidebar-item__meta {
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    color: var(--color-text-tertiary);
+    letter-spacing: 0.3px;
+  }
+
+  .conv-sidebar-item__expression {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conv-sidebar-item__result {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    letter-spacing: -0.3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conv-sidebar__all {
+    background: transparent;
+    border: none;
+    padding: 8px 4px;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
+  }
+
+  .conv-sidebar__all:hover {
+    color: var(--color-text-primary);
+  }
+
+  /* --- Focus column (center) --- */
+
+  /* Mobile chat feed is hidden; focal card takes the space. */
+  .conv-history {
+    display: none;
+  }
+
+  .conv-focal-wrapper {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .conv-focus {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+  }
+
+  /* Focal card — desktop hero. Bigger typography + equivalence line. */
+  .conv-card--focal {
+    padding: 32px 36px;
+    border-radius: var(--radius-xl, 14px);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .conv-card--focal .conv-card__meta {
+    margin-bottom: 18px;
+  }
+
+  .conv-chip--dim-focal {
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+  }
+
+  .conv-card--focal .conv-card__transcription {
+    font-size: 0.95rem;
+    color: var(--color-text-strong);
+    margin-bottom: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-style: normal;
+  }
+
+  .conv-card--focal .conv-card__transcription .conv-card__muted {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.6px;
+    text-transform: lowercase;
+    color: var(--color-text-tertiary);
+    margin: 0 0 2px 0;
+    font-weight: 500;
+  }
+
+  .conv-card__quoted {
+    font-family: var(--font-sans);
+    font-style: italic;
+    color: var(--color-text-strong);
+  }
+
+  .conv-card--focal .conv-card__expression {
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    color: var(--color-text-strong);
+    letter-spacing: -0.3px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .conv-card--focal .conv-card__expression .conv-card__muted {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.6px;
+    text-transform: lowercase;
+    color: var(--color-text-tertiary);
+    margin-bottom: 2px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+  }
+
+  .conv-card__result-label {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.6px;
+    text-transform: lowercase;
+    color: var(--color-text-tertiary);
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+  }
+
+  .conv-card--focal .conv-card__result {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    color: var(--color-text-primary);
+    letter-spacing: -1.5px;
+    line-height: 1;
+    margin: 0 0 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .conv-card__result-value {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .conv-card--focal .conv-card__result-value {
+    font-size: clamp(3.5rem, 7vw, 5.5rem);
+  }
+
+  .conv-card__result-unit {
+    font-size: 0.35em;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    letter-spacing: -0.5px;
+  }
+
+  .conv-card__equivalence {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    color: var(--color-text-tertiary);
+    margin: 0 0 auto 0;
+    padding-bottom: 8px;
+  }
+
+  .conv-card--focal .conv-card__actions {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border-faint);
+    gap: 8px;
+  }
+
+  .conv-card--focal .conv-action {
+    padding: 7px 14px;
+    font-size: 0.8rem;
+  }
+
+  /* Desktop composer — compact single-row input below focal. */
+  .conv-focus .conv-composer-input {
+    padding: 12px 16px;
+    margin-bottom: 0;
+  }
+
+  .conv-focus .conv-composer-input .expression-input {
+    padding: 10px 14px;
+    min-height: 44px;
+  }
+
+  .conv-focus .conv-composer-input__hint {
+    display: inline-flex;
+  }
+
+  /* --- Right column: controls (keypad + frac + voice) --- */
+
+  .conv-controls {
+    background: var(--gradient-card);
+    padding: 16px;
+    gap: 10px;
+  }
+
+  .conv-controls .fraction-container {
+    margin-bottom: 0;
+  }
+
+  .conv-controls .fraction-pad {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .conv-controls .frac-btn {
+    padding: 10px 4px;
+    font-size: 0.95rem;
+  }
+
+  .conv-controls .keypad {
+    flex: 1;
+    gap: 8px;
+  }
+
+  .conv-controls .keypad-row {
+    gap: 8px;
+  }
+
+  .conv-controls .key {
+    font-size: 1.4rem;
+    padding: 14px 0;
+    border-radius: var(--radius-lg);
+  }
+
+  .conv-controls .voice-btn {
+    padding: 14px 18px;
+    font-size: 0.9rem;
+  }
+
+  .conv-composer-input__dot {
+    display: inline-block;
+  }
+}
+
+/* ---- Very large screens (≥1400px) — more breathing room ---- */
+@media (min-width: 1400px) {
+  .conv-main {
+    grid-template-columns: 300px minmax(0, 1fr) 360px;
+    max-width: 1440px;
+    gap: 20px;
+  }
+
+  .conv-card--focal {
+    padding: 40px 44px;
+  }
+}
+
+/* ============================================================================
+   HEADER v2 — wordmark + ⌘K shortcut + avatar
+   Mobile: shows logo + sign-in + hamburger like before (wordmark hidden).
+   Desktop: logo + "OnSite Calculator" text + ⌘K placeholder + avatar.
+   ============================================================================ */
+
+.brand-wordmark {
+  display: none;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-sans);
+  letter-spacing: -0.3px;
+  user-select: none;
+}
+
+.brand-wordmark__name {
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.brand-wordmark__product {
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--color-brand-amber-dark);
+}
+
+/* ⌘K keyboard-shortcut pill — desktop only, visual placeholder. */
+.header-shortcut {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 8px;
+  background: var(--color-surface-canvas-warm);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.header-shortcut:hover {
+  background: var(--color-surface-card-bottom);
+}
+
+.header-shortcut kbd {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  background: transparent;
+  padding: 0 2px;
+}
+
+/* Avatar — circular, shows user initials. Desktop-only variant of the
+   sign-out button. On mobile we keep the icon version from the old header. */
+.header-avatar {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--gradient-avatar);
+  box-shadow: var(--shadow-avatar);
+  color: var(--color-text-inverse);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: box-shadow var(--transition-base);
+}
+
+.header-avatar:hover {
+  box-shadow: var(--shadow-card), 0 0 0 3px rgba(15, 20, 25, 0.05);
+}
+
+.header-avatar:active {
+  box-shadow: var(--shadow-key-pressed);
+  transform: translateY(0.5px);
+}
+
+@media (min-width: 1024px) {
+  .brand-wordmark {
+    display: inline-flex;
+  }
+  .header-shortcut {
+    display: inline-flex;
+  }
+  .header-avatar {
+    display: inline-flex;
+  }
+  /* Hide the mobile-era sign-out icon button + name chip on desktop — avatar takes over. */
+  .header .sign-out-btn,
+  .header .user-name {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   TAB NAVIGATION v2 — new wrapper `.tab-navigation__tabs` + desktop status cluster
+   ============================================================================ */
+
+/* The outer <nav> now has two children. On mobile, we only show the tabs;
+   on desktop, the status cluster fades in on the right. */
+.tab-navigation {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  position: relative;
+}
+
+.tab-navigation__tabs {
+  display: flex;
+  flex: 1;
+}
+
+.tab-navigation__status {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.tab-navigation__version {
+  letter-spacing: 0.3px;
+}
+
+.tab-navigation__online {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.3px;
+}
+
+.tab-navigation__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-semantic-area-border);
+  flex-shrink: 0;
+}
+
+.tab-navigation__online--no .tab-navigation__dot {
+  background: var(--color-semantic-danger-border);
+}
+
+@media (min-width: 1024px) {
+  .tab-navigation__status {
+    display: inline-flex;
+  }
+  .tab-navigation__tabs {
+    flex: 0 1 auto;
+  }
+  .tab-navigation {
+    justify-content: space-between;
+    padding: 0 8px;
+  }
+  /* On desktop show label text alongside the icon, a bit more generous padding. */
+  .tab-btn .tab-label {
+    display: inline;
+  }
+  .tab-btn {
+    padding-inline: 14px;
+  }
+}
+
