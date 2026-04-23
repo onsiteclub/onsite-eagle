@@ -1,5 +1,10 @@
 name: CI
 
+# Monorepo quality gate — intentionally cross-app.
+# `branches: [main]` is correct here: this workflow is the integration
+# checkpoint at merge time, not per-feature validation. Per-app build
+# workflows (build-<app>-<platform>.yml) handle feature-branch CI.
+# See BRANCH_CONVENTIONS.md §2b at the repo root.
 on:
   pull_request:
     branches: [main]

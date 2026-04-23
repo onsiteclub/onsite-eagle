@@ -1,5 +1,10 @@
 name: Build Android (EAS)
 
+# Manual-only workflow serving four Expo apps via an `app` dropdown.
+# Per BRANCH_CONVENTIONS.md §2c, this means two agents firing it at
+# the same time contend for the same EXPO_TOKEN. Long-term, split into
+# one workflow per app (build-<app>-android.yml) so each agent owns
+# its own pipeline end-to-end.
 on:
   workflow_dispatch:
     inputs:

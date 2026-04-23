@@ -11,7 +11,8 @@ on:
           - debug
         default: release
   push:
-    branches: [main]
+    # Any branch — paths filter keeps other apps from triggering this workflow.
+    # See BRANCH_CONVENTIONS.md at the repo root for the isolation rules.
     paths:
       - 'apps/checklist/**'
       - 'packages/framing/**'
