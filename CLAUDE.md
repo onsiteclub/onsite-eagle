@@ -70,6 +70,20 @@ Se um app precisa de algo novo em packages:
 3. Cerbero cria/modifica o package
 4. Apps atualizam para usar
 
+### Regra de Branch & CI (para TODOS os agentes em paralelo)
+
+**LEIA [BRANCH_CONVENTIONS.md](./BRANCH_CONVENTIONS.md) ANTES de qualquer trabalho.**
+
+Resumo crucial:
+
+- Branch sempre nomeada `<app>/<descricao>` (ex: `checklist/capacitor-refactor`, `ops/inbox-v1`)
+- **Nunca reutilizar nome de branch** apos merge — vira nova branch
+- **Um app por branch** — nao commite arquivos de outro app na sua branch
+- **Workflows filtram por `paths`** — push em uma app nao dispara CI de outra
+- **Workflows nao tem filtro de branch** (`branches: [main]`) — rodam em qualquer branch de feature
+- **Confirmar branch antes do 1o edit:** `git branch --show-current`
+- **Merge e o unico ponto de sincronizacao** — ate la, agentes trabalham isolados
+
 ---
 
 ## 3. AS TRES CABECAS
