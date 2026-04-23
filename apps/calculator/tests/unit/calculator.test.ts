@@ -75,6 +75,18 @@ describe('formatInches', () => {
     expect(formatInches(24.25)).toBe("2' 1/4\"");
   });
 
+  // Step 4 — lock in the long-length rendering. Once a measurement crosses
+  // into full-foot territory (72" = 6', 84" = 7', etc.) the primary display
+  // must prefer the feet+inches shape so construction readers can size it
+  // at a glance instead of parsing three digits of total inches.
+  it('renders lengths >= 72" as feet + inches (not raw inches)', () => {
+    expect(formatInches(72)).toBe("6'");
+    expect(formatInches(84)).toBe("7'");
+    expect(formatInches(95)).toBe("7' 11\"");
+    expect(formatInches(120.5)).toBe("10' 1/2\"");
+    expect(formatInches(144.25)).toBe("12' 1/4\"");
+  });
+
   it('formats feet + whole + fraction', () => {
     expect(formatInches(30.5)).toBe("2' 6 1/2\"");
   });
