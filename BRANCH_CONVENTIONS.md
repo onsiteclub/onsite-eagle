@@ -45,9 +45,12 @@ meta/<cross-cutting>                 # conventions, CI, repo-wide docs
 
 ## 2. Isolation: your push cannot trigger my CI
 
-Every app has its own workflow in `.github/workflows/build-<app>-<platform>.yml`.
-Each workflow MUST filter on `paths` so that only changes to its own app
-trigger it:
+There are **three kinds of workflows**, each with its own trigger rule.
+
+### 2a. App build workflows — `build-<app>-<platform>.yml`
+
+One per app-platform pair (e.g. `build-checklist-android.yml`,
+`build-ops-web.yml`). These validate that YOUR app still builds.
 
 ```yaml
 on:
@@ -60,16 +63,54 @@ on:
       - '.github/workflows/build-<your-app>-<platform>.yml'
 ```
 
-**Critical:** do NOT set `branches: [main]`. That would break the whole
-isolation model — your app's CI wouldn't run on feature branches, forcing
-you to wait for merge before validating a build.
+**Critical:** do NOT set `branches: [main]` on app build workflows. That
+breaks the isolation model — your app's CI wouldn't run on feature
+branches, forcing you to wait for merge before validating a build.
 
 With `paths` + no branch filter:
-- `git push checklist/my-work` → only the checklist workflow runs
-- `git push ops/my-work`       → only the ops workflow runs
+- `git push checklist/my-work` → only the checklist build runs
+- `git push ops/my-work`       → only the ops build runs
 - `git push main`              → only workflows whose paths were touched run
 
 You never block another app's CI, and vice versa.
+
+### 2b. Monorepo quality gate — `ci.yml`
+
+Runs format/lint/typecheck across every app and package. Designed as the
+**integration checkpoint before merge**, not per-feature validation.
+
+```yaml
+on:
+  pull_request:
+    branches: [main]   # Runs on every PR targeting main
+  push:
+    branches: [main]   # Runs once on the post-merge main
+```
+
+**`branches: [main]` here is intentional.** This workflow is cross-app
+by design (it checks the whole tree works together); feature branches
+don't need to re-run it on every push. The gate fires when you open
+a PR and again when the PR lands.
+
+Don't duplicate this per-app — one quality gate for the whole repo.
+
+### 2c. Manual-only workflows — `workflow_dispatch` without `push`
+
+For operations that should never fire automatically: EAS builds, manual
+deployments, data migrations, etc.
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs: { ... }
+  # No push trigger at all.
+```
+
+If multiple apps share a single manual workflow (like `build-android.yml`
+takes an `app` dropdown input for every Expo app), the apps can still
+step on each other — two agents firing it at the same time race for
+shared resources like `EXPO_TOKEN`. **Prefer splitting into one workflow
+per app** when the manual workflow becomes load-bearing.
 
 ---
 
