@@ -8,7 +8,7 @@
  *   3. Upsert frm_site_workers by phone (auto-materialize)
  *   4. Check machine status — if offline, send auto-reply, skip parsing
  *   5. Load frm_patterns for the worker
- *   6. Call Claude Haiku to parse the message
+ *   6. Call OpenAI (gpt-4o) to parse the message
  *   7. Insert frm_material_requests with source='ai_parsed' or 'ai_ambiguous'
  *   8. Send acknowledgment auto-reply
  *   9. Log inbound + outbound in frm_messages
@@ -18,7 +18,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
+const OPENAI_MODEL = Deno.env.get('OPENAI_MODEL') || 'gpt-4o';
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
 const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
 const TWILIO_FROM_NUMBER = Deno.env.get('TWILIO_FROM_NUMBER') || '';
@@ -26,12 +27,13 @@ const TWILIO_MESSAGING_SERVICE_SID = Deno.env.get('TWILIO_MESSAGING_SERVICE_SID'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// ---- Haiku prompt (non-negotiable structure per directive) ----
+// ---- OpenAI parser prompt ----
+// Output is always wrapped as { "orders": [...] } for JSON-mode compatibility.
 const SYSTEM_PROMPT = `You are a materials-order parser for a construction lumberyard.
 Input: one text message from a construction worker, in any language.
-Output: strict JSON, English only, no prose, no markdown.
+Output: strict JSON in the shape { "orders": [ ... ] }. English only inside. No prose, no markdown.
 
-Required fields:
+Each order object has these fields:
 - lot: string or null  (e.g. "15", "22A", null if absent)
 - material: string or null  (canonical English, e.g. "OSB 5/8\\"", "2x6 8ft SPF", "shingles bundle")
 - quantity: number or null
@@ -40,7 +42,8 @@ Required fields:
 - notes: string or null (anything the operator should know)
 
 Rules:
-- If the message contains multiple orders, return an array of objects.
+- If the message contains one order, return { "orders": [ <single object> ] }.
+- If multiple orders, return all of them inside the orders array.
 - If lot is missing, set it to null. Do not guess from context.
 - Use the worker's prior vocabulary patterns (provided below) to resolve slang.
 - Never fabricate numbers. If quantity is unclear, null.`;
@@ -111,14 +114,14 @@ Deno.serve(async (req: Request) => {
       .order('confidence', { ascending: false })
       .limit(20);
 
-    // --- Step 4: Call Claude Haiku ---
+    // --- Step 4: Call OpenAI (gpt-4o by default) ---
     const patternsJson = JSON.stringify(patterns || []);
     const userPrompt = `Worker history (most recent canonical mappings):\n${patternsJson}\n\nMessage:\n${body}`;
 
-    const parsed = await callHaiku(userPrompt);
-
-    // Normalize to array
-    const orders = Array.isArray(parsed) ? parsed : [parsed];
+    const parsed = await callOpenAI(userPrompt);
+    const orders = Array.isArray(parsed?.orders) && parsed.orders.length > 0
+      ? parsed.orders
+      : [{ lot: null, material: null, quantity: null, confidence: 0, language: 'en', notes: 'parse_failed' }];
 
     // --- Step 5: Insert requests ---
     for (const order of orders) {
@@ -282,34 +285,37 @@ async function upsertPattern(
   }
 }
 
-async function callHaiku(userMessage: string) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+async function callOpenAI(userMessage: string) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: OPENAI_MODEL,
       max_tokens: 512,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
+      temperature: 0,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
     }),
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Haiku API error: ${response.status} ${errText}`);
+    throw new Error(`OpenAI API error: ${response.status} ${errText}`);
   }
 
   const result = await response.json();
-  const text = result.content?.[0]?.text || '{}';
+  const text = result.choices?.[0]?.message?.content || '{}';
 
   try {
     return JSON.parse(text);
   } catch {
-    return { lot: null, material: null, quantity: null, confidence: 0, language: 'en', notes: text };
+    return { orders: [] };
   }
 }
 
