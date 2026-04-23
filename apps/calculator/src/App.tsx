@@ -11,10 +11,21 @@ import TriangleCalculator from './components/TriangleCalculator';
 import StairsCalculator from './components/StairsCalculator';
 import HamburgerMenu from './components/HamburgerMenu';
 import AuthGate from './components/AuthGate';
+import Toast from './components/Toast';
 import { useOnlineStatus } from './hooks';
 import { supabase } from './lib/supabase';
-import type { VoiceState } from './types/calculator';
+import type { VoiceState, RoutedIntent } from './types/calculator';
 import './styles/App.css';
+
+// Step 2 — friendly label shown in the auto-switch toast so the user
+// understands WHY the tab jumped. Keeps tabs as a UX affordance (visible
+// what's possible) without making them control behavior.
+const TAB_LABEL_PT: Record<TabType, string> = {
+  calculator: 'Calculadora',
+  stairs: 'Escada',
+  triangle: 'Triângulo',
+  converter: 'Conversor',
+};
 
 export default function App() {
   if (supabase) {
@@ -33,6 +44,12 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<TabType>('calculator');
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [authMessage, setAuthMessage] = useState<string | undefined>();
+  // Step 2 — voice intent routing. When GPT classifies the input as
+  // stairs/triangle/conversion, the Calculator tab hands off the parsed
+  // expression + parameters via this slot; the destination tab consumes
+  // it on mount (see e.g. UnitConverter) and clears it once applied.
+  const [routedIntent, setRoutedIntent] = useState<RoutedIntent | null>(null);
+  const [routeToast, setRouteToast] = useState<string | null>(null);
   const isOnline = useOnlineStatus();
 
   // Safely access auth (may not be within AuthProvider if supabase is null)
@@ -64,6 +81,24 @@ function AppContent() {
       await auth.signOut();
     }
   }, [auth]);
+
+  // Step 2 — single entry point for auto-routing. Called by tabs that interpret
+  // natural-language input (today: ConversationalCalculator). Switches the tab,
+  // stashes the parsed intent for the destination to consume, and surfaces a
+  // toast so the user can tell WHY the view changed.
+  const handleIntentRouted = useCallback(
+    (tab: TabType, intent?: RoutedIntent) => {
+      setActiveTab(tab);
+      setRoutedIntent(intent ?? null);
+      setRouteToast(`Abrindo ${TAB_LABEL_PT[tab]}…`);
+    },
+    [],
+  );
+
+  // Destination tabs call this after applying the routed intent to their form.
+  const consumeRoutedIntent = useCallback(() => {
+    setRoutedIntent(null);
+  }, []);
 
   return (
     <div className="app">
@@ -128,7 +163,7 @@ function AppContent() {
             setVoiceState={setVoiceState}
             hasVoiceAccess={!!user}
             onVoiceUpgradeClick={handleVoiceUpgradeClick}
-            onIntentRouted={setActiveTab}
+            onIntentRouted={handleIntentRouted}
           />
         )}
 
@@ -136,6 +171,8 @@ function AppContent() {
           <StairsCalculator
             voiceEnabled={!!user}
             isRecording={voiceState === 'recording'}
+            routedIntent={routedIntent}
+            onRoutedIntentConsumed={consumeRoutedIntent}
           />
         )}
 
@@ -143,6 +180,8 @@ function AppContent() {
           <TriangleCalculator
             voiceEnabled={!!user}
             isRecording={voiceState === 'recording'}
+            routedIntent={routedIntent}
+            onRoutedIntentConsumed={consumeRoutedIntent}
           />
         )}
 
@@ -150,6 +189,8 @@ function AppContent() {
           <UnitConverter
             voiceEnabled={!!user}
             isRecording={voiceState === 'recording'}
+            routedIntent={routedIntent}
+            onRoutedIntentConsumed={consumeRoutedIntent}
           />
         )}
       </div>
@@ -161,6 +202,18 @@ function AppContent() {
         isOnline={isOnline}
         appVersion={typeof __APP_VERSION__ !== 'undefined' ? `v${__APP_VERSION__}` : undefined}
       />
+
+      {/* Step 2 — auto-switch feedback. Tabs are a discovery affordance, not a
+          gate, but when GPT routes the user somewhere new they deserve to know
+          why the view changed. */}
+      {routeToast && (
+        <Toast
+          message={routeToast}
+          type="info"
+          duration={2500}
+          onClose={() => setRouteToast(null)}
+        />
+      )}
 
       {/* Auth Gate Modal */}
       {showAuthGate && supabase && (

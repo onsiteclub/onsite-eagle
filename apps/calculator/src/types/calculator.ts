@@ -3,6 +3,19 @@
 
 export type VoiceState = 'idle' | 'recording' | 'processing';
 
+/** Step 2 — a routed intent is what the Calculator tab hands over to another
+ *  tab when GPT classifies the voice input as stairs/triangle/conversion.
+ *  The destination tab can consume `expression` + `parameters` on mount to
+ *  pre-fill its form; null means "no pending hand-off". */
+export interface RoutedIntent {
+  /** Engine-ready expression string (may be parseable by the destination). */
+  expression?: string;
+  /** Structured parameters GPT extracted — shape depends on the intent. */
+  parameters?: Record<string, unknown>;
+  /** Raw transcription for debugging / user feedback ("você disse …"). */
+  transcription?: string;
+}
+
 /** Phase 1 — dimensional arithmetic. `dim` counts powers of length:
  *  0 = pure number (2 + 3 = 5)
  *  1 = length (5' 6" = 66 inches)

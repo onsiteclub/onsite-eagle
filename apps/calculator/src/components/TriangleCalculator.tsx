@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { parseToInches, formatInches } from '../lib/calculator/engine';
+import type { RoutedIntent } from '../types/calculator';
 
 type SideType = 'a' | 'b' | 'c'; // a = base, b = height, c = hypotenuse
 
@@ -11,9 +12,16 @@ const FRACTION_PAD = [
 interface TriangleCalculatorProps {
   voiceEnabled?: boolean;
   isRecording?: boolean;
+  /** Step 2 — pre-fill sides from voice intent. Shape matches api/interpret.ts
+   *  triangle intent: `{a?: number, b?: number, c?: number}` (inches). */
+  routedIntent?: RoutedIntent | null;
+  onRoutedIntentConsumed?: () => void;
 }
 
-export default function TriangleCalculator(_props: TriangleCalculatorProps) {
+export default function TriangleCalculator({
+  routedIntent,
+  onRoutedIntentConsumed,
+}: TriangleCalculatorProps) {
   // The two "user-set" sides (editHistory[0] = older, editHistory[1] = most recent)
   // The third side is always computed.
   const [editHistory, setEditHistory] = useState<[SideType, SideType]>(['a', 'b']);
@@ -37,6 +45,22 @@ export default function TriangleCalculator(_props: TriangleCalculatorProps) {
     else if (side === 'b') setSideB(value);
     else setSideC(value);
   };
+
+  // Step 2 — consume routed voice intent. GPT's triangle intent reports sides
+  // as numeric inches under `parameters.{a,b,c}`. We fill the two sides it
+  // gave us and let the effect below compute the third.
+  useEffect(() => {
+    if (!routedIntent?.parameters) return;
+    const p = routedIntent.parameters as { a?: unknown; b?: unknown; c?: unknown };
+    const given: SideType[] = [];
+    if (typeof p.a === 'number' && isFinite(p.a)) { setSideA(String(p.a)); given.push('a'); }
+    if (typeof p.b === 'number' && isFinite(p.b)) { setSideB(String(p.b)); given.push('b'); }
+    if (typeof p.c === 'number' && isFinite(p.c)) { setSideC(String(p.c)); given.push('c'); }
+    if (given.length >= 2) {
+      setEditHistory([given[0], given[1]]);
+    }
+    onRoutedIntentConsumed?.();
+  }, [routedIntent, onRoutedIntentConsumed]);
 
   // Recalculate the computed side whenever user-set sides change
   useEffect(() => {

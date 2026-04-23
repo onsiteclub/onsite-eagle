@@ -2,8 +2,9 @@
 // Unit Converter with same layout style as Easy-Square
 // Supports: in, ft, yd, mm, cm, m
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { parseToInches } from '../lib/calculator/engine';
+import type { RoutedIntent } from '../types/calculator';
 
 type UnitType = 'in' | 'ft' | 'yd' | 'mm' | 'cm' | 'm';
 
@@ -54,13 +55,60 @@ interface UnitConverterProps {
   onVoiceRequest?: () => void;
   isRecording?: boolean;
   voiceEnabled?: boolean;
+  /** Step 2 — when the Calculator tab auto-routes a conversion voice query
+   *  here, this carries the parsed `{from, fromUnit, toUnit}` so the form
+   *  arrives pre-filled instead of blank. */
+  routedIntent?: RoutedIntent | null;
+  /** Called once the intent has been applied so App clears the slot. */
+  onRoutedIntentConsumed?: () => void;
 }
 
-export default function UnitConverter(_props: UnitConverterProps) {
+const VALID_UNITS: readonly UnitType[] = ['in', 'ft', 'yd', 'mm', 'cm', 'm'];
+
+/** GPT may return "inches" / "feet" / "meters" — normalize to our short codes.
+ *  Returns null when the unit isn't one we support. */
+function normalizeUnit(raw: unknown): UnitType | null {
+  if (typeof raw !== 'string') return null;
+  const k = raw.trim().toLowerCase();
+  if ((VALID_UNITS as readonly string[]).includes(k)) return k as UnitType;
+  switch (k) {
+    case 'inch': case 'inches': case '"': return 'in';
+    case 'foot': case 'feet': case "'":  return 'ft';
+    case 'yard': case 'yards':           return 'yd';
+    case 'millimeter': case 'millimeters': case 'milimetro': case 'milimetros': return 'mm';
+    case 'centimeter': case 'centimeters': case 'centimetro': case 'centimetros': return 'cm';
+    case 'meter': case 'meters': case 'metro': case 'metros': return 'm';
+    default: return null;
+  }
+}
+
+export default function UnitConverter({
+  routedIntent,
+  onRoutedIntentConsumed,
+}: UnitConverterProps) {
   const [inputValue, setInputValue] = useState('');
   const [fromUnit, setFromUnit] = useState<UnitType>('mm');
   const [toUnit, setToUnit] = useState<UnitType>('in');
   const [result, setResult] = useState<ConversionResult | null>(null);
+
+  // Step 2 — consume a routed-in intent (voice-from-Calculator). We read
+  // `parameters.from / fromUnit / toUnit` as produced by api/interpret.ts
+  // when `intent === 'conversion'`. Falls back to a no-op so arriving here
+  // via manual tab click stays untouched.
+  useEffect(() => {
+    if (!routedIntent?.parameters) return;
+    const { from, fromUnit: fu, toUnit: tu } = routedIntent.parameters as {
+      from?: unknown; fromUnit?: unknown; toUnit?: unknown;
+    };
+    const normFrom = normalizeUnit(fu);
+    const normTo = normalizeUnit(tu);
+    if (typeof from === 'number' && isFinite(from)) setInputValue(String(from));
+    if (normFrom) setFromUnit(normFrom);
+    if (normTo) setToUnit(normTo);
+    onRoutedIntentConsumed?.();
+    // Depend on identity — the slot is cleared by the parent after consume,
+    // so this effect won't re-run on normal state changes.
+  }, [routedIntent, onRoutedIntentConsumed]);
 
   // Convert value between units
   const convert = useCallback((value: number, from: UnitType, to: UnitType): number => {

@@ -16,7 +16,7 @@ import Toast from './Toast';
 import ConversationCard from './ConversationCard';
 import { HistoryModal } from './HistoryModal';
 import VoiceOverlay from './VoiceOverlay';
-import type { HistoryEntry, VoiceState, VoiceResponse } from '../types/calculator';
+import type { HistoryEntry, VoiceState, VoiceResponse, RoutedIntent } from '../types/calculator';
 import type { TabType } from './TabNavigation';
 
 // Same keypad grammar as the classic Calculator — users' muscle memory preserved.
@@ -46,9 +46,11 @@ interface ConversationalCalculatorProps {
   hasVoiceAccess: boolean;
   onVoiceUpgradeClick: () => void;
   onVoiceUsed?: () => void;
-  /** Phase 4.2 — when voice returns an intent like "stairs" or "triangle", the
-   *  parent can auto-switch to that tab. No-op if not provided. */
-  onIntentRouted?: (tab: TabType) => void;
+  /** Phase 4.2 / Step 2 — when voice returns an intent like "stairs" or
+   *  "triangle", the parent can auto-switch to that tab. The optional
+   *  `intent` payload lets the destination pre-fill its form. No-op if not
+   *  provided. */
+  onIntentRouted?: (tab: TabType, intent?: RoutedIntent) => void;
 }
 
 /** Phase 4.2 — maps GPT's intent field to the tab it corresponds to. */
@@ -159,13 +161,19 @@ export default function ConversationalCalculator({
         parameters?: Record<string, unknown>;
       };
 
-      // Phase 4.2 — route to the right tab if the GPT intent says so.
+      // Phase 4.2 / Step 2 — route to the right tab if the GPT intent says so.
       // The parent swaps view; this component stops being mounted a tick later.
+      // The intent payload (expression + parameters) travels with the route so
+      // the destination tab can pre-fill its form and the user sees their voice
+      // input immediately reflected, not a blank screen.
       if (onIntentRouted) {
         const targetTab = tabForIntent(data.intent);
         if (targetTab) {
-          onIntentRouted(targetTab);
-          // Don't also update the composer — the destination tab owns the result now.
+          onIntentRouted(targetTab, {
+            expression: data.expression,
+            parameters: data.parameters,
+            transcription: hasVoiceTrainingConsent ? data.expression : undefined,
+          });
           setVoiceState('idle');
           setPendingTranscription(null);
           return;

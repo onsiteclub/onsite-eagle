@@ -5,18 +5,27 @@
 // was the pre-pressure-plate implementation). The new one delegates all math
 // to src/lib/calculator/stairs.ts and renders live compliance chips.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { calculateStairs, type ComplianceKind } from '../lib/calculator/stairs';
 import { parseToInches, formatInches } from '../lib/calculator/engine';
+import type { RoutedIntent } from '../types/calculator';
 
 interface StairsCalculatorProps {
   voiceEnabled?: boolean;
   isRecording?: boolean;
   /** Optional pre-filled values from voice intent routing (Phase 4.1). */
   initialParameters?: { totalRise?: number; riserHeight?: number; stepCount?: number; tread?: number };
+  /** Step 2 — carries `{totalRise, riserHeight, tread, stepCount}` when the
+   *  Calculator tab auto-routes a stairs voice query here. */
+  routedIntent?: RoutedIntent | null;
+  onRoutedIntentConsumed?: () => void;
 }
 
-export default function StairsCalculator({ initialParameters }: StairsCalculatorProps) {
+export default function StairsCalculator({
+  initialParameters,
+  routedIntent,
+  onRoutedIntentConsumed,
+}: StairsCalculatorProps) {
   // Inputs stored as strings so the user can type fractions ("9' 2 1/2") — the
   // engine's parser turns them into inches on compute.
   const [totalRiseInput, setTotalRiseInput] = useState(
@@ -29,6 +38,27 @@ export default function StairsCalculator({ initialParameters }: StairsCalculator
     initialParameters?.tread ? String(initialParameters.tread) : '10'
   );
   const [nosingInput, setNosingInput] = useState('1');
+
+  // Step 2 — consume routed voice intent. Accepts same field names as
+  // `initialParameters` (api/interpret.ts uses those for the stairs intent).
+  useEffect(() => {
+    if (!routedIntent?.parameters) return;
+    const p = routedIntent.parameters as {
+      totalRise?: unknown; riserHeight?: unknown; tread?: unknown; stepCount?: unknown;
+    };
+    if (typeof p.totalRise === 'number' && isFinite(p.totalRise)) {
+      setTotalRiseInput(String(p.totalRise));
+    } else if (typeof p.totalRise === 'string') {
+      setTotalRiseInput(p.totalRise);
+    }
+    if (typeof p.riserHeight === 'number' && isFinite(p.riserHeight)) {
+      setRiserHeightInput(String(p.riserHeight));
+    }
+    if (typeof p.tread === 'number' && isFinite(p.tread)) {
+      setTreadInput(String(p.tread));
+    }
+    onRoutedIntentConsumed?.();
+  }, [routedIntent, onRoutedIntentConsumed]);
 
   const result = useMemo(() => {
     const totalRise = parseToInches(totalRiseInput);
