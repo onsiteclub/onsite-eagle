@@ -100,6 +100,16 @@ function AppContent() {
     setRoutedIntent(null);
   }, []);
 
+  // Step 6 — user-driven alternative interpretation. Unlike `handleIntentRouted`
+  // (which trusts GPT), this fires when the user says "não foi isso?" and picks
+  // a different tab. No payload travels — the user will re-enter on the
+  // destination, this is purely a navigation affordance.
+  const handleAltInterpretation = useCallback((tab: TabType) => {
+    setActiveTab(tab);
+    setRoutedIntent(null);
+    setRouteToast(`Abrindo ${TAB_LABEL_PT[tab]}…`);
+  }, []);
+
   return (
     <div className="app">
       {/* Shared Header
@@ -164,6 +174,7 @@ function AppContent() {
             hasVoiceAccess={!!user}
             onVoiceUpgradeClick={handleVoiceUpgradeClick}
             onIntentRouted={handleIntentRouted}
+            onAltInterpretation={handleAltInterpretation}
           />
         )}
 

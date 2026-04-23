@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { calculate } from '../lib/calculator';
 import ResultPanel from './ResultPanel';
 import type { CalculationResult, HistoryEntry } from '../types/calculator';
+import type { TabType } from './TabNavigation';
 
 interface ConversationCardProps {
   entry: HistoryEntry;
@@ -20,7 +21,19 @@ interface ConversationCardProps {
   variant?: 'chat' | 'focal';
   /** Optional — when provided (focal only today), renders an "Explicar" button. */
   onExplain?: (entry: HistoryEntry) => void;
+  /** Step 6 — when GPT's interpretation missed the mark, the user can swap
+   *  to one of the other tools. Focal-only affordance. */
+  onAltInterpretation?: (tab: TabType) => void;
 }
+
+// Step 6 — alternatives the "não foi isso?" picker offers. Calculator stays
+// out of the list because we're already on it. Keep it tight — three chips
+// fit in the focal actions row without becoming noise.
+const ALT_INTERPRETATIONS: ReadonlyArray<{ tab: TabType; label: string }> = [
+  { tab: 'stairs',    label: 'escada' },
+  { tab: 'triangle',  label: 'triângulo' },
+  { tab: 'converter', label: 'conversor' },
+];
 
 export default function ConversationCard({
   entry,
@@ -29,10 +42,13 @@ export default function ConversationCard({
   onUpdate,
   variant = 'chat',
   onExplain,
+  onAltInterpretation,
 }: ConversationCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(entry.expression);
   const [editError, setEditError] = useState<string | null>(null);
+  // Step 6 — toggle for the inline alternatives palette.
+  const [showAlts, setShowAlts] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -187,9 +203,42 @@ export default function ConversationCard({
                 explicar
               </button>
             )}
+            {variant === 'focal' && onAltInterpretation && (
+              <button
+                type="button"
+                className={`conv-action ${showAlts ? 'conv-action--active' : ''}`}
+                onClick={() => setShowAlts((v) => !v)}
+                aria-expanded={showAlts}
+                aria-controls="alt-interpretations"
+              >
+                não foi isso?
+              </button>
+            )}
           </>
         )}
       </footer>
+
+      {/* Step 6 — alternative-interpretation palette. Reveals on demand so the
+          default card stays quiet; the user only sees the alts when they
+          believe GPT missed the interpretation. */}
+      {variant === 'focal' && onAltInterpretation && showAlts && !isEditing && (
+        <div id="alt-interpretations" className="conv-card__alts" role="group" aria-label="Outras interpretações">
+          <span className="conv-card__alts-hint">era sobre:</span>
+          {ALT_INTERPRETATIONS.map((alt) => (
+            <button
+              key={alt.tab}
+              type="button"
+              className="conv-action conv-action--alt"
+              onClick={() => {
+                onAltInterpretation(alt.tab);
+                setShowAlts(false);
+              }}
+            >
+              {alt.label}
+            </button>
+          ))}
+        </div>
+      )}
     </article>
   );
 }

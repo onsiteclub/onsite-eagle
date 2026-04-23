@@ -1308,6 +1308,34 @@
   color: var(--color-text-on-charcoal);
 }
 
+/* Step 6 — "não foi isso?" toggle and its revealed palette. */
+.conv-action--active {
+  box-shadow: var(--shadow-key-pressed);
+  color: var(--color-brand-amber-dark);
+}
+
+.conv-card__alts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border-faint);
+}
+
+.conv-card__alts-hint {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.3px;
+}
+
+.conv-action--alt {
+  font-size: 0.72rem;
+  letter-spacing: 0.2px;
+}
+
 /* Inline editor (Phase 3.5) — RECEBE inset input inside the card. */
 .conv-card--editing {
   box-shadow: var(--shadow-card), inset 3px 0 0 var(--color-brand-amber-dark);

@@ -61,6 +61,10 @@ interface ConversationalCalculatorProps {
    *  `intent` payload lets the destination pre-fill its form. No-op if not
    *  provided. */
   onIntentRouted?: (tab: TabType, intent?: RoutedIntent) => void;
+  /** Step 6 — user-driven "não foi isso?" escape hatch on the focal card.
+   *  Simple tab switch; no data is handed off because the user already
+   *  rejected our guess. */
+  onAltInterpretation?: (tab: TabType) => void;
 }
 
 /** Phase 4.2 — maps GPT's intent field to the tab it corresponds to. */
@@ -81,6 +85,7 @@ export default function ConversationalCalculator({
   onVoiceUpgradeClick,
   onVoiceUsed,
   onIntentRouted,
+  onAltInterpretation,
 }: ConversationalCalculatorProps) {
   const isOnline = useOnlineStatus();
   const [showConsentModal, setShowConsentModal] = useState(false);
@@ -512,6 +517,7 @@ export default function ConversationalCalculator({
                 onRetry={handleRetry}
                 onUpdate={updateEntry}
                 onExplain={handleExplain}
+                onAltInterpretation={onAltInterpretation}
               />
             </div>
           )}
