@@ -625,6 +625,54 @@
   font-size: 0.85em;
 }
 
+/* Step 3 — discovery chips under the empty-state hint. Each chip shows an
+   example input; tapping it pre-fills the composer. Visual: low-emphasis
+   pressure plate (same vocabulary as other chips in the app). */
+.conv-empty__examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.conv-empty__example {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--color-surface-canvas-warm);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
+}
+
+.conv-empty__example:hover {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
+
+.conv-empty__example:active {
+  transform: translateY(1px);
+}
+
+.conv-empty__example-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+}
+
+.conv-empty__example code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--color-text-primary);
+}
+
 /* Turn card — EMERGE base. Latest turn gets a subtle amber highlight on the left edge. */
 .conv-card {
   background: var(--gradient-card);

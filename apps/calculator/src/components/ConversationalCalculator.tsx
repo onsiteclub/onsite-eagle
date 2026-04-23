@@ -33,6 +33,16 @@ const KEYPAD = [
   ['0', '.', '='],
 ];
 
+// Step 3 — empty-state discovery chips. Each example exercises a different
+// dimension so users see the engine handles fractions, area, and volume,
+// not just simple math. Tapping a chip pre-fills the composer; user still
+// has to press "=" so there's no surprise commit.
+const EMPTY_STATE_EXAMPLES: ReadonlyArray<{ label: string; expression: string }> = [
+  { label: 'fração',  expression: '5 1/2 + 3 1/4' },
+  { label: 'área',    expression: `5' * 10'` },
+  { label: 'volume',  expression: `2' * 3' * 4'` },
+];
+
 const getApiEndpoint = () => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   if (Capacitor.isNativePlatform()) return 'https://onsite-calculator.vercel.app/api/interpret';
@@ -432,14 +442,30 @@ export default function ConversationalCalculator({
             FOCUS COLUMN — chat feed (mobile) OR focal card (desktop) + composer.
             ================================================================= */}
         <section className="conv-focus">
-          {/* Empty state (both viewports) */}
+          {/* Empty state (both viewports) — includes discovery chips so the
+              user sees at a glance that the engine handles fractions, area,
+              and volume (not just plain math). Tapping a chip pre-fills the
+              composer; user can tweak or hit "=" directly. */}
           {history.length === 0 && voiceState === 'idle' && (
             <div className="conv-empty">
               <p className="conv-empty__title">Pronto pra calcular</p>
               <p className="conv-empty__hint">
-                Digite uma medida (ex: <code>5 1/2 + 3 1/4</code>) ou fale algo como
+                Digite, toque um exemplo, ou fale algo como
                 <em> “cinco e meio mais três e um quarto”</em>.
               </p>
+              <div className="conv-empty__examples" aria-label="Exemplos de entrada">
+                {EMPTY_STATE_EXAMPLES.map((ex) => (
+                  <button
+                    key={ex.expression}
+                    type="button"
+                    className="conv-empty__example"
+                    onClick={() => setExpression(ex.expression)}
+                  >
+                    <span className="conv-empty__example-label">{ex.label}</span>
+                    <code>{ex.expression}</code>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
