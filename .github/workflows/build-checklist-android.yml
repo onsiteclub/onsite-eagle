@@ -53,12 +53,27 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          BUILD_TYPE: ${{ inputs.build_type || 'release' }}
         # build:native = node scripts/build-capacitor.mjs
         # Shelves API routes / middleware / dynamic [param] routes (used by
         # the web/PWA build on Vercel), runs next build with BUILD_TARGET=
         # capacitor to emit `out/`, runs `cap sync android`, then restores
         # the shelved files.
-        run: npm run build:native
+        run: |
+          if [ "$BUILD_TYPE" = "debug" ]; then
+            # Debug builds can run without Supabase secrets — placeholders
+            # keep the static export compiling so testers can validate the
+            # native shell (camera, SQLite, offline) on a real device.
+            export NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}"
+            export NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key-for-debug-build}"
+            echo "Debug build — using Supabase URL: $NEXT_PUBLIC_SUPABASE_URL"
+          else
+            if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+              echo "::error::Release build requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY secrets"
+              exit 1
+            fi
+          fi
+          npm run build:native
 
       - name: Decode signing keystore
         if: ${{ !inputs.build_type || inputs.build_type == 'release' }}
