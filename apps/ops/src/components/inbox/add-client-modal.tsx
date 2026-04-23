@@ -2,7 +2,7 @@
 
 import { addClientAction, type InboxActionState } from '@/app/(dashboard)/inbox/actions'
 import { Modal } from '@/components/shared/modal'
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 
 const initial: InboxActionState = { error: null }
 
@@ -36,21 +36,29 @@ export function AddClientModal({
   const [state, formAction, pending] = useActionState(addClientAction, initial)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
 
+  // Guarda: evita que o useEffect abaixo dispare onSuccess mais de uma vez
+  // por submit. Sem isso, router.refresh() no parent re-renderiza, onSuccess
+  // ganha nova referência, e o efeito re-dispara → loop até o setTimeout
+  // da success modal ganhar a corrida.
+  const handledStateRef = useRef<InboxActionState | null>(null)
+
   useEffect(() => {
     if (open && invoice) {
       // Pré-seleciona todas as empresas (operador ajusta se quiser)
       const next: Record<string, boolean> = {}
       companies.forEach((c) => (next[c.id] = true))
       setSelected(next)
+      // Reset do guard quando o modal reabre pra um novo invoice
+      handledStateRef.current = null
     }
   }, [open, invoice, companies])
 
   useEffect(() => {
-    // Sucesso: action retornou error:null depois de submit (não é o estado inicial)
-    if (!pending && state === initial) return
-    if (!pending && state.error === null) {
-      onSuccess()
-    }
+    if (pending) return
+    if (state === initial) return
+    if (handledStateRef.current === state) return
+    handledStateRef.current = state
+    if (state.error === null) onSuccess()
   }, [pending, state, onSuccess])
 
   function toggle(id: string) {

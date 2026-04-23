@@ -2,7 +2,7 @@
 
 import { rejectSenderAction } from '@/app/(dashboard)/inbox/actions'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import { SuccessModal } from '@/components/shared/success-modal'
 import { AddClientModal, type AddClientCompany, type AddClientInvoice } from './add-client-modal'
 import { InboxRow } from './inbox-row'
@@ -66,11 +66,14 @@ export function InboxView({
     })
   }
 
-  function onAddSuccess() {
+  // useCallback: referência estável evita loop do useEffect no AddClientModal.
+  // Sem isso, cada router.refresh() re-cria onAddSuccess → re-dispara efeito
+  // interno do modal → chama onAddSuccess de novo → loop.
+  const onAddSuccess = useCallback(() => {
     setModal({ kind: 'success', message: 'Cliente adicionado' })
     setTimeout(() => setModal(null), 1200)
     router.refresh()
-  }
+  }, [router])
 
   function onRowClick(rowId: string) {
     const clientId = rowInvoiceIds[rowId]
