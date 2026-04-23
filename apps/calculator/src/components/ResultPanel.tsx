@@ -24,8 +24,27 @@ export default function ResultPanel({ entry }: ResultPanelProps) {
     case 'area':   return <AreaResult entry={entry} />;
     case 'volume': return <VolumeResult entry={entry} />;
     case 'length':
-    default:       return <LengthResult entry={entry} />;
+    default:       return shouldShowDualUnit(entry)
+      ? <DualUnitLengthResult entry={entry} />
+      : <LengthResult entry={entry} />;
   }
+}
+
+/**
+ * Step 5 — dual-unit trigger. Activates when either:
+ *   (a) the source expression mentions metric units (mm/cm/m or Portuguese
+ *       equivalents) — future-ready for when the engine parses metric input
+ *       and for voice/GPT flows that echo metric back.
+ *   (b) the length crosses 12 feet / ~3.66 m — a room-scale measurement
+ *       where Canadian blueprints typically annotate both systems.
+ *
+ * Short lengths (stud spacings, trim widths) stay single-unit to avoid
+ * noise; their metric equivalent still shows in the equivalence line below.
+ */
+function shouldShowDualUnit(entry: HistoryEntry): boolean {
+  const inches = entry.resultDecimal;
+  if (isFinite(inches) && inches >= 144) return true; // ≥12 ft
+  return /\b(mm|cm|m|milimetros?|centimetros?|metros?)\b/i.test(entry.expression);
 }
 
 // ============================================================================
@@ -61,6 +80,42 @@ function LengthResult({ entry }: ResultPanelProps) {
       <EquivalenceLine entry={entry} />
     </>
   );
+}
+
+/**
+ * Step 5 — dual-unit length. Imperial (primary) and metric sit side-by-side
+ * at the same visual tier so a Brazilian carpenter on a Canadian site can
+ * read either system at a glance. Falls back to LengthResult when the
+ * metric conversion isn't informative (short lengths).
+ */
+function DualUnitLengthResult({ entry }: ResultPanelProps) {
+  const imperial = entry.displayPrimary ?? entry.resultFeetInches;
+  const { value: impValue, unit: impUnit } = splitValueAndUnit(imperial);
+  const mm = entry.resultDecimal * 25.4;
+  const metric = mm >= 1000 ? `${trimTrailingZeros(mm / 1000, 3)} m` : `${trimTrailingZeros(mm, 1)} mm`;
+  const { value: metValue, unit: metUnit } = splitValueAndUnit(metric);
+  return (
+    <>
+      <p className="conv-card__result conv-card__result--dual">
+        <span className="conv-card__muted conv-card__result-label">resultado</span>
+        <span className="conv-card__result-value">
+          <span>{impValue}</span>
+          {impUnit && <span className="conv-card__result-unit">{impUnit}</span>}
+        </span>
+        <span className="conv-card__result-divider" aria-hidden="true">·</span>
+        <span className="conv-card__result-value conv-card__result-value--metric">
+          <span>{metValue}</span>
+          {metUnit && <span className="conv-card__result-unit">{metUnit}</span>}
+        </span>
+      </p>
+      {/* No equivalence line — the metric equivalent is already the co-primary. */}
+    </>
+  );
+}
+
+function trimTrailingZeros(n: number, digits: number): string {
+  if (!isFinite(n)) return 'Error';
+  return Number(n.toFixed(digits)).toString();
 }
 
 function AreaResult({ entry }: ResultPanelProps) {

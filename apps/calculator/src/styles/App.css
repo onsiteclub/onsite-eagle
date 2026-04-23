@@ -3302,6 +3302,34 @@
     padding-bottom: 8px;
   }
 
+  /* Step 5 — dual-unit focal rendering. Imperial and metric sit as peers,
+     metric slightly dimmer but at the same size tier, separated by a quiet
+     dot. Wraps to two rows on narrow viewports. */
+  .conv-card--focal .conv-card__result--dual {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px 20px;
+  }
+
+  .conv-card--focal .conv-card__result--dual .conv-card__result-label {
+    flex-basis: 100%;
+    margin-bottom: 2px;
+  }
+
+  .conv-card--focal .conv-card__result-value--metric {
+    color: var(--color-text-secondary);
+    /* Metric reads as a peer, not a subtitle — same size tier, lighter hue. */
+    font-size: clamp(2.2rem, 4.5vw, 3.5rem);
+  }
+
+  .conv-card__result-divider {
+    font-size: 0.4em;
+    color: var(--color-text-tertiary);
+    align-self: center;
+    padding: 0 4px;
+  }
+
   .conv-card--focal .conv-card__actions {
     margin-top: 16px;
     padding-top: 16px;
