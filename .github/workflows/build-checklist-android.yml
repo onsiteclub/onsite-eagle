@@ -48,16 +48,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js static export
+      - name: Build static export + Capacitor sync
         working-directory: apps/checklist
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        run: npm run build
-
-      - name: Capacitor sync
-        working-directory: apps/checklist
-        run: npx cap sync android
+        # build:native = node scripts/build-capacitor.mjs
+        # Shelves API routes / middleware / dynamic [param] routes (used by
+        # the web/PWA build on Vercel), runs next build with BUILD_TARGET=
+        # capacitor to emit `out/`, runs `cap sync android`, then restores
+        # the shelved files.
+        run: npm run build:native
 
       - name: Decode signing keystore
         if: ${{ !inputs.build_type || inputs.build_type == 'release' }}

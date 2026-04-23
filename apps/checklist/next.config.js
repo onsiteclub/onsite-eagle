@@ -1,8 +1,14 @@
 /** @type {import('next').NextConfig} */
+
+// Dual-target config:
+//   - Default (`next build`)              → SSR for Vercel / PWA
+//   - `BUILD_TARGET=capacitor next build` → static export for mobile APK
+// See scripts/build-capacitor.mjs — the native build shelves API routes,
+// middleware, and dynamic [param] segments before invoking next build.
+const isCapacitor = process.env.BUILD_TARGET === 'capacitor'
+
 const nextConfig = {
   reactStrictMode: true,
-  output: 'export',
-  trailingSlash: true,
   transpilePackages: [
     '@onsite/supabase',
     '@onsite/auth',
@@ -12,7 +18,7 @@ const nextConfig = {
     '@onsite/tokens',
   ],
   images: {
-    unoptimized: true,
+    ...(isCapacitor ? { unoptimized: true } : {}),
     remotePatterns: [
       {
         protocol: 'https',
@@ -21,6 +27,12 @@ const nextConfig = {
       },
     ],
   },
+  ...(isCapacitor
+    ? {
+        output: 'export',
+        trailingSlash: true,
+      }
+    : {}),
 }
 
 module.exports = nextConfig

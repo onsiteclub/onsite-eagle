@@ -7,6 +7,16 @@ import { createClient } from '@onsite/supabase/client'
 import AuthGuard from '@/components/AuthGuard'
 import SyncBadge from '@/components/SyncBadge'
 
+/**
+ * Client-side layout for the authenticated /app section.
+ *
+ * Works in both deployment targets:
+ *  - Web (Vercel SSR): `middleware.ts` blocks unauthenticated requests
+ *    BEFORE this layout renders, so <AuthGuard> only briefly sees a
+ *    valid session and hands off immediately.
+ *  - Capacitor (static export): no middleware, so <AuthGuard> is the
+ *    sole authentication gate.
+ */
 export default function AppLayout({
   children,
 }: {

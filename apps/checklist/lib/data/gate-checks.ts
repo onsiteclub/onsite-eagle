@@ -392,6 +392,18 @@ function toData(
   }
 }
 
+/**
+ * Public: convert an @onsite/framing remote row into the GateCheckData
+ * shape the UI components expect. Useful when server components (SSR
+ * routes) fetch data with the framing helpers directly and need to
+ * hand it to the shared TransitionCard.
+ */
+export function toGateCheckData(
+  gc: FrmGateCheck & { items: FrmGateCheckItem[] },
+): GateCheckData {
+  return toDataFromRemote(gc)
+}
+
 function toDataFromRemote(
   gc: FrmGateCheck & { items: FrmGateCheckItem[] },
 ): GateCheckData {
