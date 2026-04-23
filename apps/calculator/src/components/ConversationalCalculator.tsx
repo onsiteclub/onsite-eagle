@@ -15,6 +15,7 @@ import VoiceConsentModal from './VoiceConsentModal';
 import Toast from './Toast';
 import ConversationCard from './ConversationCard';
 import { HistoryModal } from './HistoryModal';
+import VoiceOverlay from './VoiceOverlay';
 import type { HistoryEntry, VoiceState, VoiceResponse } from '../types/calculator';
 import type { TabType } from './TabNavigation';
 
@@ -570,6 +571,15 @@ export default function ConversationalCalculator({
           </button>
         </aside>
       </main>
+
+      {/* Fullscreen overlay — mobile/tablet only (desktop hides via CSS).
+          The CTA inside the overlay acts as the "stop + calculate" button
+          since the original voice button sits beneath the overlay on mobile. */}
+      <VoiceOverlay
+        state={voiceState}
+        transcript={pendingTranscription}
+        onStop={handleVoiceToggle}
+      />
 
       {showConsentModal && <VoiceConsentModal onConsent={handleConsentResponse} />}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
