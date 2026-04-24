@@ -1,14 +1,14 @@
 /**
- * Requests Screen — Operator 2 (Standalone Prototype)
+ * Requests Screen — Operator 2
  *
- * Two sub-tabs:
- *   Queue (default) — pending requests, click Delivered to move to archive
- *   Delivered — archived requests that were already fulfilled
+ * Raw worker message is the protagonist. AI parse + translation live behind
+ * the ✨ icon in a modal — opt-in, never cluttering the machinist's default
+ * view.
  */
 
 import { useEffect, useCallback, useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert,
+  View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '@onsite/tokens';
@@ -20,6 +20,7 @@ interface IncomingRequest {
   source: string | null;
   material_name: string | null;
   quantity: number | null;
+  notes: string | null;
   status: string;
   confidence: number | null;
   language_detected: string | null;
@@ -32,10 +33,16 @@ interface IncomingRequest {
 
 type Tab = 'queue' | 'delivered';
 
+const LANG_FLAGS: Record<string, string> = {
+  en: '🇬🇧', pt: '🇵🇹', es: '🇪🇸', fr: '🇫🇷', tl: '🇵🇭',
+  vi: '🇻🇳', zh: '🇨🇳', ar: '🇸🇦', hi: '🇮🇳', ru: '🇷🇺',
+};
+
 export default function RequestsScreen() {
   const [requests, setRequests] = useState<IncomingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('queue');
+  const [aiModalRequest, setAiModalRequest] = useState<IncomingRequest | null>(null);
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -97,12 +104,10 @@ export default function RequestsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Requests</Text>
       </View>
 
-      {/* Sub-tabs */}
       <View style={styles.tabBar}>
         <Pressable
           style={[styles.tab, activeTab === 'queue' && styles.tabActive]}
@@ -137,7 +142,6 @@ export default function RequestsScreen() {
         </Pressable>
       </View>
 
-      {/* Content */}
       {loading ? (
         <View style={styles.empty}>
           <ActivityIndicator size="large" color={colors.accent} />
@@ -162,11 +166,17 @@ export default function RequestsScreen() {
             <RequestCard
               request={item}
               onDeliver={handleDeliver}
+              onOpenAI={() => setAiModalRequest(item)}
               showDeliverButton={activeTab === 'queue'}
             />
           )}
         />
       )}
+
+      <AIHelperModal
+        request={aiModalRequest}
+        onClose={() => setAiModalRequest(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -174,52 +184,168 @@ export default function RequestsScreen() {
 function RequestCard({
   request: req,
   onDeliver,
+  onOpenAI,
   showDeliverButton,
 }: {
   request: IncomingRequest;
   onDeliver: (id: string) => void;
+  onOpenAI: () => void;
   showDeliverButton: boolean;
 }) {
   const isDelivered = req.status === 'delivered';
-  const isAmbiguous = req.source === 'ai_ambiguous';
-  const materialLabel = [req.quantity, req.material_name].filter(Boolean).join(' x ');
+  const rawMessage = req.raw_message || '(empty message)';
+  const flag = req.language_detected ? LANG_FLAGS[req.language_detected] : null;
+  const timeLabel = new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <View
-      style={[
-        styles.card,
-        isAmbiguous && !isDelivered && styles.cardAmbiguous,
-      ]}
-    >
-      <View style={styles.cardBody}>
-        <Text style={[styles.lotText, isDelivered && styles.textMuted]}>
-          {req.lot?.lot_number ? `LOT ${req.lot.lot_number}` : 'LOT ?'}
+    <View style={[styles.card, isDelivered && styles.cardDelivered]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.metaText} numberOfLines={1}>
+          {req.worker_name || req.worker_phone || 'Unknown'}
+          {'  ·  '}
+          {timeLabel}
+          {flag ? `  ·  ${flag}` : ''}
         </Text>
-        {isAmbiguous && req.raw_message && !isDelivered ? (
-          <Text style={styles.rawMessage}>"{req.raw_message}"</Text>
-        ) : (
-          <Text style={[styles.materialText, isDelivered && styles.textMuted]}>
-            {materialLabel || req.raw_message || '—'}
-          </Text>
-        )}
-        {req.worker_name && (
-          <Text style={styles.workerText}>{req.worker_name}</Text>
-        )}
+        <Pressable
+          onPress={onOpenAI}
+          style={styles.aiIcon}
+          hitSlop={8}
+          accessibilityLabel="AI helper"
+        >
+          <Text style={styles.aiIconText}>✨</Text>
+        </Pressable>
       </View>
+
+      <Text style={[styles.rawMessage, isDelivered && styles.textMuted]}>
+        {rawMessage}
+      </Text>
 
       <View style={styles.cardAction}>
         {isDelivered && req.delivered_at ? (
           <Text style={styles.deliveredTime}>
-            {'\u2713'}{' '}
+            {'✓'} Delivered{' '}
             {new Date(req.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         ) : showDeliverButton ? (
           <Pressable style={styles.deliverBtn} onPress={() => onDeliver(req.id)}>
-            <Text style={styles.deliverBtnText}>{'\u2713'} Delivered</Text>
+            <Text style={styles.deliverBtnText}>{'✓'} Delivered</Text>
           </Pressable>
         ) : null}
       </View>
     </View>
+  );
+}
+
+function AIHelperModal({
+  request,
+  onClose,
+}: {
+  request: IncomingRequest | null;
+  onClose: () => void;
+}) {
+  const [translation, setTranslation] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+
+  // Reset state when modal closes or switches to a different request
+  useEffect(() => {
+    setTranslation(null);
+    setTranslating(false);
+    setTranslateError(null);
+  }, [request?.id]);
+
+  if (!request) return null;
+
+  const handleTranslate = async () => {
+    if (!request.raw_message) return;
+    setTranslating(true);
+    setTranslateError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('translate-message', {
+        body: { text: request.raw_message, target_lang: 'en' },
+      });
+      if (error) throw error;
+      setTranslation(data?.translation || '(empty)');
+    } catch (err) {
+      console.error('Translate failed:', err);
+      setTranslateError('Could not translate. Try again.');
+    } finally {
+      setTranslating(false);
+    }
+  };
+
+  const lot = request.lot?.lot_number || '?';
+  const material = request.material_name || '?';
+  const qty = request.quantity != null ? String(request.quantity) : '?';
+  const confidencePct = request.confidence != null
+    ? `${Math.round(request.confidence * 100)}%`
+    : 'n/a';
+  const flag = request.language_detected ? LANG_FLAGS[request.language_detected] : '';
+
+  return (
+    <Modal
+      visible={!!request}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+          <Text style={styles.modalTitle}>AI helper</Text>
+
+          <Text style={styles.modalSectionLabel}>Original {flag}</Text>
+          <Text style={styles.modalOriginal}>{request.raw_message || '(empty)'}</Text>
+
+          <Text style={styles.modalSectionLabel}>Translation</Text>
+          {translation ? (
+            <Text style={styles.modalTranslation}>{translation}</Text>
+          ) : translateError ? (
+            <View>
+              <Text style={styles.modalError}>{translateError}</Text>
+              <Pressable style={styles.modalBtn} onPress={handleTranslate}>
+                <Text style={styles.modalBtnText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : translating ? (
+            <ActivityIndicator color={colors.accent} style={{ marginVertical: spacing.sm }} />
+          ) : (
+            <Pressable style={styles.modalBtn} onPress={handleTranslate}>
+              <Text style={styles.modalBtnText}>🌐 Translate to English</Text>
+            </Pressable>
+          )}
+
+          <Text style={styles.modalSectionLabel}>Parsed fields</Text>
+          <View style={styles.parseGrid}>
+            <View style={styles.parseRow}>
+              <Text style={styles.parseKey}>Lot</Text>
+              <Text style={styles.parseValue}>{lot}</Text>
+            </View>
+            <View style={styles.parseRow}>
+              <Text style={styles.parseKey}>Material</Text>
+              <Text style={styles.parseValue}>{material}</Text>
+            </View>
+            <View style={styles.parseRow}>
+              <Text style={styles.parseKey}>Quantity</Text>
+              <Text style={styles.parseValue}>{qty}</Text>
+            </View>
+            <View style={styles.parseRow}>
+              <Text style={styles.parseKey}>Confidence</Text>
+              <Text style={styles.parseValue}>{confidencePct}</Text>
+            </View>
+            {request.notes ? (
+              <View style={styles.parseRow}>
+                <Text style={styles.parseKey}>Notes</Text>
+                <Text style={styles.parseValue}>{request.notes}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Pressable style={styles.modalClose} onPress={onClose}>
+            <Text style={styles.modalCloseText}>Close</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -237,7 +363,6 @@ const styles = StyleSheet.create({
     ...typography.screenTitle,
   },
 
-  // Sub-tabs
   tabBar: {
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
@@ -288,7 +413,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
 
-  // List
   list: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
@@ -309,11 +433,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
 
-  // Cards
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -321,42 +441,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     marginBottom: spacing.sm,
-    minHeight: 64,
   },
-  cardAmbiguous: {
-    backgroundColor: colors.amberSoft,
-    borderColor: colors.amberLine,
+  cardDelivered: {
+    opacity: 0.65,
   },
-  cardBody: {
-    flex: 1,
-    marginRight: spacing.md,
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
-  cardAction: {
-    alignItems: 'flex-end',
-  },
-  lotText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  materialText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  rawMessage: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: colors.warning,
-    marginTop: 2,
-  },
-  workerText: {
+  metaText: {
     fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 4,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  aiIcon: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+  },
+  aiIconText: {
+    fontSize: 18,
+  },
+  rawMessage: {
+    fontSize: 17,
+    lineHeight: 24,
+    color: colors.text,
+    marginBottom: spacing.md,
   },
   textMuted: {
     color: colors.textSecondary,
+  },
+  cardAction: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   deliverBtn: {
     paddingHorizontal: spacing.md,
@@ -373,5 +495,97 @@ const styles = StyleSheet.create({
   deliveredTime: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.lg,
+  },
+  modalSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    marginTop: spacing.md,
+  },
+  modalOriginal: {
+    fontSize: 16,
+    color: colors.text,
+    lineHeight: 22,
+  },
+  modalTranslation: {
+    fontSize: 16,
+    color: colors.text,
+    lineHeight: 22,
+    fontStyle: 'italic',
+  },
+  modalError: {
+    fontSize: 14,
+    color: colors.warning,
+    marginBottom: spacing.sm,
+  },
+  modalBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.background,
+  },
+  modalBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  parseGrid: {
+    gap: spacing.xs,
+  },
+  parseRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  parseKey: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  parseValue: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
+    marginLeft: spacing.md,
+  },
+  modalClose: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.text,
+  },
+  modalCloseText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.background,
   },
 });
