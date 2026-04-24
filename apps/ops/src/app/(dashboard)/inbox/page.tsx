@@ -4,6 +4,10 @@ import {
   type NewSenderData,
 } from '@/components/inbox/inbox-view'
 import { InboxTabs, type InboxView as InboxViewKind } from '@/components/inbox/inbox-tabs'
+import {
+  DuplicatesView,
+  type DuplicateRow,
+} from '@/components/inbox/duplicates-view'
 import type { LinkableClient } from '@/components/inbox/link-client-modal'
 import { RejectedView, type RejectedRow } from '@/components/inbox/rejected-view'
 import {
@@ -35,7 +39,7 @@ function statusFromInvoice(status: string): { status: InboxStatus; label: string
 }
 
 function parseView(raw: string | undefined): InboxViewKind {
-  if (raw === 'rejected' || raw === 'unprocessed') return raw
+  if (raw === 'rejected' || raw === 'unprocessed' || raw === 'duplicates') return raw
   return 'active'
 }
 
@@ -49,8 +53,13 @@ export default async function InboxPage({
   const params = await searchParams
   const view = parseView(params.view)
 
-  // Counts for all 3 tabs (always) + payload for the active tab.
-  const [activeCountResp, rejectedCountResp, unprocessedCountResp] = await Promise.all([
+  // Counts for all 4 tabs (always) + payload for the active tab.
+  const [
+    activeCountResp,
+    rejectedCountResp,
+    unprocessedCountResp,
+    duplicatesCountResp,
+  ] = await Promise.all([
     supabase
       .from('ops_invoices')
       .select('id', { count: 'exact', head: true })
@@ -66,6 +75,13 @@ export default async function InboxPage({
       .select('id', { count: 'exact', head: true })
       .eq('operator_id', operator.id)
       .is('resolved_at', null),
+    // Versions only exist when someone resent a PDF we already have.
+    // RLS on ops_invoice_versions filters by operator via the FK join.
+    supabase
+      .from('ops_invoice_versions')
+      .select('id', { count: 'exact', head: true })
+      .eq('rejected', false)
+      .gt('version_number', 1),
   ])
 
   const tabs = (
@@ -74,6 +90,7 @@ export default async function InboxPage({
       activeCount={activeCountResp.count ?? 0}
       rejectedCount={rejectedCountResp.count ?? 0}
       unprocessedCount={unprocessedCountResp.count ?? 0}
+      duplicatesCount={duplicatesCountResp.count ?? 0}
     />
   )
 
@@ -127,6 +144,55 @@ export default async function InboxPage({
       <>
         {tabs}
         <UnprocessedView rows={rows} />
+      </>
+    )
+  }
+
+  if (view === 'duplicates') {
+    // version_number > 1 = re-arrival. is_current stays false for these.
+    const { data: versions } = await supabase
+      .from('ops_invoice_versions')
+      .select(`
+        id, version_number, received_at, pdf_url,
+        invoice:ops_invoices!inner(
+          id, from_name, from_email, subject, received_at, status, operator_id
+        )
+      `)
+      .eq('rejected', false)
+      .gt('version_number', 1)
+      .order('received_at', { ascending: false })
+      .limit(100)
+
+    // Collect pdf paths (each version stores its own pdf_url, same hash as original)
+    const paths = (versions ?? [])
+      .map((v) => v.pdf_url)
+      .filter((p): p is string => !!p)
+    const signedUrls = await getInvoicePdfUrls(Array.from(new Set(paths)))
+
+    const rows: DuplicateRow[] = (versions ?? []).flatMap((v) => {
+      const inv = Array.isArray(v.invoice) ? v.invoice[0] : v.invoice
+      if (!inv) return []
+      if (inv.operator_id !== operator.id) return []
+      return [
+        {
+          versionId: v.id,
+          invoiceId: inv.id,
+          versionNumber: v.version_number,
+          fromName: inv.from_name ?? inv.from_email,
+          fromEmail: inv.from_email,
+          originalSubject: inv.subject ?? '(sem assunto)',
+          originalStatus: inv.status,
+          originalReceivedLabel: formatDateShortPt(inv.received_at),
+          reArrivedLabel: `${formatDateShortPt(v.received_at)} · ${formatTime24(v.received_at)}`,
+          pdfUrl: v.pdf_url ? (signedUrls[v.pdf_url] ?? null) : null,
+        },
+      ]
+    })
+
+    return (
+      <>
+        {tabs}
+        <DuplicatesView rows={rows} />
       </>
     )
   }

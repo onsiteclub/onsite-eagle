@@ -1,21 +1,30 @@
 import Link from 'next/link'
 
-export type InboxView = 'active' | 'rejected' | 'unprocessed'
+export type InboxView = 'active' | 'rejected' | 'unprocessed' | 'duplicates'
 
 export function InboxTabs({
   current,
   activeCount,
   rejectedCount,
   unprocessedCount,
+  duplicatesCount,
 }: {
   current: InboxView
   activeCount: number
   rejectedCount: number
   unprocessedCount: number
+  duplicatesCount: number
 }) {
   return (
     <div className="flex gap-1 mb-5 border-b border-line">
       <Tab href="/inbox" label="Ativos" count={activeCount} active={current === 'active'} />
+      <Tab
+        href="/inbox?view=duplicates"
+        label="Duplicatas"
+        count={duplicatesCount}
+        active={current === 'duplicates'}
+        alert={duplicatesCount > 0}
+      />
       <Tab
         href="/inbox?view=rejected"
         label="Rejeitados"
@@ -37,11 +46,13 @@ function Tab({
   label,
   count,
   active,
+  alert,
 }: {
   href: string
   label: string
   count: number
   active: boolean
+  alert?: boolean
 }) {
   return (
     <Link
@@ -58,7 +69,11 @@ function Tab({
         <span
           className={[
             'ml-2 inline-block px-1.5 py-0.5 text-[10px] font-mono',
-            active ? 'bg-yellow text-ink' : 'bg-paper-2 text-ink-3',
+            active
+              ? 'bg-yellow text-ink'
+              : alert
+                ? 'bg-red text-paper'
+                : 'bg-paper-2 text-ink-3',
           ].join(' ')}
         >
           {count}

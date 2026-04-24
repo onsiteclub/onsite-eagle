@@ -196,19 +196,52 @@ export async function POST(request: NextRequest) {
   }
 
   // 5. Dedup at DB level: if this operator already got an invoice with this
-  // pdf_hash, treat as duplicate. (Sprint 2 will track versions.)
+  // pdf_hash, record the re-arrival in ops_invoice_versions instead of
+  // silently swallowing. Operator sees a badge and can decide to compare.
   const { data: existingInvoice } = await supabase
     .from('ops_invoices')
-    .select('id')
+    .select('id, amount_gross')
     .eq('operator_id', operator.id)
     .eq('pdf_hash', pdfHash)
     .maybeSingle()
 
   if (existingInvoice) {
+    // Next version_number = max(existing) + 1. First re-arrival = 2.
+    const { data: lastVersion } = await supabase
+      .from('ops_invoice_versions')
+      .select('version_number')
+      .eq('invoice_id', existingInvoice.id)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const nextVersion = (lastVersion?.version_number ?? 1) + 1
+
+    const { data: version, error: versionErr } = await supabase
+      .from('ops_invoice_versions')
+      .insert({
+        invoice_id: existingInvoice.id,
+        version_number: nextVersion,
+        amount_gross: existingInvoice.amount_gross,
+        pdf_url: pdfPath,
+        pdf_hash: pdfHash,
+        received_at: email.Date,
+        is_current: false,
+        rejected: false,
+      })
+      .select('id')
+      .single()
+
+    if (versionErr) {
+      console.error('[inbox] version insert failed', versionErr)
+    }
+
     return NextResponse.json({
       ok: true,
       status: 'duplicate',
       invoice_id: existingInvoice.id,
+      version_id: version?.id ?? null,
+      version_number: nextVersion,
     })
   }
 

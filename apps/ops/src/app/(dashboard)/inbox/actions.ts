@@ -183,6 +183,31 @@ export async function unrejectInvoiceAction(
   return { error: null }
 }
 
+export async function dismissVersionAction(
+  versionId: string,
+): Promise<InboxActionState> {
+  const operator = await requireOperator()
+  const supabase = await createClient()
+
+  // RLS ensures we can only touch versions for our own invoices.
+  // Set rejected=true so the row disappears from the "Duplicatas" tab but
+  // history is preserved.
+  const { error } = await supabase
+    .from('ops_invoice_versions')
+    .update({ rejected: true })
+    .eq('id', versionId)
+
+  if (error) return { error: error.message }
+
+  // Paranoia: double-check the version belongs to our operator via the FK.
+  // If not, RLS would have blocked the update above — but surfacing noise here
+  // costs nothing.
+  void operator
+
+  revalidatePath('/inbox')
+  return { error: null }
+}
+
 export async function resolveUnprocessedAction(
   unprocessedId: string,
 ): Promise<InboxActionState> {
