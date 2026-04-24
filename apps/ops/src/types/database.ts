@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
   public: {
     Tables: {
       agg_platform_daily: {
@@ -3405,6 +3410,56 @@ export type Database = {
           },
         ]
       }
+      frm_operator_numbers: {
+        Row: {
+          id: string
+          metadata: Json
+          monthly_cost: number | null
+          operator_id: string
+          phone_e164: string
+          provider: string
+          provider_sid: string | null
+          provisioned_at: string
+          released_at: string | null
+          site_id: string | null
+          status: string
+        }
+        Insert: {
+          id?: string
+          metadata?: Json
+          monthly_cost?: number | null
+          operator_id: string
+          phone_e164: string
+          provider?: string
+          provider_sid?: string | null
+          provisioned_at?: string
+          released_at?: string | null
+          site_id?: string | null
+          status?: string
+        }
+        Update: {
+          id?: string
+          metadata?: Json
+          monthly_cost?: number | null
+          operator_id?: string
+          phone_e164?: string
+          provider?: string
+          provider_sid?: string | null
+          provisioned_at?: string
+          released_at?: string | null
+          site_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frm_operator_numbers_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "frm_jobsites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       frm_operator_state: {
         Row: {
           operator_id: string
@@ -5489,6 +5544,53 @@ export type Database = {
           },
         ]
       }
+      ops_inbox_unprocessed: {
+        Row: {
+          created_at: string
+          from_email: string
+          from_name: string | null
+          id: string
+          operator_id: string
+          raw_email_id: string | null
+          reason: string
+          received_at: string
+          resolved_at: string | null
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          from_email: string
+          from_name?: string | null
+          id?: string
+          operator_id: string
+          raw_email_id?: string | null
+          reason: string
+          received_at: string
+          resolved_at?: string | null
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          from_email?: string
+          from_name?: string | null
+          id?: string
+          operator_id?: string
+          raw_email_id?: string | null
+          reason?: string
+          received_at?: string
+          resolved_at?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ops_inbox_unprocessed_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "ops_operators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ops_invoice_versions: {
         Row: {
           amount_gross: number
@@ -5559,6 +5661,8 @@ export type Database = {
           raw_email_id: string | null
           received_at: string
           site_address: string | null
+          source: string
+          source_version: string | null
           status: string
           subject: string | null
           updated_at: string
@@ -5588,6 +5692,8 @@ export type Database = {
           raw_email_id?: string | null
           received_at: string
           site_address?: string | null
+          source?: string
+          source_version?: string | null
           status?: string
           subject?: string | null
           updated_at?: string
@@ -5617,6 +5723,8 @@ export type Database = {
           raw_email_id?: string | null
           received_at?: string
           site_address?: string | null
+          source?: string
+          source_version?: string | null
           status?: string
           subject?: string | null
           updated_at?: string
