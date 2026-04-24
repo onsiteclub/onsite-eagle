@@ -1,7 +1,7 @@
 # OnSite Calculator — Plano de Refactor (Motor + UX)
 
 **Criado em:** 2026-04-23
-**Status:** executável
+**Status:** Fase A ✅ · Fase B ✅ · Fase C ⏳ · Fase D ⏳
 **Escopo:** `apps/calculator/` no monorepo eagle. Sem branches, commits direto na `main` (convenção do ecossistema).
 
 > **Nota sobre o plano antigo.** Este documento **substitui as Fases 0–4** de [REFACTOR_AND_MIGRATION_PLAN.md](./REFACTOR_AND_MIGRATION_PLAN.md). O plano antigo continua válido como referência de longo prazo (Fase 5+: voz real, Sentry, monetização, iOS, Stairs/Triangle v2). Se houver conflito entre os dois, este prevalece até Fase D concluir.
@@ -24,7 +24,7 @@ Entregar uma Calculator funcional no monorepo com **motor puro testado, UX manua
 
 ---
 
-## Fase A — Motor isolado
+## Fase A — Motor isolado ✅
 
 **Objetivo.** Portar o engine do repo standalone para um módulo TypeScript puro dentro de `apps/calculator/src/engine/` (ou promover para `packages/calc-engine` se a reutilização entre apps ficar óbvia).
 
@@ -34,7 +34,9 @@ Entregar uma Calculator funcional no monorepo com **motor puro testado, UX manua
 
 **Estimativa.** 3–4 dias (ajustes, não rewrite — o código já existe no standalone).
 
-## Fase B — UX manual em cima do motor
+**Entrega (commit `bf69a1c`, 2026-04-23).** Módulo `src/engine/` criado via `git mv` a partir de `src/lib/calculator/`. Única impureza (`import logger` em engine.ts) removida — o catch agora retorna `buildErrorResult` sem side effect. Types do engine (`CalculationResult`, `DimensionType`, `Token`, `CanonicalUnit`) extraídos para `src/engine/types.ts`; `src/types/calculator.ts` re-exporta pra compat. 9 import sites atualizados. **103/103 testes engine passando, cobertura 96.19% stmts / 88.23% branches / 100% funções.** Zero mocks de rede/Supabase nos testes. Engine importa apenas `./types` e `./building-codes/obc-2024.json`.
+
+## Fase B — UX manual em cima do motor ✅
 
 **Objetivo.** Tela onde o usuário escolhe a operação, digita operandos com unidades e vê o resultado — sem auth, sem histórico, sem backend.
 
@@ -43,6 +45,8 @@ Entregar uma Calculator funcional no monorepo com **motor puro testado, UX manua
 **Critério de saída.** Qualquer operação suportada pelo motor é executável manualmente pela UI, em Android físico, sem login e sem internet. Build Android via Codemagic continua verde.
 
 **Estimativa.** 3 dias.
+
+**Entrega (2026-04-23).** Auditoria revelou que a infraestrutura de degradação graciosa já existia: `supabase` é `null` sem env vars ([supabase.ts:46-60](./src/lib/supabase.ts#L46-L60)), App envolve em `AuthProvider` só quando há supabase ([App.tsx:30-40](./src/App.tsx#L30-L40)), `saveCalculation` pula sem `userId` ([calculations.ts:87-96](./src/lib/calculations.ts#L87-L96)), histórico é 100% local via Capacitor Preferences, Sentry é no-op sem DSN. Keypad + fraction pad cobrem aritmética imperial; Stairs/Triangle/Converter têm formulários manuais estruturados. Único bloqueio encontrado: marcadores de merge conflict não resolvidos em ConversationalCalculator.tsx (linhas 19-23 e 616-620) — removidos. **Validação: 217/217 testes, typecheck limpo, lint limpo, `vite build` roda sem nenhuma env var (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SENTRY_DSN`, `VITE_OPENAI_API_KEY`, `VITE_API_URL` todas ausentes) — `built in 1.76s`.**
 
 ## Fase C — Camadas de produto
 
