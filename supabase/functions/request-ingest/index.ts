@@ -155,7 +155,7 @@ Deno.serve(async (req: Request) => {
         jobsiteId: worker.jobsite_id,
         requestId: recentMachinistMsg.request_id,
         senderType: 'worker',
-        senderId: worker.id,
+        senderId: null,
         senderName: worker.display_name || phone,
         content: body,
       });
@@ -269,7 +269,7 @@ Deno.serve(async (req: Request) => {
           jobsiteId: worker.jobsite_id,
           requestId: pending.id,
           senderType: 'worker',
-          senderId: worker.id,
+          senderId: null,
           senderName: worker.display_name || phone,
           content: body,
         });
@@ -335,7 +335,7 @@ Deno.serve(async (req: Request) => {
           jobsiteId: worker.jobsite_id,
           requestId: firstInsertedId,
           senderType: 'worker',
-          senderId: worker.id,
+          senderId: null,
           senderName: worker.display_name || phone,
           content: body,
         });
@@ -416,7 +416,7 @@ async function logMessage(opts: {
   content: string;
   lotId?: string | null;
 }) {
-  await supabase.from('frm_messages').insert({
+  const { error } = await supabase.from('frm_messages').insert({
     jobsite_id: opts.jobsiteId,
     lot_id: opts.lotId ?? null,
     request_id: opts.requestId,
@@ -425,6 +425,9 @@ async function logMessage(opts: {
     sender_name: opts.senderName,
     content: opts.content,
   });
+  if (error) {
+    console.error('logMessage insert failed:', error, 'payload:', opts);
+  }
 }
 
 async function upsertPattern(
