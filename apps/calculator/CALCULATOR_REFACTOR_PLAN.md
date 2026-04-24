@@ -1,7 +1,7 @@
 # OnSite Calculator — Plano de Refactor (Motor + UX)
 
 **Criado em:** 2026-04-23
-**Status:** Fase A ✅ · Fase B ✅ · Fase C ✅ · Fase D ⏳
+**Status:** Fase A ✅ · Fase B ✅ · Fase C ✅ · Fase D ✅
 **Escopo:** `apps/calculator/` no monorepo eagle. Sem branches, commits direto na `main` (convenção do ecossistema).
 
 > **Nota sobre o plano antigo.** Este documento **substitui as Fases 0–4** de [REFACTOR_AND_MIGRATION_PLAN.md](./REFACTOR_AND_MIGRATION_PLAN.md). O plano antigo continua válido como referência de longo prazo (Fase 5+: voz real, Sentry, monetização, iOS, Stairs/Triangle v2). Se houver conflito entre os dois, este prevalece até Fase D concluir.
@@ -60,7 +60,7 @@ Entregar uma Calculator funcional no monorepo com **motor puro testado, UX manua
 
 **Entrega (2026-04-23).** Auditoria corrigiu dois itens que o panorama original havia marcado errado: (i) `src/lib/device.ts` já existia e está bem feito (68 linhas, cache + fallback para localStorage, `rotateDeviceId()` após deleção); (ii) o "bug" de `logger.ts` escrever em `app_logs` não é bug — CLAUDE.md §8.14 documenta `app_logs` como tabela válida com schema que bate exatamente com o que o logger envia (level, module, action, context, device_info, success, app_name, app_version). `PrivacyDashboard` já está wired via [HamburgerMenu.tsx:139](./src/components/HamburgerMenu.tsx#L139), `/api/privacy/delete` já existe e deleta de `ccl_calculations`, `core_voice_logs`, `log_errors`, `log_events` (identificação por JWT ou x-device-id). `@sentry/react` continua instalado como no-op sem DSN — decisão de desinstalar fica com o humano. **Única mudança real de código:** propagar `user.id` de [App.tsx:174-175](./src/App.tsx) para `ConversationalCalculator` via nova prop `userId`, que passa para `compute()` e `setExpressionAndCompute()` — sem isso `saveCalculation()` nunca disparava mesmo com usuário logado, porque o hook `useCalculator` filtra em `saveOptions?.userId`. Bônus: adicionar `userId` + `onIntentRouted` aos deps do `useCallback` do `handleAudioUpload` eliminou um warning preexistente de react-hooks/exhaustive-deps. **Validação: 217/217 testes, tsc limpo no escopo calculator, lint sem warnings novos, `vite build` sem env vars ✓ 1.81s.**
 
-## Fase D — Input conversacional com placeholder determinístico
+## Fase D — Input conversacional com placeholder determinístico ✅
 
 **Objetivo.** Campo de texto livre que parseia expressões em português/inglês construction-idiomáticas ("10 pés mais 3 polegadas", "área de 12 por 8", "20% de 150") e produz o mesmo input estruturado que a UI da Fase B consome.
 
@@ -69,6 +69,8 @@ Entregar uma Calculator funcional no monorepo com **motor puro testado, UX manua
 **Critério de saída.** Calculator é 100% utilizável por texto livre, sem clicar em botões de operação, para as operações cobertas pelo motor. Suite de teste do parser em `tests/unit/parser/` com ≥30 frases-exemplo reais tiradas dos logs antigos do standalone.
 
 **Estimativa.** 4–5 dias.
+
+**Entrega (2026-04-23).** Parser em [src/parser/](./src/parser/) com 3 arquivos: `index.ts` (pipeline de 12 passos), `tables.ts` (lookup PT/EN para unidades, operadores, números por extenso, frações, porcentagem), `types.ts` (contrato `ParseResult`). Pipeline determinístico, zero LLM, zero deps externas. API pública: `parseExpression(text): ParseResult`. UI integrada em [ConversationalCalculator](./src/components/ConversationalCalculator.tsx) via novo handler `handleCommit` que unifica o caminho keypad `=` e Enter do input — se houver 2+ letras consecutivas no input, roda pelo parser antes de chamar o engine; senão trata como expressão engine-direta. O antigo `<div role="textbox">` não-editável virou `<input type="text">` real, permitindo digitação livre em desktop/mobile. Keypad continua funcional em paralelo para quem prefere fraction pad. Falhas de parse mostram toast com `reason + suggestion`. **46 testes em [tests/unit/parser/parse-expression.test.ts](./tests/unit/parser/parse-expression.test.ts)** cobrindo: aritmética básica PT/EN, números por extenso, unidades imperial (pés/polegadas) + métrico (m/cm/mm), área e volume via "por"/"by", porcentagem ("X% de Y", "X por cento de Y"), frações por extenso (meio, um quarto, três oitavos), números mistos (cinco e meio → 5 1/2), erros (vazio, garbage, URL). Cada teste verifica ambas propriedades: expressão gerada + resultado do engine. **Validação: 263/263 testes (46 novos), tsc limpo, lint sem warnings novos, `vite build` sem env vars em 1.70s, bundle cresceu 4.5KB para o parser (puro TypeScript).**
 
 ---
 

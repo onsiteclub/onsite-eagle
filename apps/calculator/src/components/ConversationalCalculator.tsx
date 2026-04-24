@@ -11,6 +11,7 @@ import { logger } from '../lib/logger';
 import { logger as pkgLogger } from '@onsite/logger';
 import { getLocalConsentStatus } from '../lib/consent';
 import { supabase } from '../lib/supabase';
+import { parseExpression } from '../parser';
 import VoiceConsentModal from './VoiceConsentModal';
 import Toast from './Toast';
 import ConversationCard from './ConversationCard';
@@ -111,7 +112,6 @@ export default function ConversationalCalculator({
     expression,
     setExpression,
     setExpressionAndCompute,
-    compute,
     clear,
     backspace,
     appendKey,
@@ -312,17 +312,47 @@ export default function ConversationalCalculator({
     }
   };
 
+  // Phase D — commit the current expression. If the user typed words
+  // ("dez pés mais três polegadas"), run through the deterministic parser
+  // first; otherwise treat `expression` as already engine-ready. A single
+  // handler powers both the keypad "=" and the Enter key on the text input.
+  const handleCommit = useCallback(() => {
+    const raw = expression.trim();
+    if (!raw) return;
+
+    // Two or more consecutive letters = natural-language input. The parser
+    // output replaces the raw text before we hand it to the engine.
+    const hasWords = /[a-zA-ZÀ-ÿ]{2,}/.test(raw);
+    let exprToCompute = raw;
+    if (hasWords) {
+      const parsed = parseExpression(raw);
+      if (!parsed.ok) {
+        const msg = parsed.suggestion ? `${parsed.reason} ${parsed.suggestion}` : parsed.reason;
+        setToast({ message: msg, type: 'info' });
+        return;
+      }
+      exprToCompute = parsed.expression;
+    }
+
+    const result = setExpressionAndCompute(exprToCompute, {
+      inputMethod: 'keypad',
+      userId: userId ?? undefined,
+    });
+    if (result) {
+      addToHistory(result, { inputMethod: 'manual' });
+      setExpression(''); // Fresh composer after commit — result lives in the card.
+    } else {
+      setToast({
+        message: 'Não consegui calcular. Tente "5 1/2 + 3 1/4" ou "10 pés mais 3 polegadas".',
+        type: 'info',
+      });
+    }
+  }, [expression, setExpressionAndCompute, addToHistory, setExpression, userId]);
+
   const handleKeyClick = (key: string) => {
     switch (key) {
       case '=': {
-        const result = compute({
-          inputMethod: 'keypad',
-          userId: userId ?? undefined,
-        });
-        if (result) {
-          addToHistory(result, { inputMethod: 'manual' });
-          setExpression(''); // Fresh composer after commit — result lives in the card.
-        }
+        handleCommit();
         break;
       }
       case 'C':       return clear();
@@ -531,17 +561,36 @@ export default function ConversationalCalculator({
             </div>
           )}
 
-          {/* Composer — expression input. On mobile the keypad+voice follow in
-              `.conv-controls` below (same DOM order, flex-column stack). On
-              desktop the keypad goes to the right column via grid placement. */}
+          {/* Composer — expression input. Editable text field so users can type
+              either raw expressions ("5 1/2 + 3 1/4") or natural-language phrases
+              ("dez pés mais três polegadas") — the latter goes through the Phase D
+              parser on Enter/"=". Keypad below the composer still works for
+              fraction-heavy structured input.
+              On mobile the keypad+voice follow in `.conv-controls` below (same DOM
+              order, flex-column stack). On desktop the keypad goes to the right
+              column via grid placement. */}
           <div className="conv-composer-input">
             <div className="expression-wrapper">
-              <div className="expression-input" role="textbox" aria-label="Expressão">
+              <div className="expression-input">
                 <span className="conv-composer-input__dot" aria-hidden="true" />
-                <span className={`expression-text ${!expression ? 'placeholder' : ''}`}>
-                  {expression || 'Digite ou fale: 5 1/2 + 3 1/4'}
-                </span>
-                <span className="conv-composer-input__hint" aria-hidden="true">space</span>
+                <input
+                  type="text"
+                  className="expression-text expression-text--input"
+                  value={expression}
+                  placeholder='5 1/2 + 3 1/4  ·  dez pés mais três polegadas'
+                  onChange={(e) => setExpression(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCommit();
+                    }
+                  }}
+                  aria-label="Expressão"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+                <span className="conv-composer-input__hint" aria-hidden="true">↵</span>
               </div>
             </div>
           </div>

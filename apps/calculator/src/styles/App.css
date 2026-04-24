@@ -275,6 +275,22 @@
   color: var(--color-text-tertiary);
 }
 
+/* Phase D — editable variant: strip browser chrome, inherit the display
+   typography. Placeholder rendering uses the same tertiary text color as the
+   legacy span.placeholder state. */
+.expression-text--input {
+  border: none;
+  background: transparent;
+  outline: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+.expression-text--input::placeholder {
+  color: var(--color-text-tertiary);
+  opacity: 1;
+}
+
 /* History button — mini pressure plate with amber accent.
    ACIONA behavior, small variant (miniKey). */
 .history-btn {
