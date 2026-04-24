@@ -8,7 +8,7 @@
 
 import { useEffect, useCallback, useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert, Modal,
+  View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert, Modal, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '@onsite/tokens';
@@ -41,6 +41,7 @@ const LANG_FLAGS: Record<string, string> = {
 export default function RequestsScreen() {
   const [requests, setRequests] = useState<IncomingRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('queue');
   const [aiModalRequest, setAiModalRequest] = useState<IncomingRequest | null>(null);
 
@@ -63,6 +64,12 @@ export default function RequestsScreen() {
       setLoading(false);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchRequests();
+    setRefreshing(false);
+  }, [fetchRequests]);
 
   useEffect(() => {
     fetchRequests();
@@ -146,22 +153,33 @@ export default function RequestsScreen() {
         <View style={styles.empty}>
           <ActivityIndicator size="large" color={colors.accent} />
         </View>
-      ) : displayedItems.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>
-            {activeTab === 'queue' ? 'No pending requests' : 'No deliveries yet'}
-          </Text>
-          <Text style={styles.emptyHint}>
-            {activeTab === 'queue'
-              ? 'Send a WhatsApp or SMS to start receiving requests'
-              : 'Delivered requests will appear here'}
-          </Text>
-        </View>
       ) : (
         <FlatList
           data={displayedItems}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={
+            displayedItems.length === 0 ? styles.listEmpty : styles.list
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>
+                {activeTab === 'queue' ? 'No pending requests' : 'No deliveries yet'}
+              </Text>
+              <Text style={styles.emptyHint}>
+                {activeTab === 'queue'
+                  ? 'Send a WhatsApp or SMS to start receiving requests\nPull down to refresh'
+                  : 'Delivered requests will appear here'}
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => (
             <RequestCard
               request={item}
@@ -416,6 +434,10 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
+  },
+  listEmpty: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
   },
   empty: {
     flex: 1,
