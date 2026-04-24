@@ -434,6 +434,115 @@ body {
 /* =============================================================================
    INBOX
    ========================================================================= */
+.inbox-search-wrap {
+  margin-bottom: 16px;
+}
+.inbox-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1.5px solid var(--color-line);
+  background: var(--color-paper);
+  transition: border-color 0.12s;
+}
+.inbox-search:focus-within {
+  border-color: var(--color-ink);
+}
+.inbox-search svg {
+  color: var(--color-ink-3);
+  flex-shrink: 0;
+}
+.inbox-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 12px 0;
+  font-family: var(--font-sans), "Archivo", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+}
+.inbox-search input::placeholder {
+  color: var(--color-ink-4);
+}
+.inbox-search-clear {
+  font-family: var(--font-mono), "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--color-ink-3);
+  cursor: pointer;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: none;
+  border: none;
+  visibility: hidden;
+}
+.inbox-search.has-value .inbox-search-clear {
+  visibility: visible;
+}
+.inbox-search-clear:hover {
+  color: var(--color-ink);
+}
+
+.inbox-empty {
+  padding: 60px 20px;
+  text-align: center;
+  font-family: var(--font-mono), "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--color-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.inbox-thread-child {
+  display: grid;
+  grid-template-columns: 90px 1fr auto 110px;
+  gap: 18px;
+  padding: 12px 20px 12px 56px;
+  border-bottom: 1px solid var(--color-line);
+  align-items: center;
+  background: var(--color-paper-2);
+  position: relative;
+  transition: background 0.1s;
+}
+.inbox-thread-child:hover {
+  background: var(--color-paper-3);
+}
+.inbox-thread-child::before {
+  content: '';
+  position: absolute;
+  left: 32px;
+  top: 0;
+  bottom: 50%;
+  width: 12px;
+  border-left: 1.5px solid var(--color-line-strong);
+  border-bottom: 1.5px solid var(--color-line-strong);
+}
+.inbox-thread-child .inbox-state-row {
+  color: var(--color-ink-3);
+  font-size: 9px;
+}
+.inbox-thread-child .inbox-from {
+  font-size: 13px;
+  font-weight: 600;
+}
+.inbox-thread-child .inbox-subject {
+  font-size: 11px;
+}
+.thread-indicator {
+  font-family: var(--font-mono), "JetBrains Mono", monospace;
+  font-size: 9px;
+  color: var(--color-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  padding: 2px 6px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  margin-left: 8px;
+}
+
 .inbox-list {
   border: 1px solid var(--color-line);
   background: var(--color-paper);

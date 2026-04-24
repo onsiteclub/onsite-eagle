@@ -11,26 +11,22 @@ import { NextResponse, type NextRequest } from 'next/server'
 // =============================================================================
 // /api/inbox — Postmark Inbound webhook
 // =============================================================================
-// Autenticação: token via query-string (`?token=...`) OU header
-// `Authorization: Bearer ...`. Configurar URL no dashboard Postmark como:
-//   https://ops.onsiteclub.ca/api/inbox?token=<POSTMARK_INBOUND_WEBHOOK_SECRET>
+// Auth: token via `?token=...` or `Authorization: Bearer ...`. Postmark doesn't
+// HMAC-sign, so token-in-URL is the recommended approach per their docs.
 //
-// Postmark NÃO assina payloads via HMAC. Em vez disso, eles sugerem:
-//   - Basic auth na URL
-//   - IP allowlisting (50.31.156.6, 18.217.206.57, 3.134.147.250)
-//   - Token secreto na URL (o que usamos aqui)
-//
-// Usa service_role — bypassa RLS para poder inserir como qualquer operador.
-// Nunca expor esta route para rotas autenticadas do app.
+// Uses service_role — bypasses RLS to insert on behalf of any operator. Never
+// expose this route to authenticated app routes.
 // =============================================================================
 
 type PostmarkAttachment = {
   Name: string
   ContentType: string
-  Content: string // base64
+  Content: string
   ContentLength?: number
   ContentID?: string | null
 }
+
+type PostmarkHeader = { Name: string; Value: string }
 
 type PostmarkPayload = {
   From: string
@@ -40,32 +36,57 @@ type PostmarkPayload = {
   Date: string
   MessageID: string
   Attachments?: PostmarkAttachment[]
+  Headers?: PostmarkHeader[]
   TextBody?: string
   HtmlBody?: string
 }
 
+type InboxState =
+  | 'new_sender'
+  | 'conflict'
+  | 'timekeeper'
+  | 'external_pdf'
+  | 'message'
+  | 'reply'
+
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.POSTMARK_INBOUND_WEBHOOK_SECRET
   if (!secret) return false
-
-  // Accepted in either query-string OR Bearer header.
   const { searchParams } = new URL(request.url)
   const provided =
     searchParams.get('token') ??
     request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
     null
-
   if (!provided) return false
-
-  // Timing-safe compare.
   const a = Buffer.from(secret)
   const b = Buffer.from(provided)
   if (a.length !== b.length) return false
   return timingSafeEqual(a, b)
 }
 
-// 3-tier extraction cascade: XMP metadata → subject parse → manual_required.
-// See ops-directive-amendment-xmp.md for the contract.
+function getHeader(email: PostmarkPayload, name: string): string | null {
+  const hit = email.Headers?.find((h) => h.Name.toLowerCase() === name.toLowerCase())
+  return hit?.Value ?? null
+}
+
+// Extracts the first MessageID from an email header value. In-Reply-To is
+// usually a single `<id>`, References may hold multiple space-separated ids.
+// We match the parent as the LAST id in References (most recent ancestor).
+function extractReplyParentId(email: PostmarkPayload): string | null {
+  const inReplyTo = getHeader(email, 'In-Reply-To')
+  if (inReplyTo) {
+    const m = inReplyTo.match(/<([^>]+)>/)
+    if (m) return m[1]
+  }
+  const refs = getHeader(email, 'References')
+  if (refs) {
+    const all = Array.from(refs.matchAll(/<([^>]+)>/g)).map((x) => x[1])
+    if (all.length > 0) return all[all.length - 1]
+  }
+  return null
+}
+
+// 3-tier extraction cascade: XMP → subject → manual_required
 function extractInvoiceData(
   pdfBuffer: Buffer,
   subject: string | undefined | null,
@@ -125,23 +146,22 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // 1. Identify operator from recipient (username@inbox-domain)
-  const [username] = email.To.toLowerCase().split('@')
+  // 1. Identify operator from recipient
+  const [username] = email.To.toLowerCase().split(/[<>"\s@]/).filter(Boolean)
+  const recipientLocal = email.To.toLowerCase().match(/([^\s<>"]+)@/)?.[1] ?? username
   const { data: operator } = await supabase
     .from('ops_operators')
-    .select('id, default_fee_percent')
-    .eq('inbox_username', username)
+    .select('id')
+    .eq('inbox_username', recipientLocal)
     .maybeSingle()
 
   if (!operator) {
-    // Recipient doesn't match any operator — discard silently (HTTP 200 so
-    // Postmark doesn't retry).
     return NextResponse.json({ ok: true, status: 'no_operator' })
   }
 
   const fromEmail = email.From.toLowerCase()
 
-  // 2. Blocklist check
+  // 2. Blocklist → drop silently (the only silent drop)
   const { data: blocked } = await supabase
     .from('ops_inbox_blocklist')
     .select('id')
@@ -153,99 +173,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, status: 'blocked' })
   }
 
-  // 3. PDF attachment (primary business requirement — sem PDF, sem invoice)
-  const pdfAttachment = email.Attachments?.find(
-    (a) => a.ContentType === 'application/pdf',
-  )
-
-  if (!pdfAttachment) {
-    // Persist so the operator can review it in /inbox/unprocessed.
-    // Previously this email was silently 200'd and lost.
-    await supabase.from('ops_inbox_unprocessed').insert({
-      operator_id: operator.id,
-      from_email: fromEmail,
-      from_name: email.FromName ?? null,
-      subject: email.Subject ?? null,
-      received_at: email.Date,
-      raw_email_id: email.MessageID,
-      reason: 'no_pdf',
-    })
-    return NextResponse.json({ ok: true, status: 'no_pdf' })
-  }
-
-  // 4. Upload PDF to storage, keyed by hash for integrity + dedup
-  const pdfBuffer = Buffer.from(pdfAttachment.Content, 'base64')
-  const pdfHash = createHash('sha256').update(pdfBuffer).digest('hex')
-  const pdfPath = `${operator.id}/${pdfHash}.pdf`
-
-  const { error: uploadError } = await supabase.storage
-    .from('ops-invoices')
-    .upload(pdfPath, pdfBuffer, {
-      contentType: 'application/pdf',
-      upsert: false,
-    })
-
-  // Duplicate upload = same PDF already stored → not an error.
-  const isDuplicate =
-    uploadError?.message.includes('already exists') ||
-    uploadError?.message.includes('The resource already exists')
-
-  if (uploadError && !isDuplicate) {
-    console.error('[inbox] storage upload failed', uploadError)
-    return new NextResponse('Storage error', { status: 500 })
-  }
-
-  // 5. Dedup at DB level: if this operator already got an invoice with this
-  // pdf_hash, record the re-arrival in ops_invoice_versions instead of
-  // silently swallowing. Operator sees a badge and can decide to compare.
-  const { data: existingInvoice } = await supabase
-    .from('ops_invoices')
-    .select('id, amount_gross')
-    .eq('operator_id', operator.id)
-    .eq('pdf_hash', pdfHash)
-    .maybeSingle()
-
-  if (existingInvoice) {
-    // Next version_number = max(existing) + 1. First re-arrival = 2.
-    const { data: lastVersion } = await supabase
-      .from('ops_invoice_versions')
-      .select('version_number')
-      .eq('invoice_id', existingInvoice.id)
-      .order('version_number', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    const nextVersion = (lastVersion?.version_number ?? 1) + 1
-
-    const { data: version, error: versionErr } = await supabase
-      .from('ops_invoice_versions')
-      .insert({
-        invoice_id: existingInvoice.id,
-        version_number: nextVersion,
-        amount_gross: existingInvoice.amount_gross,
-        pdf_url: pdfPath,
-        pdf_hash: pdfHash,
-        received_at: email.Date,
-        is_current: false,
-        rejected: false,
-      })
+  // 3. Detect reply to an existing message in our inbox
+  const inReplyTo = extractReplyParentId(email)
+  let parentMessageId: string | null = null
+  if (inReplyTo) {
+    const { data: parent } = await supabase
+      .from('ops_inbox_messages')
       .select('id')
-      .single()
-
-    if (versionErr) {
-      console.error('[inbox] version insert failed', versionErr)
-    }
-
-    return NextResponse.json({
-      ok: true,
-      status: 'duplicate',
-      invoice_id: existingInvoice.id,
-      version_id: version?.id ?? null,
-      version_number: nextVersion,
-    })
+      .eq('operator_id', operator.id)
+      .eq('message_id', inReplyTo)
+      .maybeSingle()
+    parentMessageId = parent?.id ?? null
   }
 
-  // 6. Look up existing client by email
+  // 4. Lookup client by from_email (identifies "known sender")
   const { data: client } = await supabase
     .from('ops_clients')
     .select('id')
@@ -253,12 +194,154 @@ export async function POST(request: NextRequest) {
     .eq('email', fromEmail)
     .maybeSingle()
 
-  // 7. Extract invoice data via 3-tier cascade (XMP → subject → manual)
+  // 5. Find PDF attachment
+  const pdfAttachment = email.Attachments?.find(
+    (a) => a.ContentType === 'application/pdf',
+  )
+
+  // ===========================================================================
+  // NO PDF branch
+  // ===========================================================================
+  if (!pdfAttachment) {
+    const state: InboxState = parentMessageId
+      ? 'reply'
+      : client
+        ? 'message'
+        : 'new_sender'
+
+    const { data: msg, error: msgErr } = await supabase
+      .from('ops_inbox_messages')
+      .insert({
+        operator_id: operator.id,
+        message_id: email.MessageID,
+        in_reply_to_message_id: inReplyTo,
+        parent_message_id: parentMessageId,
+        from_email: fromEmail,
+        from_name: email.FromName ?? null,
+        subject: email.Subject ?? null,
+        received_at: email.Date,
+        invoice_id: null,
+        state,
+      })
+      .select('id')
+      .single()
+
+    if (msgErr) {
+      // duplicate delivery (same MessageID) → idempotent 200
+      if (msgErr.message.includes('duplicate')) {
+        return NextResponse.json({ ok: true, status: 'duplicate_delivery' })
+      }
+      console.error('[inbox] message insert failed (no-pdf)', msgErr)
+      return new NextResponse('DB error', { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true, status: state, message_id: msg.id })
+  }
+
+  // ===========================================================================
+  // PDF branch
+  // ===========================================================================
+  const pdfBuffer = Buffer.from(pdfAttachment.Content, 'base64')
+  const pdfHash = createHash('sha256').update(pdfBuffer).digest('hex')
+  const pdfPath = `${operator.id}/${pdfHash}.pdf`
+
+  // Upload (dedup on storage is fine — same hash, same bytes)
+  const { error: uploadError } = await supabase.storage
+    .from('ops-invoices')
+    .upload(pdfPath, pdfBuffer, {
+      contentType: 'application/pdf',
+      upsert: false,
+    })
+  const isDuplicateStorage =
+    uploadError?.message.includes('already exists') ||
+    uploadError?.message.includes('The resource already exists')
+  if (uploadError && !isDuplicateStorage) {
+    console.error('[inbox] storage upload failed', uploadError)
+    return new NextResponse('Storage error', { status: 500 })
+  }
+
+  // Check DB dedup by pdf_hash
+  const { data: existingInvoice } = await supabase
+    .from('ops_invoices')
+    .select('id, amount_gross')
+    .eq('operator_id', operator.id)
+    .eq('pdf_hash', pdfHash)
+    .maybeSingle()
+
+  // ---- CONFLICT: same PDF arrived again ----
+  if (existingInvoice) {
+    // Record version (history)
+    const { data: lastVersion } = await supabase
+      .from('ops_invoice_versions')
+      .select('version_number')
+      .eq('invoice_id', existingInvoice.id)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const nextVersion = (lastVersion?.version_number ?? 1) + 1
+    await supabase.from('ops_invoice_versions').insert({
+      invoice_id: existingInvoice.id,
+      version_number: nextVersion,
+      amount_gross: existingInvoice.amount_gross,
+      pdf_url: pdfPath,
+      pdf_hash: pdfHash,
+      received_at: email.Date,
+      is_current: false,
+      rejected: false,
+    })
+
+    // Record in inbox feed as CONFLICT row, linked to the original invoice
+    const { data: msg, error: msgErr } = await supabase
+      .from('ops_inbox_messages')
+      .insert({
+        operator_id: operator.id,
+        message_id: email.MessageID,
+        in_reply_to_message_id: inReplyTo,
+        parent_message_id: parentMessageId,
+        from_email: fromEmail,
+        from_name: email.FromName ?? null,
+        subject: email.Subject ?? null,
+        received_at: email.Date,
+        invoice_id: existingInvoice.id,
+        state: 'conflict',
+      })
+      .select('id')
+      .single()
+    if (msgErr && !msgErr.message.includes('duplicate')) {
+      console.error('[inbox] message insert failed (conflict)', msgErr)
+    }
+
+    return NextResponse.json({
+      ok: true,
+      status: 'conflict',
+      invoice_id: existingInvoice.id,
+      version_number: nextVersion,
+      message_id: msg?.id ?? null,
+    })
+  }
+
+  // ---- Normal PDF invoice ----
   const extracted = extractInvoiceData(pdfBuffer, email.Subject)
 
-  // 8. Insert invoice.
-  // `from_email` stays as the Postmark envelope address (source of truth for
-  // identity); XMP issuer_email is used only when Postmark's is missing.
+  // state logic for non-conflict PDFs:
+  //   reply header → 'reply'
+  //   unknown sender → 'new_sender'
+  //   known sender + XMP → 'timekeeper'
+  //   known sender, no XMP → 'external_pdf'
+  const state: InboxState = parentMessageId
+    ? 'reply'
+    : !client
+      ? 'new_sender'
+      : extracted.source === 'xmp'
+        ? 'timekeeper'
+        : 'external_pdf'
+
+  // Invoice gets status 'approved' when sender is known and not a reply,
+  // because we auto-post to the ledger below. 'new_sender' stays as status
+  // 'new_sender' until Paulo decides. Replies with PDF behave like the base
+  // case (known vs unknown).
+  const invoiceStatus = !client ? 'new_sender' : 'approved'
+
   const { data: invoice, error: insertError } = await supabase
     .from('ops_invoices')
     .insert({
@@ -277,9 +360,10 @@ export async function POST(request: NextRequest) {
       raw_email_id: email.MessageID,
       source: extracted.source,
       source_version: extracted.source_version,
-      status: client ? 'pending' : 'new_sender',
+      status: invoiceStatus,
+      approved_at: invoiceStatus === 'approved' ? new Date().toISOString() : null,
     })
-    .select('id')
+    .select('id, amount_gross')
     .single()
 
   if (insertError || !invoice) {
@@ -287,16 +371,66 @@ export async function POST(request: NextRequest) {
     return new NextResponse('DB error', { status: 500 })
   }
 
+  // Inbox feed row
+  const { data: msg, error: msgErr } = await supabase
+    .from('ops_inbox_messages')
+    .insert({
+      operator_id: operator.id,
+      message_id: email.MessageID,
+      in_reply_to_message_id: inReplyTo,
+      parent_message_id: parentMessageId,
+      from_email: fromEmail,
+      from_name: email.FromName ?? null,
+      subject: email.Subject ?? null,
+      received_at: email.Date,
+      invoice_id: invoice.id,
+      state,
+    })
+    .select('id')
+    .single()
+  if (msgErr && !msgErr.message.includes('duplicate')) {
+    console.error('[inbox] message insert failed', msgErr)
+  }
+
+  // ---- Auto-ledger entry when sender is known (non-reply) ----
+  // Replies to existing invoices don't create a new ledger entry — the
+  // original invoice already has one.
+  if (client && state !== 'reply') {
+    const { data: lastEntry } = await supabase
+      .from('ops_ledger_entries')
+      .select('balance_after')
+      .eq('client_id', client.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const prev = lastEntry ? Number(lastEntry.balance_after) : 0
+    const gross = Number(invoice.amount_gross)
+    const balanceAfter = Math.round((prev - gross) * 100) / 100
+
+    await supabase.from('ops_ledger_entries').insert({
+      operator_id: operator.id,
+      client_id: client.id,
+      entry_type: 'invoice_received',
+      amount: -gross,
+      balance_after: balanceAfter,
+      invoice_id: invoice.id,
+      description: `Invoice ${extracted.invoice_number ?? invoice.id.slice(0, 8)}`,
+      entry_date: new Date().toISOString().split('T')[0],
+      created_by: null,
+    })
+  }
+
   return NextResponse.json({
     ok: true,
-    status: client ? 'pending' : 'new_sender',
+    status: state,
     invoice_id: invoice.id,
+    message_id: msg?.id ?? null,
     source: extracted.source,
-    amount_parsed: extracted.amount_gross,
   })
 }
 
-// GET para health-check do webhook (Postmark pode pingar pra validar URL)
+// GET handshake for Postmark "Check" button
 export async function GET() {
   return NextResponse.json({ ok: true, route: 'ops inbox webhook' })
 }

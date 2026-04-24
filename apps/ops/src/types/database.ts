@@ -2419,8 +2419,12 @@ export type Database = {
           id: string
           item_code: string
           item_label: string
+          max_photos: number
+          min_photos: number | null
           notes: string | null
+          photo_guidance: string | null
           photo_url: string | null
+          photo_urls: string[]
           result: string | null
         }
         Insert: {
@@ -2429,8 +2433,12 @@ export type Database = {
           id?: string
           item_code: string
           item_label: string
+          max_photos?: number
+          min_photos?: number | null
           notes?: string | null
+          photo_guidance?: string | null
           photo_url?: string | null
+          photo_urls?: string[]
           result?: string | null
         }
         Update: {
@@ -2439,8 +2447,12 @@ export type Database = {
           id?: string
           item_code?: string
           item_label?: string
+          max_photos?: number
+          min_photos?: number | null
           notes?: string | null
+          photo_guidance?: string | null
           photo_url?: string | null
+          photo_urls?: string[]
           result?: string | null
         }
         Relationships: [
@@ -2466,6 +2478,9 @@ export type Database = {
           is_blocking: boolean | null
           item_code: string
           item_label: string
+          max_photos: number
+          min_photos: number | null
+          photo_guidance: string | null
           sort_order: number | null
           transition: string
         }
@@ -2474,6 +2489,9 @@ export type Database = {
           is_blocking?: boolean | null
           item_code: string
           item_label: string
+          max_photos?: number
+          min_photos?: number | null
+          photo_guidance?: string | null
           sort_order?: number | null
           transition: string
         }
@@ -2482,6 +2500,9 @@ export type Database = {
           is_blocking?: boolean | null
           item_code?: string
           item_label?: string
+          max_photos?: number
+          min_photos?: number | null
+          photo_guidance?: string | null
           sort_order?: number | null
           transition?: string
         }
@@ -2920,18 +2941,19 @@ export type Database = {
           in_transit_at: string | null
           jobsite_id: string | null
           language_detected: string | null
-          lot_id: string
+          lot_id: string | null
+          lot_text_hint: string | null
           material_name: string | null
           material_type: string | null
           notes: string | null
           operator_id: string | null
           organization_id: string | null
-          phase_id: string
+          phase_id: string | null
           photo_url: string | null
           quantity: number | null
           raw_message: string | null
           requested_at: string | null
-          requested_by: string
+          requested_by: string | null
           requested_by_name: string | null
           source: string | null
           status: string | null
@@ -2965,18 +2987,19 @@ export type Database = {
           in_transit_at?: string | null
           jobsite_id?: string | null
           language_detected?: string | null
-          lot_id: string
+          lot_id?: string | null
+          lot_text_hint?: string | null
           material_name?: string | null
           material_type?: string | null
           notes?: string | null
           operator_id?: string | null
           organization_id?: string | null
-          phase_id: string
+          phase_id?: string | null
           photo_url?: string | null
           quantity?: number | null
           raw_message?: string | null
           requested_at?: string | null
-          requested_by: string
+          requested_by?: string | null
           requested_by_name?: string | null
           source?: string | null
           status?: string | null
@@ -3010,18 +3033,19 @@ export type Database = {
           in_transit_at?: string | null
           jobsite_id?: string | null
           language_detected?: string | null
-          lot_id?: string
+          lot_id?: string | null
+          lot_text_hint?: string | null
           material_name?: string | null
           material_type?: string | null
           notes?: string | null
           operator_id?: string | null
           organization_id?: string | null
-          phase_id?: string
+          phase_id?: string | null
           photo_url?: string | null
           quantity?: number | null
           raw_message?: string | null
           requested_at?: string | null
-          requested_by?: string
+          requested_by?: string | null
           requested_by_name?: string | null
           source?: string | null
           status?: string | null
@@ -3091,13 +3115,6 @@ export type Database = {
             columns: ["phase_id"]
             isOneToOne: false
             referencedRelation: "frm_phases"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "frm_material_requests_requested_by_fkey"
-            columns: ["requested_by"]
-            isOneToOne: false
-            referencedRelation: "core_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -3253,6 +3270,7 @@ export type Database = {
           organization_id: string | null
           phase_at_creation: number | null
           reply_to_id: string | null
+          request_id: string | null
           sender_avatar_url: string | null
           sender_id: string | null
           sender_name: string
@@ -3273,6 +3291,7 @@ export type Database = {
           organization_id?: string | null
           phase_at_creation?: number | null
           reply_to_id?: string | null
+          request_id?: string | null
           sender_avatar_url?: string | null
           sender_id?: string | null
           sender_name: string
@@ -3293,6 +3312,7 @@ export type Database = {
           organization_id?: string | null
           phase_at_creation?: number | null
           reply_to_id?: string | null
+          request_id?: string | null
           sender_avatar_url?: string | null
           sender_id?: string | null
           sender_name?: string
@@ -3325,6 +3345,13 @@ export type Database = {
             columns: ["reply_to_id"]
             isOneToOne: false
             referencedRelation: "frm_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frm_messages_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "frm_material_requests"
             referencedColumns: ["id"]
           },
           {
@@ -4503,7 +4530,7 @@ export type Database = {
           total_requests: number | null
           trades: string[] | null
           updated_at: string | null
-          worker_id: string
+          worker_id: string | null
           worker_name: string | null
         }
         Insert: {
@@ -4520,7 +4547,7 @@ export type Database = {
           total_requests?: number | null
           trades?: string[] | null
           updated_at?: string | null
-          worker_id: string
+          worker_id?: string | null
           worker_name?: string | null
         }
         Update: {
@@ -4537,7 +4564,7 @@ export type Database = {
           total_requests?: number | null
           trades?: string[] | null
           updated_at?: string | null
-          worker_id?: string
+          worker_id?: string | null
           worker_name?: string | null
         }
         Relationships: [
@@ -4560,13 +4587,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "core_organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "frm_site_workers_worker_id_fkey"
-            columns: ["worker_id"]
-            isOneToOne: false
-            referencedRelation: "core_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -5540,6 +5560,73 @@ export type Database = {
             columns: ["operator_id"]
             isOneToOne: false
             referencedRelation: "ops_operators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ops_inbox_messages: {
+        Row: {
+          created_at: string
+          from_email: string
+          from_name: string | null
+          id: string
+          in_reply_to_message_id: string | null
+          invoice_id: string | null
+          message_id: string
+          operator_id: string
+          parent_message_id: string | null
+          received_at: string
+          state: string
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          from_email: string
+          from_name?: string | null
+          id?: string
+          in_reply_to_message_id?: string | null
+          invoice_id?: string | null
+          message_id: string
+          operator_id: string
+          parent_message_id?: string | null
+          received_at: string
+          state: string
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          from_email?: string
+          from_name?: string | null
+          id?: string
+          in_reply_to_message_id?: string | null
+          invoice_id?: string | null
+          message_id?: string
+          operator_id?: string
+          parent_message_id?: string | null
+          received_at?: string
+          state?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ops_inbox_messages_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ops_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ops_inbox_messages_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "ops_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ops_inbox_messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "ops_inbox_messages"
             referencedColumns: ["id"]
           },
         ]
