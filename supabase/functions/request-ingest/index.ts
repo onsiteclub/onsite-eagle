@@ -161,12 +161,12 @@ Deno.serve(async (req: Request) => {
 
       await supabase.from('frm_material_requests').insert({
         jobsite_id: worker.jobsite_id,
-        lot_id: lotId || '00000000-0000-0000-0000-000000000000', // placeholder if null
-        phase_id: 'general',
+        lot_id: lotId, // NULL if AI could not resolve a lot
+        phase_id: null, // SMS-sourced requests have no phase context
         material_name: order.material || null,
         quantity: order.quantity || null,
         notes: order.notes || null,
-        requested_by: worker.worker_id || worker.id,
+        requested_by: null, // SMS worker has no core_profiles row
         requested_by_name: worker.display_name || phone,
         status: 'requested',
         raw_message: body,
@@ -217,7 +217,7 @@ Deno.serve(async (req: Request) => {
 
 interface Worker {
   id: string;
-  worker_id: string;
+  worker_id: string | null;
   jobsite_id: string;
   display_name: string | null;
   total_requests: number;
@@ -236,12 +236,14 @@ async function upsertWorker(phone: string, siteId: string): Promise<Worker> {
 
   if (existing) return existing as Worker;
 
-  // Auto-materialize: create worker record scoped to the receiving site
+  // Auto-materialize: create worker record scoped to the receiving site.
+  // worker_id is NULL because SMS workers are phone-identified, not tied to
+  // a core_profiles row. A real registration flow can fill it in later.
   const { data: newWorker, error } = await supabase
     .from('frm_site_workers')
     .insert({
       jobsite_id: siteId,
-      worker_id: crypto.randomUUID(),
+      worker_id: null,
       phone_e164: phone,
       display_name: null,
       first_seen_at: new Date().toISOString(),
