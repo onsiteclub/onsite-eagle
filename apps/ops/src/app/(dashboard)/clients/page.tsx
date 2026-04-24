@@ -64,19 +64,21 @@ export default async function ClientsPage() {
         const feePercent = c.fee_percent_override ?? operator.default_fee_percent
 
         return (
-          <Link
+          <div
             key={c.id}
-            href={`/statement?clientId=${c.id}`}
-            className="grid gap-4 py-4 border-b border-line items-center cursor-pointer hover:bg-paper-2 transition-colors"
-            style={{ gridTemplateColumns: '80px 1fr auto auto' }}
+            className="grid gap-4 py-4 border-b border-line items-center hover:bg-paper-2 transition-colors"
+            style={{ gridTemplateColumns: '80px 1fr auto auto auto' }}
           >
-            <div className="font-mono text-[13px] font-semibold text-ink">
+            <Link
+              href={`/statement?clientId=${c.id}`}
+              className="font-mono text-[13px] font-semibold text-ink"
+            >
               {initialsOf(c.display_name)}
-            </div>
-            <div>
+            </Link>
+            <Link href={`/statement?clientId=${c.id}`} className="block">
               <div className="font-bold text-[14px]">{c.display_name}</div>
               <div className="font-mono text-[11px] text-ink-3 mt-0.5">{c.email}</div>
-            </div>
+            </Link>
             <div className="font-mono text-[13px] font-semibold text-ink">
               {Number(feePercent)}%
             </div>
@@ -88,7 +90,14 @@ export default async function ClientsPage() {
             >
               {balanceLabel}
             </div>
-          </Link>
+            <Link
+              href={`/clients/${c.id}/edit`}
+              className="font-mono text-[11px] text-ink-3 hover:text-ink underline"
+              title="Editar cliente"
+            >
+              editar
+            </Link>
+          </div>
         )
       })}
     </>
