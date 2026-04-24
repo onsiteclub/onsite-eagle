@@ -53,6 +53,20 @@ jobs:
         working-directory: apps/operator_2
         run: npx expo prebuild --platform android --clean --no-install
 
+      - name: Decode signing keystore
+        if: ${{ inputs.build_type == 'release' }}
+        working-directory: apps/operator_2/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.OPERATOR2_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Missing OPERATOR2_KEYSTORE_BASE64 secret"
+            exit 1
+          fi
+          mkdir -p app/keystore
+          echo "$KEYSTORE_BASE64" | base64 -d > app/keystore/release.keystore
+          test -s app/keystore/release.keystore
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -64,10 +78,25 @@ jobs:
         working-directory: apps/operator_2/android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Build Release APK (unsigned)
+      - name: Build Release APK (signed)
         if: ${{ inputs.build_type == 'release' }}
         working-directory: apps/operator_2/android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.OPERATOR2_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.OPERATOR2_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.OPERATOR2_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file="$PWD/app/keystore/release.keystore" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
+            --no-daemon --stacktrace
+
+      - name: Clean up keystore
+        if: ${{ always() && inputs.build_type == 'release' }}
+        working-directory: apps/operator_2/android
+        run: rm -f app/keystore/release.keystore
 
       - name: Upload Debug APK
         if: ${{ inputs.build_type == 'debug' }}

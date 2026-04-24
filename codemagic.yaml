@@ -315,24 +315,103 @@ workflows:
     artifacts:
       - apps/timekeeper/build/**
 
+  # =============================================================================
+  # OPERATOR 2 — iOS Native Build (manual trigger)
+  # =============================================================================
+  #
+  # Manual dispatch only. Builds a signed IPA on a Mac mini M2 without EAS.
+  #
+  # Prerequisites in Codemagic UI before first run:
+  #
+  #   1. Integrations → App Store Connect → add an API key
+  #      (key ID, issuer ID, .p8 file). Note the integration name.
+  #
+  #   2. Code signing → iOS code signing → enable "Automatic" with the
+  #      App Store Connect integration above. Bundle id:
+  #      ca.onsiteclub.operator2 must be registered in your Apple
+  #      Developer account.
+  #
+  #   3. Environment variables → groups → "supabase_credentials" must
+  #      contain EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.
+  #
+  # Then trigger this workflow from the Codemagic UI (Builds → Start new
+  # build → workflow=operator-2-ios-release).
   ios-build-operator-2:
-    name: iOS Build — Operator 2 (EAS)
-    max_build_duration: 60
+    name: Operator 2 · iOS Release
+    max_build_duration: 90
     instance_type: mac_mini_m2
+
     environment:
-      node: 20
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: ca.onsiteclub.operator2
       groups:
-        - expo_credentials
+        - supabase_credentials
+      vars:
+        XCODE_WORKSPACE: 'apps/operator_2/ios/OnSiteOperator2.xcworkspace'
+        XCODE_SCHEME: 'OnSiteOperator2'
+        BUNDLE_ID: 'ca.onsiteclub.operator2'
+      node: 20
+      cocoapods: default
+      xcode: latest
+
     triggering:
-      events: []
+      events: []  # Manual dispatch only
+
     scripts:
-      - name: Install dependencies
-        script: npm ci
-      - name: Install EAS CLI
-        script: npm install -g eas-cli
-      - name: Build iOS
+      - name: Install Node dependencies (monorepo)
+        script: |
+          npm ci
+
+      - name: Write .env for Expo bundler
+        script: |
+          if [ -z "$EXPO_PUBLIC_SUPABASE_URL" ] || [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::error:: Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY in supabase_credentials group"
+            exit 1
+          fi
+          cd apps/operator_2
+          printf 'EXPO_PUBLIC_SUPABASE_URL=%s\n' "$EXPO_PUBLIC_SUPABASE_URL" >  .env
+          printf 'EXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_PUBLIC_SUPABASE_ANON_KEY" >> .env
+
+      - name: Expo prebuild (regenerate ios/)
         script: |
           cd apps/operator_2
-          eas build --platform ios --profile production --non-interactive
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: CocoaPods install
+        script: |
+          cd apps/operator_2/ios
+          pod install
+
+      - name: Set up provisioning profiles
+        script: |
+          xcode-project use-profiles
+
+      - name: Increment build number
+        script: |
+          cd apps/operator_2/ios
+          agvtool new-version -all $(($BUILD_NUMBER + 1))
+
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+
     artifacts:
-      - apps/operator_2/build/**
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - apps/operator_2/ios/build/*.dSYM
+
+    publishing:
+      # Uncomment after configuring App Store Connect integration to push
+      # the build automatically to TestFlight.
+      # app_store_connect:
+      #   auth: integration
+      #   submit_to_testflight: true
+      email:
+        recipients:
+          - cristony.bruno@gmail.com
+        notify:
+          success: true
+          failure: true
