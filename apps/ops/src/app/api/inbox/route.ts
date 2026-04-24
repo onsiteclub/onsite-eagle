@@ -1,4 +1,10 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import {
+  extractXmpMetadata,
+  normalizeXmpData,
+  parseSubjectLine,
+  type ExtractedInvoice,
+} from '@/lib/email/extract-xmp'
 import { createHash, timingSafeEqual } from 'crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -58,14 +64,47 @@ function isAuthorized(request: NextRequest): boolean {
   return timingSafeEqual(a, b)
 }
 
-function extractAmountFromSubject(subject: string | undefined): number | null {
-  if (!subject) return null
-  // Matches "$1,234.56", "$2840", "$ 2,840.50", etc.
-  const match = subject.match(/\$\s*([\d,]+(?:\.\d{1,2})?)/)
-  if (!match) return null
-  const cleaned = match[1].replace(/,/g, '')
-  const value = parseFloat(cleaned)
-  return Number.isFinite(value) ? value : null
+// 3-tier extraction cascade: XMP metadata → subject parse → manual_required.
+// See ops-directive-amendment-xmp.md for the contract.
+function extractInvoiceData(
+  pdfBuffer: Buffer,
+  subject: string | undefined | null,
+): ExtractedInvoice {
+  const xmp = extractXmpMetadata(pdfBuffer)
+  if (xmp) return normalizeXmpData(xmp)
+
+  const subjectData = parseSubjectLine(subject)
+  if (subjectData.invoice_number || subjectData.amount_gross > 0) {
+    return {
+      invoice_number: subjectData.invoice_number,
+      amount_gross: subjectData.amount_gross,
+      amount_hst: 0,
+      gc_name: null,
+      site_address: null,
+      issuer_email: null,
+      issuer_name: null,
+      company_name: null,
+      company_hst_number: null,
+      issued_at: null,
+      source: 'subject',
+      source_version: null,
+    }
+  }
+
+  return {
+    invoice_number: null,
+    amount_gross: 0,
+    amount_hst: 0,
+    gc_name: null,
+    site_address: null,
+    issuer_email: null,
+    issuer_name: null,
+    company_name: null,
+    company_hst_number: null,
+    issued_at: null,
+    source: 'manual_required',
+    source_version: null,
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -120,7 +159,17 @@ export async function POST(request: NextRequest) {
   )
 
   if (!pdfAttachment) {
-    // TODO (Sprint 2): log this email for operator to review later.
+    // Persist so the operator can review it in /inbox/unprocessed.
+    // Previously this email was silently 200'd and lost.
+    await supabase.from('ops_inbox_unprocessed').insert({
+      operator_id: operator.id,
+      from_email: fromEmail,
+      from_name: email.FromName ?? null,
+      subject: email.Subject ?? null,
+      received_at: email.Date,
+      raw_email_id: email.MessageID,
+      reason: 'no_pdf',
+    })
     return NextResponse.json({ ok: true, status: 'no_pdf' })
   }
 
@@ -171,10 +220,12 @@ export async function POST(request: NextRequest) {
     .eq('email', fromEmail)
     .maybeSingle()
 
-  // 7. Parse amount best-effort from subject
-  const amount = extractAmountFromSubject(email.Subject)
+  // 7. Extract invoice data via 3-tier cascade (XMP → subject → manual)
+  const extracted = extractInvoiceData(pdfBuffer, email.Subject)
 
-  // 8. Insert invoice
+  // 8. Insert invoice.
+  // `from_email` stays as the Postmark envelope address (source of truth for
+  // identity); XMP issuer_email is used only when Postmark's is missing.
   const { data: invoice, error: insertError } = await supabase
     .from('ops_invoices')
     .insert({
@@ -182,12 +233,17 @@ export async function POST(request: NextRequest) {
       client_id: client?.id ?? null,
       pdf_url: pdfPath,
       pdf_hash: pdfHash,
-      amount_gross: amount ?? 0,
+      invoice_number: extracted.invoice_number,
+      amount_gross: extracted.amount_gross,
+      amount_hst: extracted.amount_hst || null,
+      site_address: extracted.site_address,
       from_email: fromEmail,
-      from_name: email.FromName ?? null,
+      from_name: email.FromName ?? extracted.issuer_name,
       subject: email.Subject ?? null,
       received_at: email.Date,
       raw_email_id: email.MessageID,
+      source: extracted.source,
+      source_version: extracted.source_version,
       status: client ? 'pending' : 'new_sender',
     })
     .select('id')
@@ -202,7 +258,8 @@ export async function POST(request: NextRequest) {
     ok: true,
     status: client ? 'pending' : 'new_sender',
     invoice_id: invoice.id,
-    amount_parsed: amount,
+    source: extracted.source,
+    amount_parsed: extracted.amount_gross,
   })
 }
 
