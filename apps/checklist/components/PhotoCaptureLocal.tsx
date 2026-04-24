@@ -67,7 +67,7 @@ export default function PhotoCaptureLocal({
         return
       }
 
-      const base64 = await capturePhotoBase64({ prefix: itemCode })
+      const base64 = await capturePhotoBase64()
       onPhotosChanged([...photos, base64])
     } catch (err) {
       // User cancelled or plugin error

@@ -11,9 +11,6 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: [
     '@onsite/supabase',
-    '@onsite/auth',
-    '@onsite/auth-ui',
-    '@onsite/framing',
     '@onsite/export',
     '@onsite/tokens',
   ],

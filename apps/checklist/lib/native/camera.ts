@@ -1,19 +1,7 @@
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { isNativePlatform, convertFileSrc } from './platform'
-import { savePhotoFromCamera } from './filesystem'
-
-export interface CapturedPhoto {
-  /** Stable filesystem path (pass to readPhotoAsBlob later). */
-  localPath: string
-  /** URL loadable in <img src>. */
-  displayUrl: string
-  /** Unique identifier for this capture. */
-  id: string
-}
 
 interface CaptureOptions {
-  /** Prefix for the generated filename. Default: 'photo'. */
-  prefix?: string
   /** JPEG quality 0-100. Default: 72. */
   quality?: number
   /** Max dimension in pixels. Default: 1280. */
@@ -23,57 +11,9 @@ interface CaptureOptions {
 }
 
 /**
- * Capture a photo using the native camera plugin and persist it
- * to the app's sandboxed filesystem.
- *
- * Native-only: throws if called on web.
- */
-export async function capturePhoto(options: CaptureOptions = {}): Promise<CapturedPhoto> {
-  if (!isNativePlatform()) {
-    throw new Error('capturePhoto only works on native platforms')
-  }
-
-  const {
-    prefix = 'photo',
-    quality = 72,
-    maxDimension = 1280,
-    source = 'prompt',
-  } = options
-
-  const cameraSource =
-    source === 'camera' ? CameraSource.Camera : source === 'photos' ? CameraSource.Photos : CameraSource.Prompt
-
-  const photo = await Camera.getPhoto({
-    quality,
-    width: maxDimension,
-    height: maxDimension,
-    resultType: CameraResultType.Uri,
-    source: cameraSource,
-    saveToGallery: false,
-    correctOrientation: true,
-    presentationStyle: 'fullscreen',
-  })
-
-  if (!photo.path) {
-    throw new Error('Camera returned no path')
-  }
-
-  const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-  const filename = `${prefix}_${id}.jpg`
-
-  const saved = await savePhotoFromCamera(photo.path, filename)
-
-  return {
-    id,
-    localPath: saved.localPath,
-    displayUrl: saved.displayUrl,
-  }
-}
-
-/**
  * Capture a photo and return it as a base64 data URL.
- * Use this while the rest of the app still expects base64 strings
- * (Fase 1). Fase 2 migrates to filesystem-backed photos.
+ * Used by PhotoCaptureLocal on native platforms; on web the component
+ * uses a plain <input type="file">.
  */
 export async function capturePhotoBase64(
   options: Omit<CaptureOptions, 'source'> & { source?: 'camera' | 'photos' | 'prompt' } = {},

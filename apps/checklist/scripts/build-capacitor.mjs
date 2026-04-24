@@ -18,13 +18,12 @@ import { join } from 'node:path'
 
 const root = join(process.cwd())
 
-// Paths that must be hidden during static export.
-// Tuples are [active path, backup path].
+// Paths that must be hidden during static export. Only API routes and
+// dynamic [param] segments used by /self + /report live here now — the
+// authenticated flow and auth callbacks were removed when the app became
+// fully public. Tuples are [active path, backup path].
 const shelves = [
   ['app/api', 'app/__web_api_backup'],
-  ['app/auth', 'app/__web_auth_backup'],
-  ['middleware.ts', '__web_middleware_backup.ts'],
-  ['app/app/lot/[lotId]', 'app/app/lot/__web_lotId_backup'],
   ['app/report/[token]', 'app/report/__web_token_backup'],
   ['app/self/check/[transition]', 'app/self/check/__web_transition_backup'],
 ]
