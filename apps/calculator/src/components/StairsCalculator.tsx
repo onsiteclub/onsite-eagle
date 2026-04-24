@@ -3,11 +3,15 @@
 //
 // This is the restored/rewritten version (archive/StairsCalculator-v1.tsx.bak
 // was the pre-pressure-plate implementation). The new one delegates all math
-// to src/lib/calculator/stairs.ts and renders live compliance chips.
+// to src/engine/stairs.ts and renders live compliance chips.
 
 import { useEffect, useMemo, useState } from 'react';
-import { calculateStairs, type ComplianceKind } from '../lib/calculator/stairs';
-import { parseToInches, formatInches } from '../lib/calculator/engine';
+import {
+  calculateStairs,
+  parseToInches,
+  formatInches,
+  type ComplianceKind,
+} from '../engine';
 import type { RoutedIntent } from '../types/calculator';
 
 interface StairsCalculatorProps {

@@ -1,4 +1,4 @@
-// src/lib/calculator/stairs.ts
+// src/engine/stairs.ts
 // Phase 4.3 — stair geometry + Ontario Building Code 2024 compliance check.
 //
 // Input model: the carpenter knows the TOTAL RISE (floor-to-floor). Everything

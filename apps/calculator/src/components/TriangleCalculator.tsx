@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { parseToInches, formatInches } from '../lib/calculator/engine';
+import { parseToInches, formatInches } from '../engine';
 import type { RoutedIntent } from '../types/calculator';
 
 type SideType = 'a' | 'b' | 'c'; // a = base, b = height, c = hypotenuse

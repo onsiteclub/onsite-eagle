@@ -2,7 +2,7 @@
 // Hook principal para lógica da calculadora
 
 import { useState, useCallback } from 'react';
-import { calculate, type CalculationResult } from '../lib/calculator';
+import { calculate, type CalculationResult } from '../engine';
 import { saveCalculation, type InputMethod } from '../lib/calculations';
 import { sanitizeExpression } from '../lib/sanitize-expression';
 import { logger } from '../lib/logger';

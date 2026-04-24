@@ -3,7 +3,7 @@
 // Supports: in, ft, yd, mm, cm, m
 
 import { useState, useCallback, useEffect } from 'react';
-import { parseToInches } from '../lib/calculator/engine';
+import { parseToInches } from '../engine';
 import type { RoutedIntent } from '../types/calculator';
 
 type UnitType = 'in' | 'ft' | 'yd' | 'mm' | 'cm' | 'm';

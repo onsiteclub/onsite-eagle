@@ -1,0 +1,91 @@
+# OnSite Calculator — Plano de Refactor (Motor + UX)
+
+**Criado em:** 2026-04-23
+**Status:** executável
+**Escopo:** `apps/calculator/` no monorepo eagle. Sem branches, commits direto na `main` (convenção do ecossistema).
+
+> **Nota sobre o plano antigo.** Este documento **substitui as Fases 0–4** de [REFACTOR_AND_MIGRATION_PLAN.md](./REFACTOR_AND_MIGRATION_PLAN.md). O plano antigo continua válido como referência de longo prazo (Fase 5+: voz real, Sentry, monetização, iOS, Stairs/Triangle v2). Se houver conflito entre os dois, este prevalece até Fase D concluir.
+
+---
+
+## Objetivo
+
+Entregar uma Calculator funcional no monorepo com **motor puro testado, UX manual completa e parser de texto livre determinístico** — sem depender de nenhuma API externa. Esta fase **não** entrega voz, Whisper, GPT-4o, Sentry com DSN, Stripe, monetização nem iOS; esses ficam para o plano antigo depois de validada a UX.
+
+## Princípios de arquitetura
+
+**Motor puro.** O engine de cálculo vive num módulo TypeScript sem imports de React, `@supabase/*`, `fetch` ou `window`. Recebe input estruturado (JSON), retorna resultado estruturado. Testável em Node isolado.
+
+**UI consome, não reimplementa.** Componentes React chamam funções do motor. Qualquer lógica de arredondamento, conversão de unidade ou frações mora no motor — nunca duplicada na camada de apresentação.
+
+**Placeholder funcional de voz, não visual.** Enquanto voz real não existe, o input conversacional é um `<textarea>` que alimenta o mesmo parser determinístico que, no futuro, receberá a transcrição do Whisper. Isso permite dogfooding da UX conversacional hoje, sem chave de API.
+
+**Zero APIs externas até a UX estar validada.** Sem OpenAI, sem Sentry ativo, sem Stripe. Reduz custo, superfície de bug e dependência de segredo em env.
+
+---
+
+## Fase A — Motor isolado
+
+**Objetivo.** Portar o engine do repo standalone para um módulo TypeScript puro dentro de `apps/calculator/src/engine/` (ou promover para `packages/calc-engine` se a reutilização entre apps ficar óbvia).
+
+**Entregáveis.** Funções tipadas que recebem input estruturado (operação, operandos, unidades) e retornam resultado estruturado (valor, unidade canônica, formato de display). Cobertura das operações críticas: aritmética básica, frações imperiais, conversão imperial↔métrico, áreas/volumes, fórmulas de stairs (rise/run, total rise, number of risers). Suite de teste Vitest em `tests/unit/engine/` rodando em Node sem DOM.
+
+**Critério de saída.** `npm run test -- engine` passa com cobertura ≥80% nas funções exportadas. Engine importável de `./engine` sem puxar React no bundle. Nenhum teste usa mocks de rede ou Supabase.
+
+**Estimativa.** 3–4 dias (ajustes, não rewrite — o código já existe no standalone).
+
+## Fase B — UX manual em cima do motor
+
+**Objetivo.** Tela onde o usuário escolhe a operação, digita operandos com unidades e vê o resultado — sem auth, sem histórico, sem backend.
+
+**Entregáveis.** Uma única rota/tela com seletor de operação (dropdown ou chips), campos numéricos com unidade, botão de calcular e result panel. Reaproveitar [ConversationalCalculator.tsx](./src/components/ConversationalCalculator.tsx), [ResultPanel](./src/components/) e discovery chips existentes onde couberem. Sem dependência de `@onsite/auth`, `@onsite/supabase` ou `/api/*`. App roda offline.
+
+**Critério de saída.** Qualquer operação suportada pelo motor é executável manualmente pela UI, em Android físico, sem login e sem internet. Build Android via Codemagic continua verde.
+
+**Estimativa.** 3 dias.
+
+## Fase C — Camadas de produto
+
+**Objetivo.** Adicionar auth, persistência de histórico e privacy dashboard funcional por cima da UX validada na Fase B.
+
+**Entregáveis.** `@onsite/auth` + `@onsite/auth-ui` wired no App (já parcialmente existente, validar). Histórico de cálculos persistido em `ccl_calculations` com `user_id` correto. [PrivacyDashboard.tsx](./src/components/PrivacyDashboard.tsx) conectado a `/api/privacy/delete`, o que exige criar `src/lib/device.ts` gerando UUID persistido em Capacitor Preferences. Correção do bug conhecido em `lib/logger.ts`: trocar destino `app_logs` por `log_errors` conforme schema vigente (seção 8.14 do CLAUDE.md). Remover `@sentry/react` das dependências ou deixar sem DSN (decisão do humano antes de iniciar a fase).
+
+**Critério de saída.** Usuário anônimo faz cálculo e vê resultado; usuário logado faz cálculo e vê histórico persistido; usuário logado deleta dados pelo privacy dashboard e confirma no Supabase que as linhas sumiram. Logger escreve na tabela correta.
+
+**Estimativa.** 3–4 dias.
+
+## Fase D — Input conversacional com placeholder determinístico
+
+**Objetivo.** Campo de texto livre que parseia expressões em português/inglês construction-idiomáticas ("10 pés mais 3 polegadas", "área de 12 por 8", "20% de 150") e produz o mesmo input estruturado que a UI da Fase B consome.
+
+**Entregáveis.** Parser determinístico em `src/parser/` usando regex + lookup tables (unidades, operações, números por extenso). **Sem LLM.** Integração com a UI existente: ao enviar texto, o parser gera o input estruturado, o motor resolve, o result panel renderiza. Falhas de parse retornam mensagem amigável com sugestão ("não entendi 'mais ou menos 10 pés' — tente '10 pés'"). Contrato do parser fica documentado: é o mesmo contrato que Whisper+GPT alimentarão no futuro — por isso a Fase E (voz) do plano antigo fica trivial.
+
+**Critério de saída.** Calculator é 100% utilizável por texto livre, sem clicar em botões de operação, para as operações cobertas pelo motor. Suite de teste do parser em `tests/unit/parser/` com ≥30 frases-exemplo reais tiradas dos logs antigos do standalone.
+
+**Estimativa.** 4–5 dias.
+
+---
+
+## Fora de escopo explícito
+
+Whisper, GPT-4o, OpenAI, qualquer chamada para `/api/interpret`. Sentry com DSN real (desinstalar ou stub). Stripe e qualquer paywall. Build iOS (Android-only nesta fase — `ios/` fica congelado). Stairs/Triangle v2 (mantêm comportamento v1 ou escondem atrás de feature flag). Migração integral das 100 páginas do plano antigo — apenas o que cabe nas Fases A–D.
+
+## Dependências do repo protegido
+
+Portar do `onsite-calculator/` standalone (`main` @ `e6d1fd4`, 2026-02-24):
+
+**Motor.** `src/lib/calculator-engine.ts` e adjacentes — toda a lógica de frações imperiais, conversões, áreas, stairs. Portar para `apps/calculator/src/engine/`.
+
+**Parser.** Regex de percentagem, lookup de unidades (pés, polegadas, metros, sinônimos PT/EN), normalizador de números por extenso. Hoje espalhado em [api/interpret.ts](./api/interpret.ts) e arquivos adjacentes do standalone — consolidar em `apps/calculator/src/parser/`.
+
+**Testes.** `tests/unit/calculator.test.ts` do standalone (aritmética, frações, áreas) — migrar e expandir. Se houver suite de regressão de strings de entrada reais, trazer; caso contrário, extrair ≥30 amostras dos `core_voice_logs` já capturados.
+
+**Não portar.** Qualquer código do standalone que toque Supabase, Whisper, GPT-4o, Sentry, Stripe — esses ou já existem no monorepo ou ficam para fase futura.
+
+---
+
+## Checklist de saída (fim da Fase D)
+
+Build Android verde no Codemagic; `npm run validate` limpo. Usuário anônimo faz cálculo manual e por texto livre sem internet. Usuário logado tem histórico em `ccl_calculations` e consegue apagar tudo pelo privacy dashboard. Engine e parser com cobertura de teste ≥80%. Logger escreve em `log_errors`. Nenhuma variável de ambiente de API externa (OpenAI, Sentry DSN, Stripe) é necessária para build ou runtime. App instalável em Android físico a partir de APK gerado pelo pipeline padrão.
+
+**Estimativa total: 13–16 dias de trabalho focado.** Depois disso, reabrir o plano antigo para decidir Fase E (voz real) e monetização.

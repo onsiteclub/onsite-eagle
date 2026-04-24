@@ -1,4 +1,4 @@
-// tests/unit/engine-dimensional.test.ts
+// tests/unit/engine/engine-dimensional.test.ts
 // Phase 1 — Dimensional arithmetic regression tests.
 // The D1 bug: `25' 6 × 31' 6` used to produce "9900' 9" (lengths multiplied
 // as if they were scalars). This suite pins the correct behavior — the result
@@ -6,7 +6,7 @@
 // nested arithmetic.
 
 import { describe, it, expect } from 'vitest';
-import { calculate } from '../../src/lib/calculator';
+import { calculate } from '../../../src/engine';
 
 describe('Phase 1 — Dimensional engine: D1 regression', () => {
   it("25' 6 × 31' 6 = 803.25 sqft (was '9900' 9' under old scalar engine)", () => {

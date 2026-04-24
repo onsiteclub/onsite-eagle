@@ -1,16 +1,15 @@
-// src/lib/calculator/engine.ts
-// Engine de cálculo para medidas de construção (inches, feet, frações)
+// src/engine/engine.ts
+// Engine de cálculo para medidas de construção (inches, feet, frações).
 // Phase 1: dimensional arithmetic. Multiplicar dois comprimentos vira área;
 // multiplicar área por comprimento vira volume. Escalares adaptam ao contexto
 // (ex: `5 1/2 + 3 * 2` = 11.5 inches — o 3 e 2 são dimensionless e somam como
 // comprimento por coerção). Somas/subtrações entre dimensões explícitas diferentes
 // dão erro.
+//
+// Pure module: no React, no Supabase, no network I/O, no logger side effects.
+// Callers that want telemetry wrap `calculate()` on their side.
 
-import type {
-  CalculationResult,
-  DimensionType,
-} from '../../types/calculator';
-import { logger } from '../logger';
+import type { CalculationResult, DimensionType } from './types';
 
 // ============================================
 // TIPOS INTERNOS
@@ -486,8 +485,8 @@ export function calculate(expression: string): CalculationResult | null {
 
     const q = evaluateQuantity(tokens);
     return buildResultFromQuantity(q, expr);
-  } catch (error) {
-    logger.calculator.error(String(error), expr);
+  } catch {
+    // Engine is pure — swallow and return error result. Callers decide how to log.
     return buildErrorResult(expr);
   }
 }

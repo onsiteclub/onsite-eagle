@@ -1,8 +1,8 @@
-// tests/unit/stairs.test.ts
+// tests/unit/engine/stairs.test.ts
 // Phase 4.3 — stair geometry + OBC 2024 compliance.
 
 import { describe, it, expect } from 'vitest';
-import { calculateStairs } from '../../src/lib/calculator/stairs';
+import { calculateStairs } from '../../../src/engine';
 
 describe('calculateStairs — geometry', () => {
   it('derives step count from default 7" target (108" rise → 15 steps, ~7.2" each)', () => {

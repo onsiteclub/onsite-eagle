@@ -1,4 +1,4 @@
-// src/lib/calculator/triangle.ts
+// src/engine/triangle.ts
 // Phase 4.4 — triangle math beyond Pythagoras.
 //
 // Construction-specific helpers the carpenter actually uses on site:

@@ -1,4 +1,4 @@
-// tests/unit/triangle.test.ts
+// tests/unit/engine/triangle.test.ts
 // Phase 4.4 — triangle math beyond Pythagoras.
 
 import { describe, it, expect } from 'vitest';
@@ -9,7 +9,7 @@ import {
   miterAngle,
   isSquare,
   legsFromHypAndAngle,
-} from '../../src/lib/calculator/triangle';
+} from '../../../src/engine';
 
 describe('toPitch — rise/run → N-12 notation', () => {
   it('converts 7" rise over 12" run → 7-12', () => {

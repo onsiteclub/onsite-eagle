@@ -1,13 +1,13 @@
-// tests/unit/calculator.test.ts
+// tests/unit/engine/calculator.test.ts
 import { describe, it, expect } from 'vitest';
-import { 
-  calculate, 
-  parseToInches, 
-  formatInches, 
+import {
+  calculate,
+  parseToInches,
+  formatInches,
   formatTotalInches,
   tokenize,
-  evaluateTokens 
-} from '../../src/lib/calculator';
+  evaluateTokens,
+} from '../../../src/engine';
 
 describe('parseToInches', () => {
   it('parses whole numbers', () => {

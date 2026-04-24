@@ -7,7 +7,7 @@
 // Inline edit mode works in both variants.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { calculate } from '../lib/calculator';
+import { calculate } from '../engine';
 import ResultPanel from './ResultPanel';
 import type { CalculationResult, HistoryEntry } from '../types/calculator';
 import type { TabType } from './TabNavigation';
