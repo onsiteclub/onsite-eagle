@@ -101,7 +101,9 @@ export default function Visor({ result, onCopied }: VisorProps) {
           </div>
           {result.secondary && (
             <div className="visor-dual-block">
-              <div className="visor-dual-ulabel">{result.secondary.unitLabel}</div>
+              {result.secondary.unitLabel && (
+                <div className="visor-dual-ulabel">{result.secondary.unitLabel}</div>
+              )}
               <div className="visor-dual-value">{result.secondary.value}</div>
             </div>
           )}

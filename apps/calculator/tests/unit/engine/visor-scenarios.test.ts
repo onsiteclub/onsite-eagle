@@ -93,11 +93,13 @@ describe('Vol 2 — frações puras', () => {
 // ============================================================================
 
 describe('Vol 3 — comprimento imperial', () => {
-  it(`3.1 soma feet-inches: 2' 6" + 3' 6" = 6' 0"`, () => {
+  it(`3.1 soma feet-inches: 2' 6" + 3' 6" = 6' 0" (+ 72 In secondary)`, () => {
     const r = ok(`2' 6" + 3' 6"`);
     expect(r.dim).toBe(1);
     expect(r.primary.value).toBe(`6' 0"`);
-    expect(r.secondary).toBeNull();
+    // ≥ 12" length: secondary shows total inches in alt notation.
+    expect(r.secondary).not.toBeNull();
+    expect(r.secondary?.value).toBe('72');  // formatTotalInches gives "72" for whole inches
     expect(r.valueCanonical).toBe(72);
   });
 
@@ -130,11 +132,13 @@ describe('Vol 3 — comprimento imperial', () => {
 // ============================================================================
 
 describe('Vol 4 — comprimento métrico', () => {
-  it('4.1 metros com vírgula decimal: 3,5 m + 2,5 m = 6 m', () => {
+  it('4.1 metros com vírgula decimal: 3,5 m + 2,5 m = 6 m (+ cm secondary)', () => {
     const r = ok('3,5 m + 2,5 m');
     expect(r.dim).toBe(1);
     expect(r.primary.value).toMatch(/^6\s*m$/);
-    expect(r.secondary).toBeNull();
+    // Metric length always shows alt scale as secondary (m → cm here).
+    expect(r.secondary).not.toBeNull();
+    expect(r.secondary?.value).toMatch(/cm$/);
   });
 
   it('4.2 cm preserved when result fits: 50 cm + 30 cm = 80 cm', () => {
@@ -262,6 +266,30 @@ describe('Vol 8 — erros', () => {
 // ============================================================================
 // MATRIZ DE DECISÃO — verificação cruzada
 // ============================================================================
+
+describe('Length always dual (deviation from spec, per user feedback)', () => {
+  // The v3 spec table has "dim 1 / single-system → resultado único" but the
+  // user asked for both notations side-by-side ("o visor deveria ser em em
+  // inch e feet"). The engine now always populates secondary for length so
+  // the construction reader sees both forms without manual conversion.
+  it('imperial < 12" — primary inches, secondary decimal feet', () => {
+    const r = ok(`5 1/2" + 3 1/4"`);
+    expect(r.primary.value).toBe(`8 3/4"`);
+    expect(r.secondary).not.toBeNull();
+    expect(r.secondary?.value).toMatch(/'$/);   // ends with apostrophe (feet)
+  });
+  it('imperial ≥ 12" — primary feet+inches, secondary total inches', () => {
+    const r = ok(`5' + 5'`);
+    expect(r.primary.value).toBe(`10' 0"`);
+    expect(r.secondary).not.toBeNull();
+    expect(r.secondary?.value).toMatch(/120/);
+  });
+  it('metric mm — primary mm, secondary cm', () => {
+    const r = ok('100 mm + 50 mm');
+    expect(r.primary.value).toMatch(/mm/);
+    expect(r.secondary?.value).toMatch(/cm/);
+  });
+});
 
 describe('Decision matrix — invariantes', () => {
   it('error result: primary.value is empty + secondary is null', () => {

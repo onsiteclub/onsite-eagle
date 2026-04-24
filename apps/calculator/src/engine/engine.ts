@@ -475,6 +475,54 @@ function formatMetricLength(decimalInches: number, original: OriginalUnit): { di
   return { display: `${sign}${formatLocaleDecimal(m, 2)} m`, isApproximate: false };
 }
 
+// ----------------------------------------------------------------------------
+// Alt-notation builders for length results — give the user BOTH forms so the
+// construction reader can switch between feet+inches and total inches (or
+// metric mm/cm/m) at a glance, without having to mentally convert.
+// ----------------------------------------------------------------------------
+
+/** For an imperial length, return the OTHER notation as a secondary block.
+ *  - Primary < 12" (inches form like `8 3/4"`) → secondary in decimal feet.
+ *  - Primary ≥ 12" (feet+inches form) → secondary as total inches. */
+function altImperialLength(decimalInches: number): VisorSide | null {
+  if (decimalInches === 0) return null;
+  const abs = Math.abs(decimalInches);
+  if (abs >= 12) {
+    // Total inches with fraction (e.g. "120 In", "97 1/2 In").
+    return { value: formatTotalInches(decimalInches), unitLabel: null };
+  }
+  // Decimal feet — `0.73'`. Use the apostrophe so unit is unambiguous.
+  const feet = decimalInches / 12;
+  return { value: `${formatLocaleDecimal(feet, 3)}'`, unitLabel: null };
+}
+
+/** For a metric length, return the OTHER metric scale as a secondary block.
+ *  - Primary in mm → secondary in cm (or m if very large).
+ *  - Primary in cm (single-system, < 100cm) → secondary in mm.
+ *  - Primary in m → secondary in cm. */
+function altMetricLength(decimalInches: number, original: OriginalUnit): VisorSide | null {
+  if (decimalInches === 0) return null;
+  const negative = decimalInches < 0;
+  const sign = negative ? '−' : '';
+  const absMm = Math.abs(decimalInches) * 25.4;
+
+  if (original === 'mm') {
+    if (absMm < 1000) {
+      return { value: `${sign}${formatLocaleDecimal(absMm / 10, 2)} cm`, unitLabel: null };
+    }
+    return { value: `${sign}${formatLocaleDecimal(absMm / 1000, 3)} m`, unitLabel: null };
+  }
+  if (original === 'cm') {
+    const cm = absMm / 10;
+    if (cm < 100) {
+      return { value: `${sign}${formatLocaleDecimal(absMm, 0)} mm`, unitLabel: null };
+    }
+    return { value: `${sign}${formatLocaleDecimal(cm, 0)} cm`, unitLabel: null };
+  }
+  // Default (m or unknown): show cm as alt.
+  return { value: `${sign}${formatLocaleDecimal(absMm / 10, 1)} cm`, unitLabel: null };
+}
+
 function formatAreaImperial(decimalSqIn: number): string {
   const sqft = decimalSqIn / 144;
   return formatLocaleDecimal(sqft, 2);
@@ -758,7 +806,9 @@ function buildResultFromQuantity(q: Quantity, expression: string, mixedSystems: 
         dim: 1, dimension: 'length',
         mixedSystems: false,
         primary: { value: metric.display, unitLabel: null },
-        secondary: null,
+        // Alt-notation secondary so the user sees the value in another scale
+        // (mm ↔ cm, cm ↔ mm, m ↔ cm) without manual conversion.
+        secondary: altMetricLength(decimal, q.originalUnit),
         isApproximate: metric.isApproximate,
         exactForm: null,
         valueCanonical: decimal,
@@ -772,7 +822,9 @@ function buildResultFromQuantity(q: Quantity, expression: string, mixedSystems: 
       dim: 1, dimension: 'length',
       mixedSystems: false,
       primary: { value: imperial.display, unitLabel: null },
-      secondary: null,
+      // Alt-notation secondary: feet+inches ↔ inches-only, so the carpenter
+      // sees both forms without having to convert in their head.
+      secondary: altImperialLength(decimal),
       isApproximate: imperial.isApproximate,
       exactForm: null,
       valueCanonical: decimal,

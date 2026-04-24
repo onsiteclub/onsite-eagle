@@ -4059,6 +4059,9 @@
   color: var(--color-text-primary);
   line-height: 1;
   letter-spacing: -0.02em;
+  /* Tiny right padding so a trailing inch quote (`"`) doesn't get cropped by
+     the negative letter-spacing or the container's right edge. */
+  padding-right: 4px;
 }
 
 /* Dual-result variant (mixedSystems OR dim ≥ 2). */
@@ -4090,6 +4093,7 @@
   color: var(--color-text-primary);
   line-height: 1;
   letter-spacing: -0.02em;
+  padding-right: 4px;  /* same trailing-quote crop fix as .visor-result */
 }
 
 /* Hint line under result — used for "≈ · exato: 10/3" and approx-flag. */
