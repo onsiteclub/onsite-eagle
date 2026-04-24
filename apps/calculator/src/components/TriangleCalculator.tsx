@@ -198,7 +198,24 @@ export default function TriangleCalculator({
   };
 
   return (
-    <div className="easy-square">
+    <div className="easy-square tab-desktop-3col">
+      {/* Desktop-only left-column info panel. Hidden on mobile via CSS. */}
+      <aside className="tab-info" aria-label="Esquadro — instruções">
+        <h3>Esquadro</h3>
+        <p>
+          Toque em um dos três lados para editar; o terceiro se calcula via Pitágoras.
+        </p>
+        <h4>Regras</h4>
+        <ul>
+          <li><strong>A</strong> — base (inferior)</li>
+          <li><strong>B</strong> — altura (direita)</li>
+          <li><strong>C</strong> — hipotenusa (diagonal)</li>
+        </ul>
+        <p className="tab-info__muted">
+          Presets 3-4-5 e 6-8-10 validam esquadro na prática. Tap na preset pra testar.
+        </p>
+      </aside>
+
       {/* Content Container */}
       <div className="content-container">
         {/* Triangle visual with inputs */}
@@ -276,6 +293,9 @@ export default function TriangleCalculator({
         </div>
       </div>
 
+      {/* Right-column controls wrapper (display:contents on mobile, grid cell
+          on desktop — groups fraction pad + keypad into the third column). */}
+      <div className="tab-controls">
       {/* Fraction Pad */}
       <div className="easy-square-fractions">
         {FRACTION_PAD.flat().map((frac, i) => (
@@ -314,6 +334,7 @@ export default function TriangleCalculator({
           <button className="easy-square-key" onClick={() => handleKeyPress('.')}>.</button>
         </div>
       </div>
+      </div>{/* /.tab-controls */}
     </div>
   );
 }

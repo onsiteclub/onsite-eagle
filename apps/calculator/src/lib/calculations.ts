@@ -1,12 +1,12 @@
 // src/lib/calculations.ts
-// Persistência de cálculos no Supabase
-// Schema definido por Blueprint (Blue)
+// Persists successful calculations to ccl_calculations. No-op for anon users
+// or when Supabase is not configured. Schema unchanged — we map the v3 result
+// shape to the existing `result_*` columns.
 
 import { supabase, isSupabaseEnabled } from './supabase';
 import { logger } from '@onsite/logger';
 import type { CalculationResult } from '../types/calculator';
 
-// Tipos do schema calculations
 type CalcType = 'length' | 'area' | 'volume' | 'material' | 'conversion' | 'custom';
 export type InputMethod = 'keypad' | 'voice' | 'camera';
 
@@ -32,47 +32,26 @@ interface CalculationRecord {
   created_at?: string;
 }
 
-/**
- * Detecta o tipo de cálculo baseado na expressão
- */
-function detectCalcType(_expression: string, isInchMode: boolean): CalcType {
-  // Se tem medidas de construção
-  if (isInchMode) {
-    return 'length';
+function detectCalcType(result: CalculationResult): CalcType {
+  switch (result.dimension) {
+    case 'length': return 'length';
+    case 'area':   return 'area';
+    case 'volume': return 'volume';
+    default:       return 'custom';
   }
-
-  // TODO: Detectar conversões quando implementado
-  // if (_expression.includes('to') || _expression.includes('→')) {
-  //   return 'conversion';
-  // }
-
-  // Por enquanto, decimal puro é 'custom'
-  return 'custom';
 }
 
-/**
- * Detecta o subtipo do cálculo
- */
-function detectCalcSubtype(expression: string, isInchMode: boolean): string {
-  if (isInchMode) {
-    if (expression.includes("'") && expression.includes('"')) {
-      return 'feet_inches';
-    }
-    if (expression.includes("'")) {
-      return 'feet_only';
-    }
-    if (expression.includes('"') || expression.includes('/')) {
-      return 'inches_fractions';
-    }
-    return 'mixed';
+function detectCalcSubtype(result: CalculationResult): string {
+  if (result.dimension === 'length') {
+    if (result.mixedSystems) return 'mixed_systems';
+    return result.primary.unitLabel ?? 'length';
   }
+  if (result.dimension === 'area') return 'area';
+  if (result.dimension === 'volume') return 'volume';
   return 'decimal';
 }
 
-/**
- * Salva um cálculo no banco de dados
- * Chamado após cada compute() bem-sucedido
- */
+/** Persist a successful calculation. Skips silently for anon / supabase-off. */
 export async function saveCalculation(
   result: CalculationResult,
   options: {
@@ -81,31 +60,36 @@ export async function saveCalculation(
     voiceLogId?: string;
     tradeContext?: string;
     appVersion?: string;
-  } = {}
+  } = {},
 ): Promise<string | null> {
-  // Não salvar se Supabase não está disponível
+  if (result.isError) return null;
   if (!isSupabaseEnabled() || !supabase) {
     logger.debug('DB', 'Supabase not enabled, skipping save');
     return null;
   }
-
-  // Não salvar se não tiver usuário (modo anônimo)
   if (!options.userId) {
     logger.debug('DB', 'No userId provided, skipping save');
     return null;
   }
 
-  logger.debug('DB', 'Saving calculation');
+  // Best-effort numeric back-out for the legacy `result_value` column.
+  // Strip locale separators + non-numeric glyphs before parseFloat.
+  const numericRaw = result.primary.value
+    .replace(/[. ]/g, '')   // PT thousand separators
+    .replace(/,/g, '.')           // PT decimal comma
+    .replace(/[^\d.\-−]/g, '')
+    .replace(/−/g, '-');
+  const numericValue = parseFloat(numericRaw);
 
   try {
     const record: CalculationRecord = {
       user_id: options.userId,
-      calc_type: detectCalcType(result.expression, result.isInchMode),
-      calc_subtype: detectCalcSubtype(result.expression, result.isInchMode),
+      calc_type: detectCalcType(result),
+      calc_subtype: detectCalcSubtype(result),
       input_expression: result.expression,
-      result_value: result.resultDecimal,
-      result_unit: result.isInchMode ? 'inches' : 'decimal',
-      result_formatted: result.isInchMode ? result.resultFeetInches : String(result.resultDecimal),
+      result_value: isFinite(numericValue) ? numericValue : undefined,
+      result_unit: result.primary.unitLabel ?? (result.dimension === 'length' ? 'inches' : 'decimal'),
+      result_formatted: result.primary.value,
       input_method: options.inputMethod || 'keypad',
       voice_log_id: options.voiceLogId,
       trade_context: options.tradeContext,
@@ -123,12 +107,10 @@ export async function saveCalculation(
       console.error('[Calculations] Error saving:', error.message, error);
       return null;
     }
-
-    logger.debug('DB', 'Calculation saved successfully', { id: data?.id });
+    logger.debug('DB', 'Calculation saved', { id: data?.id });
     return data?.id || null;
   } catch (err) {
     console.error('[Calculations] Exception saving:', err);
     return null;
   }
 }
-

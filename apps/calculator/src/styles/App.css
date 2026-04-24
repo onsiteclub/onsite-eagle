@@ -3859,3 +3859,265 @@
     transform: scaleY(0.6);
   }
 }
+
+/* ============================================================================
+   SHARED DESKTOP 3-COLUMN LAYOUT for sibling tabs (Stairs, Triangle, Converter)
+   ----------------------------------------------------------------------------
+   Mobile: no effect — tabs keep their flex-column stack.
+   Desktop (>=1024px): the tab root becomes a 3-column grid that mirrors the
+   Calculator's `conv-main` pattern (sidebar | focus | controls), so the four
+   tabs share a visual rhythm. Each tab opts in by adding `.tab-desktop-3col`
+   to its root element and optionally structures itself with:
+     .tab-info     — left column (descriptive / reference panel)
+     .tab-main     — center column (the tab's primary display)
+     .tab-controls — right column (keypad + fraction pad wrapper)
+   Stairs is the exception: its three existing <section>s map directly to the
+   three columns, so it doesn't need the wrapper classes.
+   ============================================================================ */
+
+/* Mobile defaults — the wrapper elements pass through so existing stacked
+   layouts continue to work. Desktop promotes them to real grid children. */
+.tab-info { display: none; }
+.tab-controls { display: contents; }
+
+@media (min-width: 1024px) {
+  .tab-desktop-3col {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr) 340px;
+    grid-template-rows: 1fr;
+    gap: 16px;
+    padding: 20px 24px;
+    max-width: 1280px;
+    margin: 0 auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    align-items: stretch;
+  }
+
+  /* Grid-area assignment for the opt-in wrapper children. */
+  .tab-desktop-3col .tab-info     { grid-column: 1; }
+  .tab-desktop-3col .tab-main,
+  .tab-desktop-3col .content-container { grid-column: 2; }
+  .tab-desktop-3col .tab-controls { grid-column: 3; }
+
+  /* Left-column info panel. Same visual vocabulary as the Calculator
+     sidebar — card background, compact padding, uppercase title. */
+  .tab-desktop-3col .tab-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: var(--gradient-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    align-self: start;
+  }
+  .tab-info h3 {
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    color: var(--color-text-tertiary);
+    margin: 0;
+  }
+  .tab-info h4 {
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: var(--color-text-tertiary);
+    margin: 8px 0 0;
+  }
+  .tab-info p,
+  .tab-info li {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    margin: 0;
+  }
+  .tab-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tab-info__muted {
+    color: var(--color-text-tertiary);
+    font-size: 0.78rem;
+  }
+
+  /* Center-column main display keeps the card background so it reads as a
+     bounded surface instead of the edge-to-edge bleed we had on mobile. */
+  .tab-desktop-3col .content-container,
+  .tab-desktop-3col .tab-main {
+    background: var(--gradient-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Right-column controls wrap the fraction pad + keypad. */
+  .tab-desktop-3col .tab-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    background: var(--gradient-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    align-self: start;
+  }
+  .tab-desktop-3col .tab-controls .easy-square-fractions,
+  .tab-desktop-3col .tab-controls .easy-square-keypad {
+    flex-shrink: 0;
+  }
+
+  /* --------------------------------------------------------------------
+     Stairs: three <section>s map 1:1 to the three grid columns — the
+     component already carries its own semantic structure, so we skip the
+     .tab-info/.tab-main/.tab-controls wrappers.
+     -------------------------------------------------------------------- */
+  .stairs-panel.tab-desktop-3col {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    padding: 20px 24px;
+    overflow: visible;
+    height: auto;
+    max-height: none;
+  }
+  .stairs-panel.tab-desktop-3col .stairs-panel__inputs,
+  .stairs-panel.tab-desktop-3col .stairs-panel__output,
+  .stairs-panel.tab-desktop-3col .stairs-panel__compliance {
+    background: var(--gradient-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    padding: 16px;
+    align-self: start;
+  }
+}
+
+
+/* ============================================================================
+   VISOR (v3 spec) — pure result-display component.
+   Cream surface, mono right-aligned, expression on top, result(s) below.
+   Implements decision matrix: scalar/length-single → single value;
+   length-mixed → dual with imperial/métrico labels; area/volume → dual with
+   sq ft / m² etc. Error state replaces value with the word "Erro" + message.
+   ============================================================================ */
+
+.visor {
+  background: var(--color-surface-card-top);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-lg, 12px);
+  padding: 18px 22px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  text-align: right;
+  color: var(--color-text-primary);
+  min-height: 132px;
+}
+
+.visor--empty .visor-result {
+  color: var(--color-text-tertiary);
+}
+
+.visor-label {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-text-tertiary);
+  text-align: left;
+  margin-bottom: 2px;
+}
+
+/* "Armação" — small expression line above the result. Greyed, wraps cleanly. */
+.visor-expr {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+/* Single-result variant (scalar, single-system length). */
+.visor-result {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 38px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Dual-result variant (mixedSystems OR dim ≥ 2). */
+.visor-dual {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.visor-dual-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.visor-dual-ulabel {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-text-tertiary);
+}
+
+.visor-dual-value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Hint line under result — used for "≈ · exato: 10/3" and approx-flag. */
+.visor-hint {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* Error state — Vol 8. */
+.visor-error .visor-result {
+  font-size: 30px;
+  color: var(--color-text-secondary);
+}
+
+.visor-error-msg {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+/* Slightly bigger on desktop. */
+@media (min-width: 1024px) {
+  .visor {
+    padding: 24px 28px 22px;
+    min-height: 168px;
+  }
+  .visor-result { font-size: 48px; }
+  .visor-dual-value { font-size: 32px; }
+  .visor-expr { font-size: 14px; }
+}

@@ -21,7 +21,7 @@ function parsedExpr(input: string): string {
 describe('parseExpression — basic Portuguese arithmetic', () => {
   it('digits only: "10 mais 3" → "10 + 3"', () => {
     expect(parsedExpr('10 mais 3')).toBe('10 + 3');
-    expect(calculate(parsedExpr('10 mais 3'))?.resultDecimal).toBe(13);
+    expect(calculate(parsedExpr('10 mais 3'))?.valueCanonical).toBe(13);
   });
 
   it('word numbers: "dez mais três" → "10 + 3"', () => {
@@ -30,17 +30,17 @@ describe('parseExpression — basic Portuguese arithmetic', () => {
 
   it('subtraction: "vinte menos cinco" → "20 - 5"', () => {
     expect(parsedExpr('vinte menos cinco')).toBe('20 - 5');
-    expect(calculate(parsedExpr('vinte menos cinco'))?.resultDecimal).toBe(15);
+    expect(calculate(parsedExpr('vinte menos cinco'))?.valueCanonical).toBe(15);
   });
 
   it('multiplication: "cinco vezes quatro" → "5 * 4"', () => {
     expect(parsedExpr('cinco vezes quatro')).toBe('5 * 4');
-    expect(calculate(parsedExpr('cinco vezes quatro'))?.resultDecimal).toBe(20);
+    expect(calculate(parsedExpr('cinco vezes quatro'))?.valueCanonical).toBe(20);
   });
 
   it('division: "dez dividido por dois" → "10 / 2"', () => {
     expect(parsedExpr('dez dividido por dois')).toBe('10 / 2');
-    expect(calculate(parsedExpr('dez dividido por dois'))?.resultDecimal).toBe(5);
+    expect(calculate(parsedExpr('dez dividido por dois'))?.valueCanonical).toBe(5);
   });
 
   it('compound tens: "vinte e cinco" → "25"', () => {
@@ -73,7 +73,7 @@ describe('parseExpression — imperial units (feet, inches)', () => {
     const expr = parsedExpr('dez pés mais três polegadas');
     expect(expr).toBe(`10 ' + 3 "`);
     // Engine reads "10 ' + 3 \"" as 10 feet plus 3 inches = 123 inches.
-    expect(calculate(expr)?.resultDecimal).toBe(123);
+    expect(calculate(expr)?.valueCanonical).toBe(123);
   });
 
   it('inches fraction word: "meia polegada" → "1/2 \\""', () => {
@@ -100,7 +100,7 @@ describe('parseExpression — imperial units (feet, inches)', () => {
 describe('parseExpression — area / multiplication shorthand', () => {
   it('area: "12 por 8" → "12 * 8"', () => {
     expect(parsedExpr('12 por 8')).toBe('12 * 8');
-    expect(calculate(parsedExpr('12 por 8'))?.resultDecimal).toBe(96);
+    expect(calculate(parsedExpr('12 por 8'))?.valueCanonical).toBe(96);
   });
 
   it('area with units: "12 pés por 8 pés" → "12 \' * 8 \'"', () => {
@@ -120,7 +120,7 @@ describe('parseExpression — area / multiplication shorthand', () => {
 
   it('volume (three operands): "2 por 3 por 4" → "2 * 3 * 4"', () => {
     expect(parsedExpr('2 por 3 por 4')).toBe('2 * 3 * 4');
-    expect(calculate(parsedExpr('2 por 3 por 4'))?.resultDecimal).toBe(24);
+    expect(calculate(parsedExpr('2 por 3 por 4'))?.valueCanonical).toBe(24);
   });
 
   it('English "by": "twelve by eight" → "12 * 8"', () => {
@@ -131,7 +131,7 @@ describe('parseExpression — area / multiplication shorthand', () => {
 describe('parseExpression — percentage', () => {
   it('"20% de 150" → "150 * 20%"', () => {
     expect(parsedExpr('20% de 150')).toBe('150 * 20%');
-    expect(calculate(parsedExpr('20% de 150'))?.resultDecimal).toBe(30);
+    expect(calculate(parsedExpr('20% de 150'))?.valueCanonical).toBe(30);
   });
 
   it('"20 por cento de 150" → "150 * 20%"', () => {
@@ -154,7 +154,7 @@ describe('parseExpression — percentage', () => {
 
   it('decimal percent: "12.5% de 200" → "200 * 12.5%"', () => {
     expect(parsedExpr('12.5% de 200')).toBe('200 * 12.5%');
-    expect(calculate(parsedExpr('12.5% de 200'))?.resultDecimal).toBe(25);
+    expect(calculate(parsedExpr('12.5% de 200'))?.valueCanonical).toBe(25);
   });
 });
 
@@ -179,7 +179,7 @@ describe('parseExpression — fractions', () => {
     const expr = parsedExpr('cinco e meio mais três e um quarto');
     expect(expr).toBe('5 1/2 + 3 1/4');
     // 5.5 + 3.25 = 8.75 inches.
-    expect(calculate(expr)?.resultDecimal).toBeCloseTo(8.75, 5);
+    expect(calculate(expr)?.valueCanonical).toBeCloseTo(8.75, 5);
   });
 
   it('English fraction: "three quarters" → "3/4"', () => {
@@ -193,7 +193,7 @@ describe('parseExpression — fractions', () => {
     // so this path is exercised weakly — prioritize PT for MVP.)
     const r = parseExpression('five and a half');
     if (r.ok) {
-      const n = calculate(r.expression)?.resultDecimal ?? NaN;
+      const n = calculate(r.expression)?.valueCanonical ?? NaN;
       expect([5.5, 5].includes(n) || Math.abs(n - 5.5) < 0.01).toBe(true);
     }
   });
@@ -202,7 +202,7 @@ describe('parseExpression — fractions', () => {
 describe('parseExpression — decimal and thousands', () => {
   it('decimal dot: "3.5 mais 2.5" → "3.5 + 2.5"', () => {
     expect(parsedExpr('3.5 mais 2.5')).toBe('3.5 + 2.5');
-    expect(calculate(parsedExpr('3.5 mais 2.5'))?.resultDecimal).toBe(6);
+    expect(calculate(parsedExpr('3.5 mais 2.5'))?.valueCanonical).toBe(6);
   });
 
   it('decimal comma (PT): "3,5 mais 2,5" → "3.5 + 2.5"', () => {

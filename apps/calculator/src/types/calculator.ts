@@ -1,21 +1,20 @@
 // src/types/calculator.ts
 // UI, voice and history types for the Calculator app.
-// Engine-owned contract types (CalculationResult, DimensionType, CanonicalUnit,
-// Token) live in `src/engine/types.ts` and are re-exported here for backward
-// compatibility with existing consumers. New code should import engine types
-// directly from `src/engine`.
+// Engine-owned contract types live in `src/engine/types.ts`; we re-export the
+// ones that consumers also reference.
 
 export type {
   CalculationResult,
   DimensionType,
-  CanonicalUnit,
+  Dim,
+  OriginalUnit,
+  System,
+  EngineErrorKind,
+  VisorSide,
   Token,
 } from '../engine/types';
 
-import type {
-  DimensionType,
-  CanonicalUnit,
-} from '../engine/types';
+import type { DimensionType, VisorSide } from '../engine/types';
 
 export type VoiceState = 'idle' | 'recording' | 'processing';
 
@@ -38,26 +37,33 @@ export interface VoiceResponse {
   voice_log_id?: string;
 }
 
+/** A persisted history entry — same shape the v3 visor consumes for replay,
+ *  with metadata about how the expression was produced. */
 export interface HistoryEntry {
   id: string;
-  expression: string;
-  resultFeetInches: string;
-  resultTotalInches: string;
-  resultDecimal: number;
-  isInchMode: boolean;
   timestamp: number;
 
-  /** How the expression was produced. Older entries may lack this field. */
+  /** Normalized armação (the expression line shown above the result). */
+  expression: string;
+
+  /** Dimension. Drives icon/label and re-evaluation hints. */
+  dimension: DimensionType;
+
+  /** Pre-formatted display strings — same shape as a fresh CalculationResult. */
+  primary: VisorSide;
+  secondary: VisorSide | null;
+
+  /** True when input mixed imperial + metric (changes how the visor labels
+   *  the secondary block). */
+  mixedSystems: boolean;
+
+  isApproximate: boolean;
+  exactForm: string | null;
+
+  /** How the expression entered the app. */
   inputMethod?: 'manual' | 'voice';
   /** Raw Whisper transcription, when inputMethod === 'voice' and user consented. */
   transcription?: string;
   /** Server-side voice_log UUID, when the voice pipeline persisted a row. */
   voiceLogId?: string;
-
-  // Phase 1 — dimensional fields. Optional for backward compat with older
-  // persisted entries; when present they drive the card display.
-  dimension?: DimensionType;
-  unitCanonical?: CanonicalUnit;
-  displayPrimary?: string;
-  displaySecondary?: string;
 }

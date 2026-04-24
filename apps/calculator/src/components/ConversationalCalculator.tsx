@@ -1,9 +1,22 @@
 // src/components/ConversationalCalculator.tsx
-// Phase 3.2 — chat-style calculator. Scrollable conversation at the top,
-// composer (expression + keypad + voice) at the bottom.
-// Replaces the classic two-card layout for the Calculator tab.
+// v3 visor-driven Calculator tab.
+//
+// Responsibilities (post-spec):
+//   - Render a single <Visor/> showing the latest CalculationResult.
+//   - Composer input (text field + on-screen keypad + fraction pad + voice).
+//   - Voice pipeline (record → /api/interpret → engine), kept intact.
+//   - Tab routing for stairs/triangle/converter intents.
+//   - History persistence: every successful compute is appended; the modal
+//     is opened by the HamburgerMenu via a `calc:open-history` window event,
+//     and tapping an entry rehydrates the composer.
+//
+// Removed (per spec):
+//   - Stacked card feed in the body
+//   - Desktop sidebar with compact recent-history
+//   - Pills (manual / dim labels) and per-card buttons (copy / edit / retry)
+//   - Empty-state discovery chips (the visor empty state covers this)
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useCalculator, useOnlineStatus, useVoiceRecorder, useCalculatorHistory } from '../hooks';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -14,13 +27,12 @@ import { supabase } from '../lib/supabase';
 import { parseExpression } from '../parser';
 import VoiceConsentModal from './VoiceConsentModal';
 import Toast from './Toast';
-import ConversationCard from './ConversationCard';
 import { HistoryModal } from './HistoryModal';
 import VoiceOverlay from './VoiceOverlay';
+import Visor from './Visor';
 import type { HistoryEntry, VoiceState, VoiceResponse, RoutedIntent } from '../types/calculator';
 import type { TabType } from './TabNavigation';
 
-// Same keypad grammar as the classic Calculator — users' muscle memory preserved.
 const FRACTION_PAD = [
   ['1/8"', '1/4"', '3/8"', '1/2"'],
   ['5/8"', '3/4"', '7/8"', "'ft"],
@@ -34,16 +46,6 @@ const KEYPAD = [
   ['0', '.', '='],
 ];
 
-// Step 3 — empty-state discovery chips. Each example exercises a different
-// dimension so users see the engine handles fractions, area, and volume,
-// not just simple math. Tapping a chip pre-fills the composer; user still
-// has to press "=" so there's no surprise commit.
-const EMPTY_STATE_EXAMPLES: ReadonlyArray<{ label: string; expression: string }> = [
-  { label: 'fração',  expression: '5 1/2 + 3 1/4' },
-  { label: 'área',    expression: `5' * 10'` },
-  { label: 'volume',  expression: `2' * 3' * 4'` },
-];
-
 const getApiEndpoint = () => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   if (Capacitor.isNativePlatform()) return 'https://onsite-calculator.vercel.app/api/interpret';
@@ -51,34 +53,26 @@ const getApiEndpoint = () => {
 };
 const API_ENDPOINT = getApiEndpoint();
 
+/** Window event the HamburgerMenu dispatches to open the history modal.
+ *  Decoupled because the menu lives outside this component's tree. */
+const OPEN_HISTORY_EVENT = 'calc:open-history';
+
 interface ConversationalCalculatorProps {
   voiceState: VoiceState;
   setVoiceState: (state: VoiceState) => void;
   hasVoiceAccess: boolean;
-  /** Phase C — when present, compute() persists each calculation to
-   *  `ccl_calculations` keyed by this user id. null/undefined keeps the
-   *  calculation local-only (anon mode). */
   userId?: string | null;
   onVoiceUpgradeClick: () => void;
   onVoiceUsed?: () => void;
-  /** Phase 4.2 / Step 2 — when voice returns an intent like "stairs" or
-   *  "triangle", the parent can auto-switch to that tab. The optional
-   *  `intent` payload lets the destination pre-fill its form. No-op if not
-   *  provided. */
   onIntentRouted?: (tab: TabType, intent?: RoutedIntent) => void;
-  /** Step 6 — user-driven "não foi isso?" escape hatch on the focal card.
-   *  Simple tab switch; no data is handed off because the user already
-   *  rejected our guess. */
   onAltInterpretation?: (tab: TabType) => void;
 }
 
-/** Phase 4.2 — maps GPT's intent field to the tab it corresponds to. */
 function tabForIntent(intent: string | undefined): TabType | null {
   switch (intent) {
     case 'stairs':     return 'stairs';
     case 'triangle':   return 'triangle';
     case 'conversion': return 'converter';
-    // calculation / area / volume / unclear stay in the main chat.
     default: return null;
   }
 }
@@ -91,7 +85,6 @@ export default function ConversationalCalculator({
   onVoiceUpgradeClick,
   onVoiceUsed,
   onIntentRouted,
-  onAltInterpretation,
 }: ConversationalCalculatorProps) {
   const isOnline = useOnlineStatus();
   const [showConsentModal, setShowConsentModal] = useState(false);
@@ -99,19 +92,15 @@ export default function ConversationalCalculator({
   const [hasVoiceConsent, setHasVoiceConsent] = useState<boolean | null>(null);
   const [hasVoiceTrainingConsent, setHasVoiceTrainingConsent] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'info' | 'success' } | null>(null);
-  // Desktop sidebar's "ver todos →" opens the full-history modal (same component
-  // the classic UI used — we just keep it around for overflow).
   const [showFullHistory, setShowFullHistory] = useState(false);
-  // Live transcription preview — shown while the pipeline is running so the user
-  // sees "you said X → we understood Y → result" in real time, not just at the end.
   const [pendingTranscription, setPendingTranscription] = useState<string | null>(null);
 
-  const { history, addToHistory, updateEntry, clearHistory } = useCalculatorHistory();
-
+  const { history, addToHistory, clearHistory } = useCalculatorHistory();
   const {
     expression,
     setExpression,
     setExpressionAndCompute,
+    lastResult,
     clear,
     backspace,
     appendKey,
@@ -119,14 +108,14 @@ export default function ConversationalCalculator({
     appendOperator,
   } = useCalculator();
 
-  // Auto-scroll to the newest card whenever the conversation grows.
-  const conversationRef = useRef<HTMLDivElement>(null);
+  // Open history when the HamburgerMenu fires the event.
   useEffect(() => {
-    const el = conversationRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [history.length, voiceState, pendingTranscription]);
+    const handler = () => setShowFullHistory(true);
+    window.addEventListener(OPEN_HISTORY_EVENT, handler);
+    return () => window.removeEventListener(OPEN_HISTORY_EVENT, handler);
+  }, []);
 
-  // Microphone consent check on mount (App Store requirement: ask before getUserMedia).
+  // Microphone consent check on mount.
   useEffect(() => {
     if (voiceConsentChecked) return;
     const status = getLocalConsentStatus('microphone_usage');
@@ -145,7 +134,7 @@ export default function ConversationalCalculator({
     }
 
     setVoiceState('processing');
-    setPendingTranscription('…'); // Shows a ghost card while Whisper runs.
+    setPendingTranscription('…');
 
     const formData = new FormData();
     formData.append('file', audioBlob, 'recording.webm');
@@ -181,11 +170,6 @@ export default function ConversationalCalculator({
         parameters?: Record<string, unknown>;
       };
 
-      // Phase 4.2 / Step 2 — route to the right tab if the GPT intent says so.
-      // The parent swaps view; this component stops being mounted a tick later.
-      // The intent payload (expression + parameters) travels with the route so
-      // the destination tab can pre-fill its form and the user sees their voice
-      // input immediately reflected, not a blank screen.
       if (onIntentRouted) {
         const targetTab = tabForIntent(data.intent);
         if (targetTab) {
@@ -209,20 +193,18 @@ export default function ConversationalCalculator({
         logger.voice.apiCall(duration, true, {
           status: response.status,
           expression: data.expression,
-          result: result?.resultDecimal,
+          result: result?.primary.value,
         });
-        if (result) {
+        if (result && !result.isError) {
           addToHistory(result, {
             inputMethod: 'voice',
-            // Only store transcription when the user opted in — privacy.
             transcription: hasVoiceTrainingConsent ? data.expression : undefined,
             voiceLogId: data.voice_log_id,
           });
-          // Clear the composer: the result now lives in a card.
           setExpression('');
         } else {
           setToast({
-            message: 'Não consegui calcular. Tenta algo como “5 e meio mais 3”.',
+            message: result?.errorMessage ?? 'Não consegui calcular.',
             type: 'info',
           });
         }
@@ -263,16 +245,10 @@ export default function ConversationalCalculator({
     },
   });
 
-  // Phase 3.3 — live transcription preview via Web Speech API.
-  // Runs in PARALLEL with MediaRecorder. The browser's engine updates the
-  // ghost card as the user speaks; Whisper (via /api/interpret) still
-  // produces the authoritative transcript that feeds GPT. On unsupported
-  // browsers (Firefox) the hook no-ops and users see Whisper's final only.
   const speech = useSpeechRecognition({
     onInterim: (text) => setPendingTranscription(text),
     onFinal: (text) => setPendingTranscription(text),
     onError: (error) => {
-      // 'no-speech' fires on silence — harmless. Other errors just log.
       if (error !== 'no-speech') {
         pkgLogger.debug('VOICE', 'SpeechRecognition error (non-fatal)', { error });
       }
@@ -303,7 +279,6 @@ export default function ConversationalCalculator({
       logger.voice.start();
       setVoiceState('recording');
       startRecording();
-      // Fire SpeechRecognition alongside MediaRecorder — pure UX, non-blocking.
       if (speech.isSupported) speech.start();
     } else if (voiceState === 'recording') {
       logger.voice.stop();
@@ -312,16 +287,13 @@ export default function ConversationalCalculator({
     }
   };
 
-  // Phase D — commit the current expression. If the user typed words
-  // ("dez pés mais três polegadas"), run through the deterministic parser
-  // first; otherwise treat `expression` as already engine-ready. A single
-  // handler powers both the keypad "=" and the Enter key on the text input.
+  /** Commit current expression — runs through the parser when the input
+   *  contains words ("dez pés mais três polegadas"), otherwise straight to
+   *  the engine. */
   const handleCommit = useCallback(() => {
     const raw = expression.trim();
     if (!raw) return;
 
-    // Two or more consecutive letters = natural-language input. The parser
-    // output replaces the raw text before we hand it to the engine.
     const hasWords = /[a-zA-ZÀ-ÿ]{2,}/.test(raw);
     let exprToCompute = raw;
     if (hasWords) {
@@ -338,31 +310,25 @@ export default function ConversationalCalculator({
       inputMethod: 'keypad',
       userId: userId ?? undefined,
     });
-    if (result) {
+    if (result && !result.isError) {
       addToHistory(result, { inputMethod: 'manual' });
-      setExpression(''); // Fresh composer after commit — result lives in the card.
-    } else {
-      setToast({
-        message: 'Não consegui calcular. Tente "5 1/2 + 3 1/4" ou "10 pés mais 3 polegadas".',
-        type: 'info',
-      });
+      setExpression('');
     }
+    // On error: keep the input intact so the user can fix it. The Visor
+    // already shows "Erro" + errorMessage from `result`.
   }, [expression, setExpressionAndCompute, addToHistory, setExpression, userId]);
 
   const handleKeyClick = (key: string) => {
     switch (key) {
-      case '=': {
-        handleCommit();
-        break;
-      }
-      case 'C':       return clear();
-      case '⌫':       return backspace();
-      case '÷':       return appendOperator('/');
-      case '×':       return appendOperator('*');
+      case '=': return handleCommit();
+      case 'C': return clear();
+      case '⌫': return backspace();
+      case '÷': return appendOperator('/');
+      case '×': return appendOperator('*');
       case '+':
-      case '-':       return appendOperator(key);
-      case '%':       return appendOperator('%');
-      default:        return appendKey(key);
+      case '-': return appendOperator(key);
+      case '%': return appendOperator('%');
+      default:  return appendKey(key);
     }
   };
 
@@ -371,42 +337,16 @@ export default function ConversationalCalculator({
     appendFraction(frac);
   };
 
-  // "Refazer" action — rehydrates the composer with the past expression so the
-  // user can tweak and recompute. If it was a voice turn, they start from the
-  // interpreted expression, not the raw transcription.
-  const handleRetry = useCallback((entry: HistoryEntry) => {
+  /** Tap a history entry → rehydrate composer with its expression. */
+  const handleHistoryEntryClick = useCallback((entry: HistoryEntry) => {
     setExpression(entry.expression);
   }, [setExpression]);
 
-  // Phase 3.6 — export the conversation as plain text and copy to clipboard.
-  // Order: newest → oldest. Columns: timestamp · input · expression · result.
-  const handleExport = useCallback(() => {
-    if (history.length === 0) return;
-    const lines = history.map(h => {
-      const when = new Date(h.timestamp).toLocaleString('pt-BR');
-      const method = h.inputMethod === 'voice' ? 'voz' : 'manual';
-      const value = h.isInchMode ? h.resultFeetInches : String(h.resultDecimal);
-      return `${when}\t${method}\t${h.expression}\t= ${value}`;
-    });
-    const payload = `OnSite Calculator — ${history.length} cálculo(s)\n\n${lines.join('\n')}`;
-    void navigator.clipboard?.writeText(payload);
-    setToast({ message: `${history.length} cálculo(s) copiados.`, type: 'success' });
-  }, [history]);
-
-  // Phase 3.4 — confirmed clear. Uses window.confirm as the simplest guard;
-  // a custom modal is overkill for a back-office action on personal data.
-  const handleClear = useCallback(() => {
+  const handleClearHistory = useCallback(() => {
     if (history.length === 0) return;
     if (!window.confirm(`Apagar ${history.length} cálculo(s) do histórico?`)) return;
     void clearHistory();
   }, [history.length, clearHistory]);
-
-  // Phase 4 placeholder — "explicar" button on the focal card. Real impl
-  // would ask GPT for a plain-language breakdown of the calculation. For now,
-  // surface a toast so the user knows the button is wired but dormant.
-  const handleExplain = useCallback(() => {
-    setToast({ message: 'Explicação em linguagem natural — em breve.', type: 'info' });
-  }, []);
 
   const voiceButtonText = !isOnline
     ? 'Offline'
@@ -425,150 +365,26 @@ export default function ConversationalCalculator({
     !hasVoiceAccess && 'locked',
   ].filter(Boolean).join(' ');
 
-  // Focal card target — desktop's hero card always shows the most recent turn.
-  const focalEntry = history[0] ?? null;
-  // Sidebar shows a short list of recent turns (compact), plus a "ver todos" affordance.
-  const sidebarEntries = history.slice(0, 4);
-
   return (
     <>
       <main className="conv-main">
         {/* =================================================================
-            SIDEBAR — desktop only. Compact history cards + overflow link.
-            Hidden via CSS on mobile/tablet (chat feed takes over there).
-            ================================================================= */}
-        <aside className="conv-sidebar" aria-label="Histórico recente">
-          <header className="conv-sidebar__header">
-            <h3 className="conv-sidebar__title">Histórico</h3>
-            {history.length > 0 && (
-              <div className="conv-sidebar__tools">
-                <button type="button" className="conv-sidebar__tool" onClick={handleExport} title="Exportar">
-                  Export
-                </button>
-                <button type="button" className="conv-sidebar__tool conv-sidebar__tool--danger" onClick={handleClear} title="Limpar">
-                  Limpar
-                </button>
-              </div>
-            )}
-          </header>
-
-          {sidebarEntries.length === 0 ? (
-            <p className="conv-sidebar__empty">Nenhum cálculo ainda.</p>
-          ) : (
-            <ul className="conv-sidebar__list">
-              {sidebarEntries.map((entry, idx) => (
-                <li key={entry.id}>
-                  <button
-                    type="button"
-                    className={`conv-sidebar-item ${idx === 0 ? 'conv-sidebar-item--latest' : ''}`}
-                    onClick={() => handleRetry(entry)}
-                    title="Refazer com esta expressão"
-                  >
-                    <span className="conv-sidebar-item__meta">
-                      {relativeTime(entry.timestamp)} · {classifySidebarDim(entry)}
-                    </span>
-                    <span className="conv-sidebar-item__expression">{entry.expression}</span>
-                    <span className="conv-sidebar-item__result">{entry.displayPrimary ?? entry.resultFeetInches}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {history.length > sidebarEntries.length && (
-            <button type="button" className="conv-sidebar__all" onClick={() => setShowFullHistory(true)}>
-              ver todos →
-            </button>
-          )}
-        </aside>
-
-        {/* =================================================================
-            FOCUS COLUMN — chat feed (mobile) OR focal card (desktop) + composer.
+            FOCUS — single visor + composer. Same column on mobile/desktop.
             ================================================================= */}
         <section className="conv-focus">
-          {/* Empty state (both viewports) — includes discovery chips so the
-              user sees at a glance that the engine handles fractions, area,
-              and volume (not just plain math). Tapping a chip pre-fills the
-              composer; user can tweak or hit "=" directly. */}
-          {history.length === 0 && voiceState === 'idle' && (
-            <div className="conv-empty">
-              <p className="conv-empty__title">Pronto pra calcular</p>
-              <p className="conv-empty__hint">
-                Digite, toque um exemplo, ou fale algo como
-                <em> “cinco e meio mais três e um quarto”</em>.
-              </p>
-              <div className="conv-empty__examples" aria-label="Exemplos de entrada">
-                {EMPTY_STATE_EXAMPLES.map((ex) => (
-                  <button
-                    key={ex.expression}
-                    type="button"
-                    className="conv-empty__example"
-                    onClick={() => setExpression(ex.expression)}
-                  >
-                    <span className="conv-empty__example-label">{ex.label}</span>
-                    <code>{ex.expression}</code>
-                  </button>
-                ))}
-              </div>
-            </div>
+          <Visor
+            result={lastResult}
+            onCopied={() => setToast({ message: 'Resultado copiado.', type: 'success' })}
+          />
+
+          {/* Live transcription preview — only while voice pipeline is active. */}
+          {voiceState !== 'idle' && pendingTranscription && pendingTranscription !== '…' && (
+            <p className="conv-transcript-preview">
+              {voiceState === 'recording' ? 'Você:' : 'Entendi:'} “{pendingTranscription}”
+            </p>
           )}
 
-          {/* Mobile/tablet: full chat feed scroll with all turns + ghost. */}
-          <div className="conv-history" ref={conversationRef} aria-live="polite">
-            {[...history].reverse().map((entry, idx, arr) => (
-              <ConversationCard
-                key={entry.id}
-                entry={entry}
-                isLatest={idx === arr.length - 1}
-                onRetry={handleRetry}
-                onUpdate={updateEntry}
-              />
-            ))}
-
-            {voiceState !== 'idle' && (
-              <div className="conv-card conv-card--pending">
-                <header className="conv-card__meta">
-                  <span className="conv-chip conv-chip--voice">🎤 voz</span>
-                  <span className="conv-chip conv-chip--pending">
-                    {voiceState === 'recording' ? 'ouvindo…' : 'processando…'}
-                  </span>
-                </header>
-                {pendingTranscription && pendingTranscription !== '…' && (
-                  <p className="conv-card__transcription">
-                    <span className="conv-card__muted">
-                      {voiceState === 'recording' ? 'Você:' : 'Entendi:'}
-                    </span>{' '}
-                    “{pendingTranscription}”
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Desktop: hero card showing only the most recent turn. */}
-          {focalEntry && (
-            <div className="conv-focal-wrapper">
-              <ConversationCard
-                key={`focal-${focalEntry.id}`}
-                entry={focalEntry}
-                isLatest
-                variant="focal"
-                onRetry={handleRetry}
-                onUpdate={updateEntry}
-                onExplain={handleExplain}
-                onAltInterpretation={onAltInterpretation}
-              />
-            </div>
-          )}
-
-          {/* Composer — expression input. Editable text field so users can type
-              either raw expressions ("5 1/2 + 3 1/4") or natural-language phrases
-              ("dez pés mais três polegadas") — the latter goes through the Phase D
-              parser on Enter/"=". Keypad below the composer still works for
-              fraction-heavy structured input.
-              On mobile the keypad+voice follow in `.conv-controls` below (same DOM
-              order, flex-column stack). On desktop the keypad goes to the right
-              column via grid placement. */}
+          {/* Composer — text input wired to the engine via handleCommit on Enter. */}
           <div className="conv-composer-input">
             <div className="expression-wrapper">
               <div className="expression-input">
@@ -598,8 +414,6 @@ export default function ConversationalCalculator({
 
         {/* =================================================================
             CONTROLS — fraction pad + keypad + voice button.
-            Mobile: stacks vertically below the composer input.
-            Desktop: becomes the right column of the grid.
             ================================================================= */}
         <aside className="conv-controls" aria-label="Teclado">
           <div className="fraction-container">
@@ -670,9 +484,6 @@ export default function ConversationalCalculator({
         </aside>
       </main>
 
-      {/* Fullscreen overlay — mobile/tablet only (desktop hides via CSS).
-          The CTA inside the overlay acts as the "stop + calculate" button
-          since the original voice button sits beneath the overlay on mobile. */}
       <VoiceOverlay
         state={voiceState}
         transcript={pendingTranscription}
@@ -682,41 +493,17 @@ export default function ConversationalCalculator({
       {showConsentModal && <VoiceConsentModal onConsent={handleConsentResponse} />}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Full-history modal — opened via sidebar's "ver todos →". Clicking
-          an entry rehydrates the composer (same behavior as "refazer"). */}
+      {/* Full history modal — opened by HamburgerMenu via window event. */}
       <HistoryModal
         history={history}
         isOpen={showFullHistory}
         onClose={() => setShowFullHistory(false)}
         onEntryClick={(entry) => {
-          handleRetry(entry as HistoryEntry);
+          handleHistoryEntryClick(entry);
           setShowFullHistory(false);
         }}
+        onClearAll={handleClearHistory}
       />
     </>
   );
-}
-
-/** Relative time string matching the mockup's sidebar ("Agora", "2 min atrás", "3h atrás"...). */
-function relativeTime(timestamp: number): string {
-  const diffMs = Date.now() - timestamp;
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return 'Agora';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} min atrás`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h atrás`;
-  const days = Math.floor(hr / 24);
-  return `${days}d atrás`;
-}
-
-/** Sidebar-friendly dimension label. Short words to fit the compact layout. */
-function classifySidebarDim(entry: HistoryEntry): string {
-  switch (entry.dimension) {
-    case 'area':   return 'Área';
-    case 'volume': return 'Volume';
-    case 'length': return 'Comprimento';
-    case 'scalar': return 'Número';
-    default:       return entry.isInchMode ? 'Comprimento' : 'Número';
-  }
 }

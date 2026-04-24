@@ -9,6 +9,8 @@ interface HistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEntryClick: (entry: HistoryEntry) => void;
+  /** Optional — when present, header shows a small "Limpar tudo" affordance. */
+  onClearAll?: () => void;
 }
 
 /**
@@ -45,7 +47,7 @@ function formatExpressionArmada(expression: string): string[] {
   return lines;
 }
 
-export function HistoryModal({ history, isOpen, onClose, onEntryClick }: HistoryModalProps) {
+export function HistoryModal({ history, isOpen, onClose, onEntryClick, onClearAll }: HistoryModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -53,7 +55,14 @@ export function HistoryModal({ history, isOpen, onClose, onEntryClick }: History
       <div className="history-modal" onClick={(e) => e.stopPropagation()}>
         <div className="history-modal-header">
           <h2>Histórico</h2>
-          <button className="history-close-btn" onClick={onClose}>✕</button>
+          <div className="history-modal-header__tools">
+            {onClearAll && history.length > 0 && (
+              <button className="history-clear-btn" onClick={onClearAll} type="button">
+                Limpar tudo
+              </button>
+            )}
+            <button className="history-close-btn" onClick={onClose} type="button">✕</button>
+          </div>
         </div>
 
         <div className="history-modal-content">
@@ -81,8 +90,13 @@ export function HistoryModal({ history, isOpen, onClose, onEntryClick }: History
                   </div>
                   <div className="history-divider">────────</div>
                   <div className="history-result">
-                    <span className="history-result-main">{entry.resultFeetInches}</span>
-                    <span className="history-result-alt">({entry.resultTotalInches})</span>
+                    <span className="history-result-main">{entry.primary.value}</span>
+                    {entry.secondary && (
+                      <span className="history-result-alt">
+                        ({entry.secondary.value}
+                        {entry.secondary.unitLabel ? ` ${entry.secondary.unitLabel}` : ''})
+                      </span>
+                    )}
                   </div>
                 </div>
               );

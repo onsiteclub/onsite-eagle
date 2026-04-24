@@ -1,0 +1,1098 @@
+<style>
+  :root {
+    --ink: #0a0a0a;
+    --ink-2: #3a3a3a;
+    --ink-3: #6a6a6a;
+    --ink-4: #9a9a9a;
+    --paper: #ffffff;
+    --paper-2: #f7f7f7;
+    --rule: #d4d4d4;
+    --rule-soft: #e4e4e4;
+    --accent: #EF9F27;
+    --mono: 'JetBrains Mono', 'Space Mono', 'SF Mono', 'Courier New', monospace;
+  }
+
+  .doc {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 4rem;
+    font-family: var(--font-sans);
+    color: var(--color-text-primary);
+    line-height: 1.6;
+  }
+
+  .doc h1 {
+    font-size: 24px;
+    font-weight: 500;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+
+  .doc h2.volume-title {
+    font-size: 20px;
+    font-weight: 500;
+    margin: 3.5rem 0 0.25rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--color-text-primary);
+    letter-spacing: -0.01em;
+  }
+
+  .doc h3.scenario-title {
+    font-size: 15px;
+    font-weight: 500;
+    margin: 0 0 0.5rem;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .scenario-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .doc p { margin: 0 0 0.75rem; font-size: 14px; }
+
+  .doc code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    padding: 1px 6px;
+    background: var(--color-background-secondary);
+    border-radius: 4px;
+  }
+
+  .subtitle {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    margin-bottom: 2rem;
+  }
+
+  .callout {
+    padding: 1rem 1.25rem;
+    background: var(--color-background-secondary);
+    border-left: 3px solid var(--accent);
+    margin: 1.5rem 0;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+
+  .callout strong { color: var(--color-text-primary); }
+
+  .volume-intro {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    margin: 0.5rem 0 1.5rem;
+  }
+
+  /* ── SCENARIO LAYOUT ── */
+  .scenario {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.75rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--color-border-tertiary);
+    align-items: start;
+  }
+
+  .scenario:first-of-type { border-top: none; }
+
+  @media (max-width: 700px) {
+    .scenario { grid-template-columns: 1fr; gap: 1rem; }
+  }
+
+  /* ── WIREFRAME VISOR (structure only, no style) ── */
+  .visor {
+    width: 260px;
+    min-height: 160px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    font-family: var(--mono);
+    text-align: right;
+    color: var(--ink);
+  }
+
+  .visor-label {
+    font-size: 9px;
+    color: var(--ink-4);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: left;
+    margin-bottom: 10px;
+    font-family: var(--mono);
+  }
+
+  .visor-expr {
+    font-size: 14px;
+    color: var(--ink-3);
+    margin-bottom: 10px;
+    word-break: break-all;
+    line-height: 1.3;
+  }
+
+  .visor-result {
+    font-size: 42px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .visor-result-md { font-size: 32px; }
+  .visor-result-sm { font-size: 24px; }
+
+  .visor-hint {
+    font-size: 11px;
+    color: var(--ink-4);
+    margin-top: 8px;
+  }
+
+  /* dual result */
+  .visor-dual {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .visor-dual-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .visor-dual-ulabel {
+    font-size: 9px;
+    color: var(--ink-4);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .visor-dual-value {
+    font-size: 26px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  /* error visor */
+  .visor-error .visor-result {
+    color: var(--ink-2);
+    font-size: 30px;
+  }
+
+  .visor-error-msg {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 6px;
+    text-align: right;
+  }
+
+  .visor-error-caret {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--ink-3);
+    margin-top: 6px;
+    text-align: left;
+    letter-spacing: 0;
+  }
+
+  .visor-error-caret span.mark {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ── SCENARIO BODY ── */
+  .scenario-body dl {
+    margin: 0.75rem 0 0;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 5px 14px;
+    font-size: 13px;
+  }
+
+  .scenario-body dt {
+    color: var(--color-text-secondary);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .scenario-body dd {
+    margin: 0;
+    color: var(--color-text-primary);
+  }
+
+  .scenario-body p {
+    font-size: 13.5px;
+    color: var(--color-text-primary);
+  }
+
+  .note {
+    padding: 0.6rem 0.85rem;
+    background: var(--color-background-secondary);
+    border-left: 2px solid var(--rule);
+    font-size: 12.5px;
+    margin: 0.75rem 0 0;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  /* ── DECISION MATRIX ── */
+  .matrix-wrap {
+    margin: 1rem 0 0;
+    overflow-x: auto;
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+  }
+
+  table.matrix {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    font-family: var(--mono);
+  }
+
+  table.matrix th,
+  table.matrix td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border-tertiary);
+    vertical-align: top;
+  }
+
+  table.matrix th {
+    background: var(--color-background-secondary);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+
+  table.matrix tr:last-child td { border-bottom: none; }
+
+  /* structure legend */
+  .structure-legend {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    margin: 1rem 0 2rem;
+    padding: 0.75rem 1rem;
+    background: var(--color-background-secondary);
+    border-radius: var(--border-radius-md);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .structure-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .structure-legend-item .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--ink);
+  }
+
+  .structure-legend-item .dot.muted { background: var(--ink-4); }
+  .structure-legend-item .dot.rule { background: var(--rule); }
+</style>
+
+<section class="doc" role="document">
+
+  <h1>Cenários de Visor — Calculadora OnSite</h1>
+  <p class="subtitle">Diretriz de implementação. Oito volumes cobrindo os tipos de cálculo que a calculadora suporta, com um mockup do visor para cada sub-cenário.</p>
+
+  <div class="callout">
+    <strong>Importante para quem vai implementar:</strong> os mockups deste documento são <strong>de estrutura, não de estilo</strong>. Mostram apenas <em>o que</em> aparece no visor e <em>onde</em> (hierarquia, posição, tamanho relativo). Fundo branco, texto preto e bordas cinzas são escolhas neutras do wireframe — não da calculadora. O estilo visual real (fundo creme <code>#f5f2ea</code>, texto <code>#1a1612</code>, accent <code>#EF9F27</code>, fonte JetBrains Mono, visor com borda suave, teclas brancas com sombra) está definido no arquivo <code>mockups-calculadora-onsite-v2.html</code>. Combine os dois: este documento dá a estrutura, o outro dá o estilo.
+  </div>
+
+  <div class="structure-legend">
+    <div class="structure-legend-item"><span class="dot"></span>texto primário (resultado)</div>
+    <div class="structure-legend-item"><span class="dot muted"></span>texto secundário (armação, labels, dicas)</div>
+    <div class="structure-legend-item"><span class="dot rule"></span>borda do visor</div>
+  </div>
+
+  <h2 style="font-size:16px;font-weight:500;margin:0 0 0.5rem;border:none;padding:0;">Princípios universais do visor</h2>
+  <p style="font-size:13.5px;">Toda composição do visor respeita quatro regras, em qualquer volume:</p>
+  <ol style="font-size:13.5px;padding-left:1.25rem;">
+    <li><strong>Uma única região retangular</strong> no topo da tela. Sem cards empilhados, sem abas, sem modos.</li>
+    <li><strong>Alinhamento à direita</strong> de toda a informação numérica (armação, resultado, labels). Tradição de calculadora.</li>
+    <li><strong>Hierarquia por tamanho</strong>: armação pequena em cima, resultado grande embaixo. Quando há dois resultados, ambos têm peso visual igual.</li>
+    <li><strong>Labels de unidade são minúsculos e ficam acima do valor</strong> que rotulam. Só aparecem quando necessários para desambiguar (caso com múltiplas unidades).</li>
+  </ol>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- VOLUME 1 — ESCALAR PURO                                  -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Volume 1 — Escalar puro</h2>
+  <p class="volume-intro">Números sem dimensão, sem unidade de construção. Base da aritmética geral. Cobre soma, subtração, multiplicação, divisão, precedência e parênteses.</p>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">2 + 2</div>
+      <div class="visor-result">4</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">1.1</span>Adição de inteiros</h3>
+      <p>Caso base. Esqueleto do qual todos os outros variam.</p>
+      <dl>
+        <dt>Input</dt><dd><code>2 + 2</code></dd>
+        <dt>Armação</dt><dd><code>2 + 2</code></dd>
+        <dt>Resultado</dt><dd><code>4</code></dd>
+        <dt>Regra</dt><dd>dim=0, resultado inteiro → exibe número cru</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">15.800 + 4.200</div>
+      <div class="visor-result">20.000</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">1.2</span>Números grandes com separador de milhar</h3>
+      <p>|valor| ≥ 1000 recebe separador do locale. Detectado pelo idioma do device (PT-BR: ponto; EN-CA: vírgula). Normalização acontece tanto na armação quanto no resultado.</p>
+      <dl>
+        <dt>Input</dt><dd><code>15800 + 4200</code> (usuário digita sem separador)</dd>
+        <dt>Armação</dt><dd><code>15.800 + 4.200</code> (motor normaliza)</dd>
+        <dt>Resultado</dt><dd><code>20.000</code></dd>
+        <dt>Regra</dt><dd>aplicar separador quando <code>|v| ≥ 1000</code>, formato por locale do device</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">100 × 3</div>
+      <div class="visor-result">300</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">1.3</span>Tradução de símbolo do operador</h3>
+      <p>Input aceita <code>*</code> e <code>/</code> (teclado). Armação exibe <code>×</code> e <code>÷</code> (símbolos matemáticos). Tradução é apenas visual; internamente o parser continua com ASCII.</p>
+      <dl>
+        <dt>Input</dt><dd><code>100 * 3</code></dd>
+        <dt>Armação</dt><dd><code>100 × 3</code></dd>
+        <dt>Resultado</dt><dd><code>300</code></dd>
+        <dt>Regra</dt><dd>display sempre <code>×</code>/<code>÷</code>; input aceita ambos</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">10 ÷ 3</div>
+      <div class="visor-result">3,3333</div>
+      <div class="visor-hint">≈ · exato: 10/3</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">1.4</span>Divisão não-exata (dízima)</h3>
+      <p>Primeira decisão pesada de display. <code>10 ÷ 3</code> não termina. fraction.js preserva o racional exato internamente; o visor mostra decimal truncado + dica embaixo.</p>
+      <dl>
+        <dt>Input</dt><dd><code>10 / 3</code></dd>
+        <dt>Armação</dt><dd><code>10 ÷ 3</code></dd>
+        <dt>Resultado</dt><dd><code>3,3333</code></dd>
+        <dt>Dica</dt><dd><code>≈ · exato: 10/3</code></dd>
+        <dt>Regra</dt><dd>truncar em 4 casas no display; preservar racional exato para cálculos subsequentes</dd>
+      </dl>
+      <div class="note">Motor marca resultado como <code>isApproximate: true</code>. UI decide se mostra a linha de dica. Alternativa considerada: adicionar <code>…</code> no final do resultado — menos espaço mas também menos informação.</div>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">(2 + 3) × 4</div>
+      <div class="visor-result">20</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">1.5</span>Parênteses explícitos</h3>
+      <p>Armação preserva parênteses tal como o usuário digitou. Nenhuma reescrita. Comunica que a calculadora entende agrupamento (ganho sobre a versão anterior, que nem tinha parênteses).</p>
+      <dl>
+        <dt>Input</dt><dd><code>(2 + 3) * 4</code></dd>
+        <dt>Armação</dt><dd><code>(2 + 3) × 4</code></dd>
+        <dt>Resultado</dt><dd><code>20</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">4 + 4 × 10</div>
+      <div class="visor-result">44</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">1.6</span>Precedência implícita invisível</h3>
+      <p>PEMDAS é aplicado mas não exposto. Armação <strong>não</strong> injeta parênteses. Usuário que conhece a regra espera o comportamento; usuário que não conhece pode estranhar o resultado — para esse caso existe a tela secundária de "como foi armado", fora do escopo deste documento.</p>
+      <dl>
+        <dt>Input</dt><dd><code>4 + 4 * 10</code></dd>
+        <dt>Armação</dt><dd><code>4 + 4 × 10</code></dd>
+        <dt>Resultado</dt><dd><code>44</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- VOLUME 2 — FRAÇÕES PURAS                                 -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Volume 2 — Frações puras</h2>
+  <p class="volume-intro">Frações sem unidade de construção. Motor sempre preserva racional exato (fraction.js). Display escolhe formato por regra determinística: fração simplificada, número misto quando ≥ 1, inteiro quando o resultado for inteiro.</p>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">1/2 + 1/4</div>
+      <div class="visor-result">3/4</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">2.1</span>Soma de frações próprias</h3>
+      <p>Ambas as frações são &lt; 1. Resultado &lt; 1 exibido como fração simplificada. Sem decimal, sem número misto (não faz sentido abaixo de 1).</p>
+      <dl>
+        <dt>Input</dt><dd><code>1/2 + 1/4</code></dd>
+        <dt>Armação</dt><dd><code>1/2 + 1/4</code></dd>
+        <dt>Resultado</dt><dd><code>3/4</code></dd>
+        <dt>Regra</dt><dd>|v| &lt; 1 → fração simplificada</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">5 1/2 + 3 1/4</div>
+      <div class="visor-result">8 3/4</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">2.2</span>Soma de números mistos</h3>
+      <p>Resultado ≥ 1 com parte fracionária → formato de número misto. Parte inteira e fração separadas por espaço. Nunca fração imprópria (<code>35/4</code>).</p>
+      <dl>
+        <dt>Input</dt><dd><code>5 1/2 + 3 1/4</code></dd>
+        <dt>Armação</dt><dd><code>5 1/2 + 3 1/4</code></dd>
+        <dt>Resultado</dt><dd><code>8 3/4</code></dd>
+        <dt>Regra</dt><dd>|v| ≥ 1 com parte fracionária → número misto</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">3/2 + 3/2</div>
+      <div class="visor-result">3</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">2.3</span>Fração que resulta em inteiro</h3>
+      <p>Resultado inteiro → exibe só o número, sem <code>3/1</code> ou <code>3,0</code>. Cai no mesmo formato do Volume 1.1.</p>
+      <dl>
+        <dt>Input</dt><dd><code>3/2 + 3/2</code></dd>
+        <dt>Armação</dt><dd><code>3/2 + 3/2</code></dd>
+        <dt>Resultado</dt><dd><code>3</code></dd>
+        <dt>Regra</dt><dd>denominador = 1 → exibe apenas o numerador</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">1/3 + 1/5</div>
+      <div class="visor-result">8/15</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">2.4</span>Fração irredutível com denominador grande</h3>
+      <p>Resultado exato <code>8/15</code> é preservado. Em alguns casos denominador pode ser muito grande (ex: <code>1/7 + 1/11 = 18/77</code>). Mostrar mesmo assim — é a representação exata. Alternativa decimal fica no Volume 1.4 (dízima com <code>≈</code>).</p>
+      <dl>
+        <dt>Input</dt><dd><code>1/3 + 1/5</code></dd>
+        <dt>Armação</dt><dd><code>1/3 + 1/5</code></dd>
+        <dt>Resultado</dt><dd><code>8/15</code></dd>
+        <dt>Regra</dt><dd>sempre simplificar antes de exibir (MDC do numerador e denominador)</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- VOLUME 3 — COMPRIMENTO IMPERIAL                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Volume 3 — Comprimento imperial</h2>
+  <p class="volume-intro">Medidas em pés e polegadas, com ou sem frações. Cobre o padrão de construção norte-americano. Resultado sempre em formato <code>X' Y Z/W"</code> quando magnitude justifica; caso contrário só em polegadas com fração.</p>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">2' 6" + 3' 6"</div>
+      <div class="visor-result">6' 0"</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">3.1</span>Soma feet-inches canônica</h3>
+      <p>Resultado em feet-inches. Zero polegadas é explícito (<code>6' 0"</code>, não <code>6'</code>) para consistência visual — sempre duas partes.</p>
+      <dl>
+        <dt>Input</dt><dd><code>2' 6" + 3' 6"</code></dd>
+        <dt>Armação</dt><dd><code>2' 6" + 3' 6"</code></dd>
+        <dt>Resultado</dt><dd><code>6' 0"</code></dd>
+        <dt>Regra</dt><dd>|v| ≥ 12" → feet-inches; sempre mostra ambas as partes</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">2'-6" + 1'-6"</div>
+      <div class="visor-result">4' 0"</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">3.2</span>Notação dash-separated no input</h3>
+      <p>Convenção de planta técnica (<code>2'-6"</code> = 2 pés 6 polegadas, não subtração). Motor v2 já resolve isso. Armação normaliza o dash para espaço.</p>
+      <dl>
+        <dt>Input</dt><dd><code>2'-6" + 1'-6"</code></dd>
+        <dt>Armação</dt><dd><code>2' 6" + 1' 6"</code> (dash normalizado)</dd>
+        <dt>Resultado</dt><dd><code>4' 0"</code></dd>
+        <dt>Regra</dt><dd>pré-tokenizer substitui <code>N'-M"</code> por <code>N' M"</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">5 1/2" + 3 1/4"</div>
+      <div class="visor-result">8 3/4"</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">3.3</span>Polegadas com fração, resultado &lt; 12"</h3>
+      <p>Magnitude pequena — não converter para feet-inches. Só polegadas com número misto. Fração arredondada para granularidade de construção (1/16").</p>
+      <dl>
+        <dt>Input</dt><dd><code>5 1/2" + 3 1/4"</code></dd>
+        <dt>Armação</dt><dd><code>5 1/2" + 3 1/4"</code></dd>
+        <dt>Resultado</dt><dd><code>8 3/4"</code></dd>
+        <dt>Regra</dt><dd>|v| &lt; 12" → só polegadas; |v| ≥ 12" → feet-inches</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">7' 2 1/2" + 0' 2 1/8"</div>
+      <div class="visor-result">7' 4 5/8"</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">3.4</span>Feet-inches com fração preservada</h3>
+      <p>Combinação mais rica: feet + polegadas + fração. O resultado mantém as três partes. Fração arredondada para 1/16" mais próximo; se o arredondamento alterar o valor, mostrar <code>≈</code> na dica.</p>
+      <dl>
+        <dt>Input</dt><dd><code>7' 2 1/2" + 0' 2 1/8"</code></dd>
+        <dt>Armação</dt><dd><code>7' 2 1/2" + 0' 2 1/8"</code></dd>
+        <dt>Resultado</dt><dd><code>7' 4 5/8"</code></dd>
+        <dt>Regra</dt><dd>arredondar fração residual para 1/16" mais próximo</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">2' − 3'</div>
+      <div class="visor-result">−1' 0"</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">3.5</span>Resultado negativo</h3>
+      <p>Subtração que vira negativa. Sinal precede o valor inteiro, não é repetido nas partes. Usa minus sign tipográfico (<code>−</code>, U+2212), não hífen.</p>
+      <dl>
+        <dt>Input</dt><dd><code>2' - 3'</code></dd>
+        <dt>Armação</dt><dd><code>2' − 3'</code></dd>
+        <dt>Resultado</dt><dd><code>−1' 0"</code></dd>
+        <dt>Regra</dt><dd>sinal negativo aplicado ao conjunto, minus sign Unicode</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- VOLUME 4 — COMPRIMENTO MÉTRICO                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Volume 4 — Comprimento métrico</h2>
+  <p class="volume-intro">Medidas em metros, centímetros, milímetros. Motor escolhe unidade de display por magnitude — nunca mistura. Vírgula decimal respeita locale do device.</p>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">3,5 m + 2,5 m</div>
+      <div class="visor-result">6 m</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">4.1</span>Metros com vírgula decimal</h3>
+      <p>Caso canônico para usuário brasileiro/português. Vírgula como separador decimal preservada (motor v2 já normaliza internamente). Resultado inteiro mostrado sem casas decimais.</p>
+      <dl>
+        <dt>Input</dt><dd><code>3,5 m + 2,5 m</code></dd>
+        <dt>Armação</dt><dd><code>3,5 m + 2,5 m</code></dd>
+        <dt>Resultado</dt><dd><code>6 m</code></dd>
+        <dt>Regra</dt><dd>resultado inteiro em metros → sem casas decimais</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">50 cm + 30 cm</div>
+      <div class="visor-result">80 cm</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">4.2</span>Centímetros — escala preservada</h3>
+      <p>Quando ambos os operandos estão em cm e o resultado cabe em cm (&lt; 100 ou apenas acima por pouco), manter a unidade de entrada. Não converter para metros silenciosamente.</p>
+      <dl>
+        <dt>Input</dt><dd><code>50 cm + 30 cm</code></dd>
+        <dt>Armação</dt><dd><code>50 cm + 30 cm</code></dd>
+        <dt>Resultado</dt><dd><code>80 cm</code></dd>
+        <dt>Regra</dt><dd>preferir a unidade mais comum no input quando possível</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">75 cm + 80 cm</div>
+      <div class="visor-result">1,55 m</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">4.3</span>Escala automática — cm → m</h3>
+      <p>Resultado &gt; 100 cm sobe para metros. Limiar: a partir de <code>100 cm</code>, exibir em metros com duas casas decimais. Abaixo de <code>100 cm</code>, manter em centímetros.</p>
+      <dl>
+        <dt>Input</dt><dd><code>75 cm + 80 cm</code></dd>
+        <dt>Armação</dt><dd><code>75 cm + 80 cm</code></dd>
+        <dt>Resultado</dt><dd><code>1,55 m</code></dd>
+        <dt>Regra</dt><dd>|v| ≥ 100 cm → exibir em metros</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">8 mm + 5 mm</div>
+      <div class="visor-result">13 mm</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">4.4</span>Milímetros — granularidade fina</h3>
+      <p>Unidade mais fina. Usada em metalurgia, carpintaria de precisão, esquadria. Nunca arredondar para cm quando o input foi em mm.</p>
+      <dl>
+        <dt>Input</dt><dd><code>8 mm + 5 mm</code></dd>
+        <dt>Armação</dt><dd><code>8 mm + 5 mm</code></dd>
+        <dt>Resultado</dt><dd><code>13 mm</code></dd>
+        <dt>Regra</dt><dd>preservar mm quando input foi em mm</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- VOLUME 5 — ÁREA                                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Volume 5 — Área (length × length)</h2>
+  <p class="volume-intro">Multiplicação de duas grandezas de comprimento produz área. Primeira vez que a regra de visor muda estruturalmente: resultado duplo com peso igual. Exibe em sq ft e m² simultaneamente porque o mercado canadense precisa dos dois.</p>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">12' × 8'</div>
+      <div class="visor-dual">
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">sq ft</div>
+          <div class="visor-dual-value">96</div>
+        </div>
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">m²</div>
+          <div class="visor-dual-value">8,92</div>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">5.1</span>Área imperial → dual sq ft + m²</h3>
+      <p>Input em pés, motor detecta dim=2, produz resultado duplo. Imperial em cima (porque o input era imperial), métrico embaixo como conversão. Labels minúsculos em cima de cada valor.</p>
+      <dl>
+        <dt>Input</dt><dd><code>12' * 8'</code></dd>
+        <dt>Armação</dt><dd><code>12' × 8'</code></dd>
+        <dt>Primário</dt><dd><code>96 sq ft</code></dd>
+        <dt>Secundário</dt><dd><code>8,92 m²</code></dd>
+        <dt>Regra</dt><dd>dim=2 com input imperial → sq ft primeiro, m² depois</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">3,5 m × 4 m</div>
+      <div class="visor-dual">
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">m²</div>
+          <div class="visor-dual-value">14</div>
+        </div>
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">sq ft</div>
+          <div class="visor-dual-value">150,7</div>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">5.2</span>Área métrica → dual m² + sq ft</h3>
+      <p>Mesmo padrão, ordem invertida. Input em metros → m² primeiro, sq ft depois. A ordem sempre segue o sistema do input principal.</p>
+      <dl>
+        <dt>Input</dt><dd><code>3,5 m * 4 m</code></dd>
+        <dt>Armação</dt><dd><code>3,5 m × 4 m</code></dd>
+        <dt>Primário</dt><dd><code>14 m²</code></dd>
+        <dt>Secundário</dt><dd><code>150,7 sq ft</code></dd>
+        <dt>Regra</dt><dd>dim=2 com input métrico → m² primeiro</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">200 sq ft + 50 sq ft</div>
+      <div class="visor-dual">
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">sq ft</div>
+          <div class="visor-dual-value">250</div>
+        </div>
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">m²</div>
+          <div class="visor-dual-value">23,22</div>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">5.3</span>Soma de áreas diretas</h3>
+      <p>Input já em unidade de área (sq ft explícito). Dim=2 preservado, não multiplicado de novo. Mesma estrutura de output.</p>
+      <dl>
+        <dt>Input</dt><dd><code>200 sq ft + 50 sq ft</code></dd>
+        <dt>Armação</dt><dd><code>200 sq ft + 50 sq ft</code></dd>
+        <dt>Resultado</dt><dd><code>250 sq ft</code> / <code>23,22 m²</code></dd>
+        <dt>Regra</dt><dd>operação entre áreas → área; dim preservado</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- VOLUME 6 — VOLUME                                        -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Volume 6 — Volume (length × length × length)</h2>
+  <p class="volume-intro">Análogo ao Volume 5, uma dimensão acima. Casos típicos: concreto por m³, sarrafo cúbico, escavação, caixa d'água. Resultado duplo cu ft + m³.</p>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">10' × 8' × 9'</div>
+      <div class="visor-dual">
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">cu ft</div>
+          <div class="visor-dual-value">720</div>
+        </div>
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">m³</div>
+          <div class="visor-dual-value">20,39</div>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">6.1</span>Volume imperial → dual cu ft + m³</h3>
+      <p>Três comprimentos multiplicados → dim=3. Mesmo padrão do Volume 5 transferido pra volume.</p>
+      <dl>
+        <dt>Input</dt><dd><code>10' * 8' * 9'</code></dd>
+        <dt>Armação</dt><dd><code>10' × 8' × 9'</code></dd>
+        <dt>Primário</dt><dd><code>720 cu ft</code></dd>
+        <dt>Secundário</dt><dd><code>20,39 m³</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">3 m × 4 m × 2,5 m</div>
+      <div class="visor-dual">
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">m³</div>
+          <div class="visor-dual-value">30</div>
+        </div>
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">cu ft</div>
+          <div class="visor-dual-value">1.059,4</div>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">6.2</span>Volume métrico → dual m³ + cu ft</h3>
+      <p>Input em metros, dim=3, m³ primeiro.</p>
+      <dl>
+        <dt>Input</dt><dd><code>3 m * 4 m * 2,5 m</code></dd>
+        <dt>Armação</dt><dd><code>3 m × 4 m × 2,5 m</code></dd>
+        <dt>Primário</dt><dd><code>30 m³</code></dd>
+        <dt>Secundário</dt><dd><code>1.059,4 cu ft</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- VOLUME 7 — MISTO                                         -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Volume 7 — Sistemas mistos (imperial + métrico)</h2>
+  <p class="volume-intro">Usuário combina unidades imperiais e métricas no mesmo cálculo. Cenário realista para Canadá e Brasil (drywall em polegadas, plantas em metros, parafusos imperiais). A mistura é o <em>sinal</em>: ninguém mistura por acidente — quando acontece, quer ver ambos os sistemas.</p>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">2' 6" + 76 cm</div>
+      <div class="visor-dual">
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">imperial</div>
+          <div class="visor-dual-value">5' 0"</div>
+        </div>
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">métrico</div>
+          <div class="visor-dual-value">152 cm</div>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">7.1</span>Soma imperial + métrico → dual simétrico</h3>
+      <p>Input misto → resultado duplo automático. Labels aqui são <em>imperial</em> e <em>métrico</em> (nomes dos sistemas), diferentes dos Volumes 5–6 onde o label é a unidade em si. A diferença: aqui ambos os valores representam a mesma medida em sistemas diferentes.</p>
+      <dl>
+        <dt>Input</dt><dd><code>2' 6" + 76 cm</code></dd>
+        <dt>Armação</dt><dd><code>2' 6" + 76 cm</code></dd>
+        <dt>Primário</dt><dd><code>5' 0"</code> (ordem segue primeiro token do input)</dd>
+        <dt>Secundário</dt><dd><code>152 cm</code></dd>
+        <dt>Regra</dt><dd>flag <code>mixedSystems: true</code> no motor → UI renderiza dual</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">36" + 50 cm</div>
+      <div class="visor-dual">
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">imperial</div>
+          <div class="visor-dual-value">4' 7 11/16"</div>
+        </div>
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">métrico</div>
+          <div class="visor-dual-value">141,4 cm</div>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">7.2</span>Misto com resultado fracionário em polegadas</h3>
+      <p>Resultado imperial é irracional depois da conversão, precisa de arredondamento para 1/16". Motor marca como aproximação; display pode adicionar <code>≈</code> discreto se a UI decidir. Métrico é exato em mm.</p>
+      <dl>
+        <dt>Input</dt><dd><code>36" + 50 cm</code></dd>
+        <dt>Armação</dt><dd><code>36" + 50 cm</code></dd>
+        <dt>Primário</dt><dd><code>4' 7 11/16"</code> (arredondado 1/16")</dd>
+        <dt>Secundário</dt><dd><code>141,4 cm</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor">
+      <div class="visor-expr">2 m × 4'</div>
+      <div class="visor-dual">
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">m²</div>
+          <div class="visor-dual-value">2,44</div>
+        </div>
+        <div class="visor-dual-block">
+          <div class="visor-dual-ulabel">sq ft</div>
+          <div class="visor-dual-value">26,25</div>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">7.3</span>Multiplicação mista → área</h3>
+      <p>Dim=2 + mixedSystems=true. Neste caso a regra de dim prevalece sobre a de sistema: labels continuam sendo as unidades (m², sq ft), não "imperial/métrico". A ordem segue o primeiro operando do input (metros primeiro).</p>
+      <dl>
+        <dt>Input</dt><dd><code>2 m * 4'</code></dd>
+        <dt>Armação</dt><dd><code>2 m × 4'</code></dd>
+        <dt>Primário</dt><dd><code>2,44 m²</code></dd>
+        <dt>Secundário</dt><dd><code>26,25 sq ft</code></dd>
+        <dt>Regra</dt><dd>quando dim ≥ 2 e misto, labels = unidades; quando dim=1 e misto, labels = sistemas</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- VOLUME 8 — ERROS                                         -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Volume 8 — Erros</h2>
+  <p class="volume-intro">Quando o motor retorna <code>Error</code>, o visor <em>não fica em branco e não some com o input</em>. Substitui o resultado por uma palavra neutra ("Erro") e mostra a expressão com marcação do ponto problemático, quando detectável. O usuário precisa saber o que errou e onde corrigir.</p>
+
+  <div class="scenario">
+    <div class="visor visor-error">
+      <div class="visor-expr">5 +</div>
+      <div class="visor-result">Erro</div>
+      <div class="visor-error-msg">expressão incompleta</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">8.1</span>Expressão incompleta — operador trailing</h3>
+      <p>Usuário pressionou <code>=</code> com operador pendente. Mensagem explicativa abaixo do "Erro". Cursor permanece no campo de input para correção rápida — não limpa.</p>
+      <dl>
+        <dt>Input</dt><dd><code>5 +</code></dd>
+        <dt>Resultado</dt><dd>palavra <code>Erro</code> + mensagem <code>expressão incompleta</code></dd>
+        <dt>Regra</dt><dd>não limpar o input; cursor na posição do erro</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor visor-error">
+      <div class="visor-expr">(2 + 3</div>
+      <div class="visor-result">Erro</div>
+      <div class="visor-error-msg">parêntese não fechado</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">8.2</span>Parênteses desbalanceados</h3>
+      <p>Mensagem é específica — "parêntese não fechado" diz ao usuário exatamente o que falta. Diferente de mensagem genérica tipo "sintaxe inválida" que nada informa.</p>
+      <dl>
+        <dt>Input</dt><dd><code>(2 + 3</code></dd>
+        <dt>Mensagem</dt><dd><code>parêntese não fechado</code></dd>
+        <dt>Regra</dt><dd>mensagens específicas por tipo de erro do parser</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor visor-error">
+      <div class="visor-expr">1.2.3</div>
+      <div class="visor-result">Erro</div>
+      <div class="visor-error-msg">número inválido: 1.2.3</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">8.3</span>Número malformado</h3>
+      <p>Mensagem inclui o token específico que falhou. Ajuda o usuário a localizar o problema em expressões longas.</p>
+      <dl>
+        <dt>Input</dt><dd><code>1.2.3</code></dd>
+        <dt>Mensagem</dt><dd><code>número inválido: 1.2.3</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor visor-error">
+      <div class="visor-expr">10 ÷ 0</div>
+      <div class="visor-result">Erro</div>
+      <div class="visor-error-msg">divisão por zero</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">8.4</span>Divisão por zero</h3>
+      <p>Caso especial. Nunca retornar <code>Infinity</code> ou <code>NaN</code> — sempre mensagem clara. Semanticamente não é bug de sintaxe, é impossibilidade matemática. Mensagem reflete isso.</p>
+      <dl>
+        <dt>Input</dt><dd><code>10 / 0</code></dd>
+        <dt>Mensagem</dt><dd><code>divisão por zero</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="visor visor-error">
+      <div class="visor-expr">5 ++ 3</div>
+      <div class="visor-result">Erro</div>
+      <div class="visor-error-msg">operadores duplicados</div>
+    </div>
+    <div class="scenario-body">
+      <h3 class="scenario-title"><span class="scenario-tag">8.5</span>Operadores duplicados</h3>
+      <p>Bug clássico que o motor v1 engolia silenciosamente (retornava 5 ou 8 em vez de erro). v2 detecta e reporta.</p>
+      <dl>
+        <dt>Input</dt><dd><code>5 ++ 3</code></dd>
+        <dt>Mensagem</dt><dd><code>operadores duplicados</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- DECISION MATRIX                                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <h2 class="volume-title">Matriz de decisão — motor → visor</h2>
+  <p class="volume-intro">Regra única que determina qual layout o visor renderiza. Motor retorna objeto <code>CalculationResult</code> com flags; UI aplica a matriz.</p>
+
+  <div class="matrix-wrap">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th>dim</th>
+          <th>mixedSystems</th>
+          <th>isError</th>
+          <th>Layout</th>
+          <th>Volumes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0</td><td>—</td><td>false</td>
+          <td>Resultado único</td>
+          <td>1, 2</td>
+        </tr>
+        <tr>
+          <td>1</td><td>false</td><td>false</td>
+          <td>Resultado único (imperial OU métrico)</td>
+          <td>3, 4</td>
+        </tr>
+        <tr>
+          <td>1</td><td>true</td><td>false</td>
+          <td>Resultado duplo, labels = sistemas</td>
+          <td>7.1, 7.2</td>
+        </tr>
+        <tr>
+          <td>≥ 2</td><td>qualquer</td><td>false</td>
+          <td>Resultado duplo, labels = unidades</td>
+          <td>5, 6, 7.3</td>
+        </tr>
+        <tr>
+          <td>—</td><td>—</td><td>true</td>
+          <td>Estado de erro (palavra + mensagem)</td>
+          <td>8</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="volume-title">Contrato do motor (para a UI consumir)</h2>
+  <p class="volume-intro">Objeto <code>CalculationResult</code> que o motor retorna. UI é função pura <code>result → visor</code>.</p>
+
+  <pre style="background:var(--color-background-secondary);padding:1rem;border-radius:8px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.5;">type CalculationResult = {
+  // sempre presente
+  isError: boolean;
+  expression: string;          // armação normalizada (× ÷ − unicode)
+
+  // quando isError = false
+  dim: 0 | 1 | 2 | 3;           // escalar, comprimento, área, volume
+  mixedSystems: boolean;        // true se input misturou imperial + métrico
+
+  primary: {
+    value: string;              // "5' 0"", "96", "8 3/4", "6 m"
+    unitLabel: string | null;   // "sq ft", "imperial", null quando óbvio
+  };
+
+  secondary: {                  // só quando dim ≥ 2 OU mixedSystems
+    value: string;
+    unitLabel: string;
+  } | null;
+
+  isApproximate: boolean;       // true quando arredondamento alterou o valor
+  exactForm: string | null;     // "10/3" para dízimas; null se desnecessário
+
+  // quando isError = true
+  errorMessage: string | null;  // "expressão incompleta", "divisão por zero"
+  errorPosition: number | null; // índice de caractere para UI destacar
+}</pre>
+
+  <h2 class="volume-title">Checklist de implementação</h2>
+  <ol style="font-size:13.5px;padding-left:1.25rem;">
+    <li>Remover do visor atual: pills <code>manual</code> / <code>• NÚMERO</code>, botões <code>copiar</code> / <code>editar</code> / <code>refazer</code>, cards empilhados do histórico no corpo principal.</li>
+    <li>Implementar componente <code>&lt;Visor&gt;</code> que recebe <code>CalculationResult</code> e aplica a matriz de decisão.</li>
+    <li>Mover histórico de cálculos para tela separada acessível pelo menu hambúrguer.</li>
+    <li>Implementar <code>long-press</code> no resultado = copiar para clipboard.</li>
+    <li>Implementar <code>tap</code> no item do histórico = recuperar expressão como novo input.</li>
+    <li>Adicionar ao motor: flag <code>mixedSystems</code>, campo <code>secondary</code>, campo <code>exactForm</code>, mensagens de erro específicas.</li>
+    <li>Testes de snapshot por cenário: cada um dos ~30 casos acima tem entrada de input e saída esperada do visor.</li>
+  </ol>
+
+  <div class="callout" style="margin-top:2rem;">
+    <strong>Referências cruzadas:</strong><br>
+    Estrutura (este documento) → <code>cenarios-visor-calculadora-onsite-v3.html</code><br>
+    Estilo visual (paleta, tipografia, teclado) → <code>mockups-calculadora-onsite-v2.html</code><br>
+    Motor técnico → commit <code>56045e1 feat(calculator): engine v2</code> + <code>tests/unit/engine/adversarial.test.ts</code>
+  </div>
+
+</section>

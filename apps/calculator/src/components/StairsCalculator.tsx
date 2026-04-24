@@ -73,7 +73,7 @@ export default function StairsCalculator({
   }, [totalRiseInput, riserHeightInput, treadInput, nosingInput]);
 
   return (
-    <div className="stairs-panel">
+    <div className="stairs-panel tab-desktop-3col">
       <section className="stairs-panel__inputs">
         <Row label="Altura total (piso a piso)" hint="Ex: 9', 108&quot;, 2740mm">
           <input

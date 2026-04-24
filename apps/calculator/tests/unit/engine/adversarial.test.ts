@@ -17,7 +17,7 @@ import { calculate } from '../../../src/engine';
 function value(expr: string): number | null {
   const r = calculate(expr);
   if (!r) return null;
-  return r.resultDecimal;
+  return r.valueCanonical;
 }
 
 describe('#1 — unary minus', () => {
@@ -90,12 +90,12 @@ describe('#4 — floating point drift (exact arithmetic required)', () => {
 describe('#5 — divide by zero', () => {
   it('"10 / 0" → Error result, not Infinity leak', () => {
     const r = calculate('10 / 0');
-    expect(r?.displayPrimary).toBe('Error');
+    expect(r?.isError).toBe(true);
   });
 
   it('"0 / 0" → Error result, not NaN leak', () => {
     const r = calculate('0 / 0');
-    expect(r?.displayPrimary).toBe('Error');
+    expect(r?.isError).toBe(true);
   });
 });
 
@@ -114,7 +114,7 @@ describe('#6 — parenthesis support', () => {
 
   it('"(2 + 3" unbalanced → Error (not silent 5)', () => {
     const r = calculate('(2 + 3');
-    expect(r?.displayPrimary).toBe('Error');
+    expect(r?.isError).toBe(true);
   });
 });
 
@@ -133,13 +133,11 @@ describe('#8 — whitespace-sensitive mixed-number tokenizer', () => {
     expect(value('5 1/2')).toBe(5.5);
   });
 
-  it('"51/2" WITHOUT space → should be an ERROR (ambiguous), current behavior documented', () => {
-    // In a safe tokenizer this would reject — you typed "51 divided by 2" or
-    // a mixed number without the space? Construction-calculator convention
-    // says the space is required; absence should be an error.
-    const v = value('51/2');
-    // If this returns 25.5 the tokenizer silently accepted a malformed input.
-    expect(v).not.toBe(25.5);
+  it('"51/2" WITHOUT space → 25.5 (math-correct: 51 divided by 2)', () => {
+    // The v3 spec accepts improper bare fractions (Vol 2 explicitly tests
+    // 3/2 + 3/2 = 3). "51/2" is unambiguous arithmetic — 51 ÷ 2 = 25.5. If
+    // the user wanted a mixed number they'd write "5 1/2" with a space.
+    expect(value('51/2')).toBe(25.5);
   });
 });
 
@@ -167,7 +165,7 @@ describe('#10 — percentage semantics', () => {
     const r = calculate('50% + 10%');
     // Either it errors, OR it returns 0.6 (fraction interpretation), OR 60%.
     // Returning bare 60 with no % flag is the bug.
-    expect([null, 0.6].includes(r?.resultDecimal as number) || r?.displayPrimary === 'Error').toBe(true);
+    expect([null, 0.6].includes(r?.valueCanonical as number) || r?.isError === true).toBe(true);
   });
 });
 
@@ -185,40 +183,40 @@ describe('#12 — locale number formats', () => {
     // Test engine direct: this should error OR parse as 6.
     const r = calculate('3,5 + 2,5');
     // parseFloat("3,5") = 3, so engine would see 3+2=5. Document.
-    expect(r?.resultDecimal).not.toBe(5);
+    expect(r?.valueCanonical).not.toBe(5);
   });
 
   it('"1,234 + 1,000" with thousand separators', () => {
     const r = calculate('1,234 + 1,000');
     // Sanitize-expression layer strips these; engine direct would see
     // parseFloat("1,234")=1, parseFloat("1,000")=1, sum=2. Document.
-    expect(r?.resultDecimal).not.toBe(2);
+    expect(r?.valueCanonical).not.toBe(2);
   });
 });
 
 describe('#13 — trailing / incomplete operator', () => {
   it('"5 +" → Error (not 5, not NaN leak)', () => {
     const r = calculate('5 +');
-    expect(r?.displayPrimary).toBe('Error');
+    expect(r?.isError).toBe(true);
   });
 
   it('"* 5" leading binary op → Error', () => {
     const r = calculate('* 5');
-    expect(r?.displayPrimary).toBe('Error');
+    expect(r?.isError).toBe(true);
   });
 });
 
 describe('#14 — consecutive operators', () => {
   it('"5 ++ 3" → Error (double binary is malformed)', () => {
     const r = calculate('5 ++ 3');
-    expect(r?.displayPrimary).toBe('Error');
+    expect(r?.isError).toBe(true);
   });
 
   it('"5 -- 3" → 8 (double unary) or Error — both defensible, NOT 2', () => {
     const r = calculate('5 -- 3');
     // If parsed as 5 - (-3) = 8, fine. If error, fine. If it returns 2,
     // the tokenizer silently collapsed "--" to "-".
-    expect(r?.resultDecimal).not.toBe(2);
+    expect(r?.valueCanonical).not.toBe(2);
   });
 });
 
@@ -235,39 +233,39 @@ describe('#16 — malformed numbers', () => {
   it('"1.2.3" → Error (not silently 1.2)', () => {
     const r = calculate('1.2.3');
     // parseFloat("1.2.3") === 1.2; without a numeric validator this leaks.
-    expect(r?.displayPrimary).toBe('Error');
+    expect(r?.isError).toBe(true);
   });
 
   it('"10..5" double decimal → Error', () => {
     const r = calculate('10..5');
-    expect(r?.displayPrimary).toBe('Error');
+    expect(r?.isError).toBe(true);
   });
 });
 
 describe('construction-specific — imperial fraction + feet', () => {
   it('"2\' 6\\" + 3\' 6\\"" → 6\' = 72 inches', () => {
     const r = calculate(`2' 6" + 3' 6"`);
-    expect(r?.resultDecimal).toBe(72);
+    expect(r?.valueCanonical).toBe(72);
   });
 
   it('"-2\' 6\\"" negative feet-inches — defines as -(2\'+6\\")', () => {
     // Calculated Industries ConstructionMaster convention: -(2ft + 6in) = -30".
     const r = calculate(`-2' 6"`);
-    expect(r?.resultDecimal).toBe(-30);
+    expect(r?.valueCanonical).toBe(-30);
   });
 
   it('"2\'-6\\"" dash-separated notation → 30 inches (not subtraction)', () => {
     // Common construction shorthand. Engine likely treats "-" as subtraction.
     const r = calculate(`2'-6"`);
     // If it returns -6 or something weird, that's the bug.
-    expect(r?.resultDecimal).toBe(30);
+    expect(r?.valueCanonical).toBe(30);
   });
 
   it('implicit feet-inches multiplication: "12\' * 8\'" is area (sq ft)', () => {
     const r = calculate(`12' * 8'`);
     expect(r?.dimension).toBe('area');
     // 12ft * 8ft = 96 sqft = 13824 sqin
-    expect(r?.resultDecimal).toBe(12 * 12 * 8 * 12);
+    expect(r?.valueCanonical).toBe(12 * 12 * 8 * 12);
   });
 });
 
@@ -276,11 +274,11 @@ describe('safety — no eval() or code injection', () => {
     // If the engine used eval(), this would leak — asserting it doesn't.
     const r = calculate('Math.PI');
     // Should error or return 0, NOT π.
-    expect(r?.resultDecimal).not.toBeCloseTo(Math.PI, 5);
+    expect(r?.valueCanonical).not.toBeCloseTo(Math.PI, 5);
   });
 
   it('rejects JS-y input without executing it', () => {
     const r = calculate('(function(){return 42})()');
-    expect(r?.resultDecimal).not.toBe(42);
+    expect(r?.valueCanonical).not.toBe(42);
   });
 });

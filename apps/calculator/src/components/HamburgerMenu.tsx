@@ -134,6 +134,22 @@ export default function HamburgerMenu() {
 
           <div className="menu-divider" />
 
+          {/* Histórico — opens HistoryModal mounted in ConversationalCalculator
+              via a window event so we don't have to lift the calc state. */}
+          <button
+            className="menu-item"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('calc:open-history'));
+              setIsOpen(false);
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>Histórico</span>
+          </button>
+
           <button
             className="menu-item"
             onClick={() => { setShowPrivacyDashboard(true); setIsOpen(false); }}

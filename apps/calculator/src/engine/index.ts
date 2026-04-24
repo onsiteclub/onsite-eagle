@@ -41,6 +41,10 @@ export type { Degrees, Pitch } from './triangle';
 export type {
   CalculationResult,
   DimensionType,
-  CanonicalUnit,
+  Dim,
+  OriginalUnit,
+  System,
+  EngineErrorKind,
+  VisorSide,
   Token,
 } from './types';

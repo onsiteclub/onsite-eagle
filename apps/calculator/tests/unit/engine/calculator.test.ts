@@ -41,17 +41,15 @@ describe('parseToInches', () => {
 });
 
 describe('formatInches', () => {
-  it('formats whole inches', () => {
-    // Whole inches without fractions/feet: no " suffix (engine v3.2 behavior)
-    expect(formatInches(8)).toBe('8');
-    expect(formatInches(11)).toBe('11');
+  it('formats whole inches with explicit inch quote (v3 spec Vol 3.3)', () => {
+    expect(formatInches(8)).toBe(`8"`);
+    expect(formatInches(11)).toBe(`11"`);
   });
 
-  it('formats exact feet without empty-quote (D2 fix)', () => {
-    expect(formatInches(12)).toBe("1'");
-    expect(formatInches(36)).toBe("3'");
-    // Regression for "9639' \"" bug (25' 6 × 31' 6 was showing empty inch quote)
-    expect(formatInches(115668)).toBe("9639'");
+  it('formats exact feet with explicit zero inches (v3 spec Vol 3.1)', () => {
+    expect(formatInches(12)).toBe(`1' 0"`);
+    expect(formatInches(36)).toBe(`3' 0"`);
+    expect(formatInches(115668)).toBe(`9639' 0"`);
   });
 
   it('formats fractions', () => {
@@ -65,46 +63,47 @@ describe('formatInches', () => {
   });
 
   it('formats feet and inches', () => {
-    expect(formatInches(30)).toBe("2' 6\"");
-    expect(formatInches(42)).toBe("3' 6\"");
+    expect(formatInches(30)).toBe(`2' 6"`);
+    expect(formatInches(42)).toBe(`3' 6"`);
   });
 
   it('formats feet + fraction without double space', () => {
-    // 1 foot + 1/2" — must be `1' 1/2"` with single space, not `1'  1/2"`
-    expect(formatInches(12.5)).toBe("1' 1/2\"");
-    expect(formatInches(24.25)).toBe("2' 1/4\"");
+    expect(formatInches(12.5)).toBe(`1' 1/2"`);
+    expect(formatInches(24.25)).toBe(`2' 1/4"`);
   });
 
-  // Step 4 — lock in the long-length rendering. Once a measurement crosses
-  // into full-foot territory (72" = 6', 84" = 7', etc.) the primary display
-  // must prefer the feet+inches shape so construction readers can size it
-  // at a glance instead of parsing three digits of total inches.
-  it('renders lengths >= 72" as feet + inches (not raw inches)', () => {
-    expect(formatInches(72)).toBe("6'");
-    expect(formatInches(84)).toBe("7'");
-    expect(formatInches(95)).toBe("7' 11\"");
-    expect(formatInches(120.5)).toBe("10' 1/2\"");
-    expect(formatInches(144.25)).toBe("12' 1/4\"");
+  // v3 spec Vol 3.1 — feet-inches always shows both parts. Zero inches
+  // explicit (`6' 0"` not `6'`) for visual consistency.
+  it('renders lengths >= 72" as feet + inches with explicit zero', () => {
+    expect(formatInches(72)).toBe(`6' 0"`);
+    expect(formatInches(84)).toBe(`7' 0"`);
+    expect(formatInches(95)).toBe(`7' 11"`);
+    // When whole-inches part is zero but a fraction exists, omit the redundant
+    // leading "0" — visor reads "10' 1/2"" not "10' 0 1/2"".
+    expect(formatInches(120.5)).toBe(`10' 1/2"`);
+    expect(formatInches(144.25)).toBe(`12' 1/4"`);
   });
 
   it('formats feet + whole + fraction', () => {
-    expect(formatInches(30.5)).toBe("2' 6 1/2\"");
+    expect(formatInches(30.5)).toBe(`2' 6 1/2"`);
   });
 
+  // v3 spec — bare integer inches still gets the inch quote so the unit
+  // is unambiguous in the visor.
   it('handles zero', () => {
-    expect(formatInches(0)).toBe('0');
+    expect(formatInches(0)).toBe(`0"`);
   });
 
   it('handles sixteenths rounding overflow', () => {
     // 15.99" round(0.99*16)=16 → bumps to 16" → 1' 4"
-    expect(formatInches(15.99)).toBe("1' 4\"");
-    // 11.999" round(0.999*16)=16 → 12" → promotes to 1'
-    expect(formatInches(11.999)).toBe("1'");
+    expect(formatInches(15.99)).toBe(`1' 4"`);
+    // 11.999" round(0.999*16)=16 → 12" → promotes to 1' 0"
+    expect(formatInches(11.999)).toBe(`1' 0"`);
   });
 
-  it('handles negative values', () => {
-    expect(formatInches(-12)).toBe("-1'");
-    expect(formatInches(-6.5)).toBe("-6 1/2\"");
+  it('handles negative values (Unicode minus per v3 spec Vol 3.5)', () => {
+    expect(formatInches(-12)).toBe(`−1' 0"`);
+    expect(formatInches(-6.5)).toBe(`−6 1/2"`);
   });
 });
 
@@ -167,70 +166,70 @@ describe('calculate', () => {
   describe('basic operations', () => {
     it('adds whole numbers', () => {
       const result = calculate('5 + 3');
-      expect(result?.resultDecimal).toBe(8);
+      expect(result?.valueCanonical).toBe(8);
     });
 
     it('subtracts whole numbers', () => {
       const result = calculate('10 - 3');
-      expect(result?.resultDecimal).toBe(7);
+      expect(result?.valueCanonical).toBe(7);
     });
 
     it('multiplies', () => {
       const result = calculate('5 * 3');
-      expect(result?.resultDecimal).toBe(15);
+      expect(result?.valueCanonical).toBe(15);
     });
 
     it('divides', () => {
       const result = calculate('12 / 4');
-      expect(result?.resultDecimal).toBe(3);
+      expect(result?.valueCanonical).toBe(3);
     });
   });
 
   describe('fractions', () => {
     it('adds fractions', () => {
       const result = calculate('1/2 + 1/4');
-      expect(result?.resultDecimal).toBe(0.75);
-      expect(result?.isInchMode).toBe(true);
+      expect(result?.valueCanonical).toBe(0.75);
+      expect(result?.dimension).toBe('length');
     });
 
     it('adds mixed numbers', () => {
       const result = calculate('5 1/2 + 3 1/4');
-      expect(result?.resultDecimal).toBe(8.75);
-      expect(result?.resultFeetInches).toBe('8 3/4"');
+      expect(result?.valueCanonical).toBe(8.75);
+      expect(result?.primary.value).toBe('8 3/4"');
     });
 
     it('subtracts mixed numbers', () => {
       const result = calculate('10 1/2 - 3 1/4');
-      expect(result?.resultDecimal).toBe(7.25);
+      expect(result?.valueCanonical).toBe(7.25);
     });
   });
 
   describe('feet and inches', () => {
     it('adds feet', () => {
       const result = calculate("2' + 1'");
-      expect(result?.resultDecimal).toBe(36);
-      // 36 inches = 3 feet exactly — no empty inch quote (D2 fix)
-      expect(result?.resultFeetInches).toBe("3'");
+      expect(result?.valueCanonical).toBe(36);
+      // v3 spec Vol 3.1: feet-inches always shows both parts; zero inches explicit.
+      expect(result?.primary.value).toBe(`3' 0"`);
     });
 
     it('adds feet and inches', () => {
       const result = calculate("2' 6 + 1' 6");
-      expect(result?.resultDecimal).toBe(48);
-      // 48 inches = 4 feet exactly — no empty inch quote (D2 fix)
-      expect(result?.resultFeetInches).toBe("4'");
+      expect(result?.valueCanonical).toBe(48);
+      // v3 spec Vol 3.1: feet-inches always shows both parts; zero inches explicit.
+      expect(result?.primary.value).toBe(`4' 0"`);
     });
   });
 
   describe('complex expressions', () => {
     it('handles multiple operations', () => {
       const result = calculate('5 1/2 + 3 1/4 - 2');
-      expect(result?.resultDecimal).toBe(6.75);
+      expect(result?.valueCanonical).toBe(6.75);
     });
 
     it('respects PEMDAS with fractions', () => {
       const result = calculate('5 1/2 + 3 * 2');
       // 5.5 + 6 = 11.5
-      expect(result?.resultDecimal).toBe(11.5);
+      expect(result?.valueCanonical).toBe(11.5);
     });
   });
 
@@ -241,25 +240,26 @@ describe('calculate', () => {
 
     it('handles division by zero', () => {
       const result = calculate('5 / 0');
-      expect(result?.resultFeetInches).toBe('Error');
+      expect(result?.isError).toBe(true);
+      expect(result?.errorKind).toBe('division_by_zero');
     });
 
     it('handles pure math mode', () => {
       const result = calculate('100 + 50');
-      expect(result?.isInchMode).toBe(false);
-      expect(result?.resultDecimal).toBe(150);
+      expect(result?.dimension).toBe('scalar');
+      expect(result?.valueCanonical).toBe(150);
     });
   });
 
   describe('percentage', () => {
     it('calculates percentage addition', () => {
       const result = calculate('100 + 10%');
-      expect(result?.resultDecimal).toBe(110);
+      expect(result?.valueCanonical).toBe(110);
     });
 
     it('calculates percentage subtraction', () => {
       const result = calculate('100 - 20%');
-      expect(result?.resultDecimal).toBe(80);
+      expect(result?.valueCanonical).toBe(80);
     });
   });
 });

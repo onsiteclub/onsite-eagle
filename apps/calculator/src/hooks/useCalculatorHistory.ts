@@ -1,5 +1,7 @@
 // src/hooks/useCalculatorHistory.ts
-// Hook para gerenciar histórico de cálculos com persistência
+// Local-only history persistence (Capacitor Preferences on native, localStorage
+// on web). Stores entries shaped like the v3 visor consumes them, so playback
+// is a 1:1 re-render without re-running the engine.
 
 import { useState, useEffect, useCallback } from 'react';
 import { Preferences } from '@capacitor/preferences';
@@ -7,38 +9,27 @@ import { Capacitor } from '@capacitor/core';
 import { logger } from '../lib/logger';
 import type { CalculationResult, HistoryEntry } from '../types/calculator';
 
-const HISTORY_KEY = 'calculator_history';
-// Phase 3.4: expanded persistence to 100 turns. 100 cards render fine without
-// virtualization on modern devices; if scroll perf becomes a problem on low-end
-// Android, add react-window here.
+const HISTORY_KEY = 'calculator_history_v2';  // bump key — old entries won't reload
 const MAX_HISTORY_SIZE = 100;
 
 export function useCalculatorHistory() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Carrega histórico do storage ao montar
   useEffect(() => {
     loadHistory();
   }, []);
 
-  // Carrega histórico do Preferences ou localStorage
   const loadHistory = async () => {
     try {
       let storedHistory: HistoryEntry[] = [];
-
       if (Capacitor.isNativePlatform()) {
         const { value } = await Preferences.get({ key: HISTORY_KEY });
-        if (value) {
-          storedHistory = JSON.parse(value);
-        }
+        if (value) storedHistory = JSON.parse(value);
       } else {
         const value = localStorage.getItem(HISTORY_KEY);
-        if (value) {
-          storedHistory = JSON.parse(value);
-        }
+        if (value) storedHistory = JSON.parse(value);
       }
-
       setHistory(storedHistory);
       logger.history.load(true, storedHistory.length);
     } catch (err) {
@@ -48,11 +39,9 @@ export function useCalculatorHistory() {
     }
   };
 
-  // Salva histórico no storage
   const saveHistory = async (newHistory: HistoryEntry[]) => {
     try {
       const value = JSON.stringify(newHistory);
-
       if (Capacitor.isNativePlatform()) {
         await Preferences.set({ key: HISTORY_KEY, value });
       } else {
@@ -64,30 +53,25 @@ export function useCalculatorHistory() {
     }
   };
 
-  // Adds an entry, capped at MAX_HISTORY_SIZE. Extras (inputMethod/transcription/voiceLogId)
-  // are optional — older callers still pass just the result.
   const addToHistory = useCallback(async (
     result: CalculationResult,
-    extras?: { inputMethod?: 'manual' | 'voice'; transcription?: string; voiceLogId?: string }
+    extras?: { inputMethod?: 'manual' | 'voice'; transcription?: string; voiceLogId?: string },
   ) => {
+    if (result.isError) return;  // never store error results
     const entry: HistoryEntry = {
       id: crypto.randomUUID(),
-      expression: result.expression,
-      resultFeetInches: result.resultFeetInches,
-      resultTotalInches: result.resultTotalInches,
-      resultDecimal: result.resultDecimal,
-      isInchMode: result.isInchMode,
       timestamp: Date.now(),
+      expression: result.expression,
+      dimension: result.dimension,
+      primary: result.primary,
+      secondary: result.secondary,
+      mixedSystems: result.mixedSystems,
+      isApproximate: result.isApproximate,
+      exactForm: result.exactForm,
       inputMethod: extras?.inputMethod,
       transcription: extras?.transcription,
       voiceLogId: extras?.voiceLogId,
-      // Phase 1 — carry engine's dim output so the card doesn't need to re-infer.
-      dimension: result.dimension,
-      unitCanonical: result.unitCanonical,
-      displayPrimary: result.displayPrimary,
-      displaySecondary: result.displaySecondary,
     };
-
     setHistory((prev) => {
       const updated = [entry, ...prev].slice(0, MAX_HISTORY_SIZE);
       saveHistory(updated);
@@ -95,38 +79,33 @@ export function useCalculatorHistory() {
     });
   }, []);
 
-  // Phase 3.5 — replace an entry's expression+result in place (inline edit).
-  // Preserves timestamp + id so the card stays where it is; only the math changes.
+  /** In-place edit (Phase 3.5). Replaces the entry's snapshot with a fresh
+   *  CalculationResult. Preserves id+timestamp so the card stays put. */
   const updateEntry = useCallback((id: string, result: CalculationResult) => {
+    if (result.isError) return;
     setHistory((prev) => {
       const next = prev.map((entry) =>
         entry.id === id
           ? {
               ...entry,
               expression: result.expression,
-              resultFeetInches: result.resultFeetInches,
-              resultTotalInches: result.resultTotalInches,
-              resultDecimal: result.resultDecimal,
-              isInchMode: result.isInchMode,
-              // Edits are implicitly manual — even if the original was voice.
+              dimension: result.dimension,
+              primary: result.primary,
+              secondary: result.secondary,
+              mixedSystems: result.mixedSystems,
+              isApproximate: result.isApproximate,
+              exactForm: result.exactForm,
               inputMethod: 'manual' as const,
-              // Don't preserve transcription/voice_log_id: they no longer describe the result.
               transcription: undefined,
               voiceLogId: undefined,
-              // Keep dim output in sync after recompute.
-              dimension: result.dimension,
-              unitCanonical: result.unitCanonical,
-              displayPrimary: result.displayPrimary,
-              displaySecondary: result.displaySecondary,
             }
-          : entry
+          : entry,
       );
       saveHistory(next);
       return next;
     });
   }, []);
 
-  // Limpa todo o histórico
   const clearHistory = useCallback(async () => {
     try {
       if (Capacitor.isNativePlatform()) {
@@ -141,11 +120,5 @@ export function useCalculatorHistory() {
     }
   }, []);
 
-  return {
-    history,
-    isLoaded,
-    addToHistory,
-    updateEntry,
-    clearHistory,
-  };
+  return { history, isLoaded, addToHistory, updateEntry, clearHistory };
 }
