@@ -172,6 +172,7 @@ function AppContent() {
             voiceState={voiceState}
             setVoiceState={setVoiceState}
             hasVoiceAccess={!!user}
+            userId={user?.id ?? null}
             onVoiceUpgradeClick={handleVoiceUpgradeClick}
             onIntentRouted={handleIntentRouted}
             onAltInterpretation={handleAltInterpretation}

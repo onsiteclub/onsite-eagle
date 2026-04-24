@@ -54,6 +54,10 @@ interface ConversationalCalculatorProps {
   voiceState: VoiceState;
   setVoiceState: (state: VoiceState) => void;
   hasVoiceAccess: boolean;
+  /** Phase C — when present, compute() persists each calculation to
+   *  `ccl_calculations` keyed by this user id. null/undefined keeps the
+   *  calculation local-only (anon mode). */
+  userId?: string | null;
   onVoiceUpgradeClick: () => void;
   onVoiceUsed?: () => void;
   /** Phase 4.2 / Step 2 — when voice returns an intent like "stairs" or
@@ -82,6 +86,7 @@ export default function ConversationalCalculator({
   voiceState,
   setVoiceState,
   hasVoiceAccess,
+  userId,
   onVoiceUpgradeClick,
   onVoiceUsed,
   onIntentRouted,
@@ -199,6 +204,7 @@ export default function ConversationalCalculator({
         const result = setExpressionAndCompute(data.expression, {
           inputMethod: 'voice',
           voiceLogId: data.voice_log_id,
+          userId: userId ?? undefined,
         });
         logger.voice.apiCall(duration, true, {
           status: response.status,
@@ -239,7 +245,7 @@ export default function ConversationalCalculator({
       setVoiceState('idle');
       setPendingTranscription(null);
     }
-  }, [setExpressionAndCompute, setExpression, setVoiceState, addToHistory, hasVoiceTrainingConsent, onVoiceUsed]);
+  }, [setExpressionAndCompute, setExpression, setVoiceState, addToHistory, hasVoiceTrainingConsent, onVoiceUsed, userId, onIntentRouted]);
 
   const { startRecording, stopRecording } = useVoiceRecorder({
     onRecordingComplete: handleAudioUpload,
@@ -309,7 +315,10 @@ export default function ConversationalCalculator({
   const handleKeyClick = (key: string) => {
     switch (key) {
       case '=': {
-        const result = compute({ inputMethod: 'keypad' });
+        const result = compute({
+          inputMethod: 'keypad',
+          userId: userId ?? undefined,
+        });
         if (result) {
           addToHistory(result, { inputMethod: 'manual' });
           setExpression(''); // Fresh composer after commit — result lives in the card.

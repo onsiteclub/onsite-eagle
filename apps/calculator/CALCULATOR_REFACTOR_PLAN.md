@@ -1,7 +1,7 @@
 # OnSite Calculator — Plano de Refactor (Motor + UX)
 
 **Criado em:** 2026-04-23
-**Status:** Fase A ✅ · Fase B ✅ · Fase C ⏳ · Fase D ⏳
+**Status:** Fase A ✅ · Fase B ✅ · Fase C ✅ · Fase D ⏳
 **Escopo:** `apps/calculator/` no monorepo eagle. Sem branches, commits direto na `main` (convenção do ecossistema).
 
 > **Nota sobre o plano antigo.** Este documento **substitui as Fases 0–4** de [REFACTOR_AND_MIGRATION_PLAN.md](./REFACTOR_AND_MIGRATION_PLAN.md). O plano antigo continua válido como referência de longo prazo (Fase 5+: voz real, Sentry, monetização, iOS, Stairs/Triangle v2). Se houver conflito entre os dois, este prevalece até Fase D concluir.
@@ -48,7 +48,7 @@ Entregar uma Calculator funcional no monorepo com **motor puro testado, UX manua
 
 **Entrega (2026-04-23).** Auditoria revelou que a infraestrutura de degradação graciosa já existia: `supabase` é `null` sem env vars ([supabase.ts:46-60](./src/lib/supabase.ts#L46-L60)), App envolve em `AuthProvider` só quando há supabase ([App.tsx:30-40](./src/App.tsx#L30-L40)), `saveCalculation` pula sem `userId` ([calculations.ts:87-96](./src/lib/calculations.ts#L87-L96)), histórico é 100% local via Capacitor Preferences, Sentry é no-op sem DSN. Keypad + fraction pad cobrem aritmética imperial; Stairs/Triangle/Converter têm formulários manuais estruturados. Único bloqueio encontrado: marcadores de merge conflict não resolvidos em ConversationalCalculator.tsx (linhas 19-23 e 616-620) — removidos. **Validação: 217/217 testes, typecheck limpo, lint limpo, `vite build` roda sem nenhuma env var (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SENTRY_DSN`, `VITE_OPENAI_API_KEY`, `VITE_API_URL` todas ausentes) — `built in 1.76s`.**
 
-## Fase C — Camadas de produto
+## Fase C — Camadas de produto ✅
 
 **Objetivo.** Adicionar auth, persistência de histórico e privacy dashboard funcional por cima da UX validada na Fase B.
 
@@ -57,6 +57,8 @@ Entregar uma Calculator funcional no monorepo com **motor puro testado, UX manua
 **Critério de saída.** Usuário anônimo faz cálculo e vê resultado; usuário logado faz cálculo e vê histórico persistido; usuário logado deleta dados pelo privacy dashboard e confirma no Supabase que as linhas sumiram. Logger escreve na tabela correta.
 
 **Estimativa.** 3–4 dias.
+
+**Entrega (2026-04-23).** Auditoria corrigiu dois itens que o panorama original havia marcado errado: (i) `src/lib/device.ts` já existia e está bem feito (68 linhas, cache + fallback para localStorage, `rotateDeviceId()` após deleção); (ii) o "bug" de `logger.ts` escrever em `app_logs` não é bug — CLAUDE.md §8.14 documenta `app_logs` como tabela válida com schema que bate exatamente com o que o logger envia (level, module, action, context, device_info, success, app_name, app_version). `PrivacyDashboard` já está wired via [HamburgerMenu.tsx:139](./src/components/HamburgerMenu.tsx#L139), `/api/privacy/delete` já existe e deleta de `ccl_calculations`, `core_voice_logs`, `log_errors`, `log_events` (identificação por JWT ou x-device-id). `@sentry/react` continua instalado como no-op sem DSN — decisão de desinstalar fica com o humano. **Única mudança real de código:** propagar `user.id` de [App.tsx:174-175](./src/App.tsx) para `ConversationalCalculator` via nova prop `userId`, que passa para `compute()` e `setExpressionAndCompute()` — sem isso `saveCalculation()` nunca disparava mesmo com usuário logado, porque o hook `useCalculator` filtra em `saveOptions?.userId`. Bônus: adicionar `userId` + `onIntentRouted` aos deps do `useCallback` do `handleAudioUpload` eliminou um warning preexistente de react-hooks/exhaustive-deps. **Validação: 217/217 testes, tsc limpo no escopo calculator, lint sem warnings novos, `vite build` sem env vars ✓ 1.81s.**
 
 ## Fase D — Input conversacional com placeholder determinístico
 
