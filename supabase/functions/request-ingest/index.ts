@@ -73,7 +73,7 @@ Deno.serve(async (req: Request) => {
     // --- Step 0: Route by receiving number (multi-tenant) ---
     const { data: opNumber } = await supabase
       .from('frm_operator_numbers')
-      .select('operator_id, site_id')
+      .select('id, operator_id, site_id')
       .eq('phone_e164', toNumber)
       .eq('status', 'active')
       .maybeSingle();
@@ -82,11 +82,30 @@ Deno.serve(async (req: Request) => {
       return twimlResponse('This number is not yet configured. Contact your supervisor.');
     }
 
-    // --- Step 1: Find or create worker for this site ---
-    const worker = await upsertWorker(phone, opNumber.site_id);
-    if (!worker.jobsite_id) {
-      return twimlResponse('Worker not assigned to a jobsite. Contact your supervisor.');
+    // --- Step 0b: Auto-materialize a default jobsite if this number isn't linked yet.
+    // Test mode: operator can start receiving SMS without pre-configuring a site.
+    let siteId: string | null = opNumber.site_id;
+    if (!siteId) {
+      const { data: newSite, error: siteErr } = await supabase
+        .from('frm_jobsites')
+        .insert({ name: 'Default Site', builder_name: 'Default' })
+        .select('id')
+        .single();
+
+      if (siteErr || !newSite) {
+        console.error('Auto-create jobsite failed:', siteErr);
+        return twimlResponse('Setup error. Contact your supervisor.');
+      }
+
+      siteId = newSite.id;
+      await supabase
+        .from('frm_operator_numbers')
+        .update({ site_id: siteId })
+        .eq('id', opNumber.id);
     }
+
+    // --- Step 1: Find or create worker for this site ---
+    const worker = await upsertWorker(phone, siteId);
 
     // --- Step 2: Check machine status ---
     const { data: jobsite } = await supabase
