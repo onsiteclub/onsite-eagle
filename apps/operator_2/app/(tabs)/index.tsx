@@ -28,6 +28,7 @@ interface IncomingRequest {
   worker_phone: string | null;
   worker_name: string | null;
   created_at: string;
+  lot_text_hint: string | null;
   lot: { lot_number: string } | null;
 }
 
@@ -215,38 +216,62 @@ function RequestCard({
   const flag = req.language_detected ? LANG_FLAGS[req.language_detected] : null;
   const timeLabel = new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // Prefer the matched lot from frm_lots (verified); fall back to the AI's
+  // raw extraction (unverified); show "?" only if truly missing.
+  const lotLabel = req.lot?.lot_number ?? req.lot_text_hint ?? '?';
+  const lotUnmatched = !req.lot?.lot_number && !!req.lot_text_hint;
+
   return (
     <View style={[styles.card, isDelivered && styles.cardDelivered]}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.metaText} numberOfLines={1}>
-          {req.worker_name || req.worker_phone || 'Unknown'}
-          {'  ·  '}
-          {timeLabel}
-          {flag ? `  ·  ${flag}` : ''}
+      {/* Header: meta info (worker · time · lang) */}
+      <Text style={styles.metaText} numberOfLines={1}>
+        {req.worker_name || req.worker_phone || 'Unknown'}
+        {'  ·  '}
+        {timeLabel}
+        {flag ? `  ·  ${flag}` : ''}
+      </Text>
+
+      {/* H1: LOT number */}
+      <View style={styles.lotRow}>
+        <Text style={[styles.lotTitle, isDelivered && styles.textMuted]}>
+          LOT {lotLabel}
         </Text>
+        {lotUnmatched ? (
+          <Text style={styles.lotUnmatchedBadge}>unverified</Text>
+        ) : null}
+      </View>
+
+      {/* H2: raw message in a responsive bubble */}
+      <View style={styles.messageBubble}>
+        <Text style={[styles.messageText, isDelivered && styles.textMuted]}>
+          {rawMessage}
+        </Text>
+      </View>
+
+      {/* Actions: translate (AI) + delivered */}
+      <View style={styles.actionsRow}>
         <Pressable
           onPress={onOpenAI}
-          style={styles.aiIcon}
+          style={styles.iconBtn}
           hitSlop={8}
           accessibilityLabel="AI helper"
         >
-          <Text style={styles.aiIconText}>✨</Text>
+          <Text style={styles.iconBtnText}>✨</Text>
         </Pressable>
-      </View>
 
-      <Text style={[styles.rawMessage, isDelivered && styles.textMuted]}>
-        {rawMessage}
-      </Text>
-
-      <View style={styles.cardAction}>
         {isDelivered && req.delivered_at ? (
           <Text style={styles.deliveredTime}>
             {'✓'} Delivered{' '}
             {new Date(req.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         ) : showDeliverButton ? (
-          <Pressable style={styles.deliverBtn} onPress={() => onDeliver(req.id)}>
-            <Text style={styles.deliverBtnText}>{'✓'} Delivered</Text>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => onDeliver(req.id)}
+            hitSlop={8}
+            accessibilityLabel="Mark delivered"
+          >
+            <Text style={styles.iconBtnText}>✓</Text>
           </Pressable>
         ) : null}
       </View>
@@ -465,53 +490,68 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   cardDelivered: {
-    opacity: 0.65,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
+    opacity: 0.6,
   },
   metaText: {
     fontSize: 12,
     color: colors.textSecondary,
-    flex: 1,
-    marginRight: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  aiIcon: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
+  lotRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  aiIconText: {
-    fontSize: 18,
-  },
-  rawMessage: {
-    fontSize: 17,
-    lineHeight: 24,
+  lotTitle: {
+    fontSize: 28,
+    fontWeight: '800',
     color: colors.text,
+    letterSpacing: -0.5,
+  },
+  lotUnmatchedBadge: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    color: colors.warning,
+    letterSpacing: 0.5,
+  },
+  messageBubble: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     marginBottom: spacing.md,
+    alignSelf: 'stretch',
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.text,
   },
   textMuted: {
     color: colors.textSecondary,
   },
-  cardAction: {
+  actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  deliverBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+  iconBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.text,
-    borderRadius: borderRadius.sm,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
   },
-  deliverBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
+  iconBtnText: {
+    fontSize: 20,
     color: colors.text,
   },
   deliveredTime: {

@@ -34,17 +34,33 @@ Input: one text message from a construction worker, in any language.
 Output: strict JSON in the shape { "orders": [ ... ] }. English only inside. No prose, no markdown.
 
 Each order object has these fields:
-- lot: string or null  (e.g. "15", "22A", null if absent)
+- lot: string or null  (e.g. "15", "22A", "70-C", "15B", null if truly absent)
 - material: string or null  (canonical English, e.g. "OSB 5/8\\"", "2x6 8ft SPF", "shingles bundle")
 - quantity: number or null
 - confidence: number 0-1
 - language: ISO-639-1 code of the input
 - notes: string or null (anything the operator should know)
 
+LOT EXTRACTION is the single most valuable field. Extract it aggressively.
+Recognize lot in these forms (any language, any position in the message):
+- Explicit markers (English): "lot 15", "LOT 15", "L15", "l15", "#15", "house 15"
+- Explicit markers (Portuguese): "lote 15", "lt 15", "casa 15"
+- Explicit markers (Spanish): "lote 15", "casa 15"
+- Explicit markers (Tagalog): "bahay 15", "lote 15"
+- Suffix formats: "22A", "70-C", "15-B", "15.A", "15/A", "15B"
+- Compact: "lot15" (no space), "L15B"
+- With preposition: "for lot 15", "to 15", "para o 15", "at 15"
+- Standalone number if clearly a lot reference (e.g. "15 - 10 2x6"): yes
+- Standalone number if ambiguous with quantity or material spec (e.g. "send 10"): no
+- Multiple lots in one message: return multiple order objects, one per lot
+
+Preserve the lot EXACTLY as the worker wrote it (keep letter suffixes, dashes,
+leading zeros). Do not normalize "22A" to "22". Do not normalize "70-C" to "70C".
+
 Rules:
 - If the message contains one order, return { "orders": [ <single object> ] }.
 - If multiple orders, return all of them inside the orders array.
-- If lot is missing, set it to null. Do not guess from context.
+- If lot is genuinely absent (no marker AND no plausible bare number), set null.
 - Use the worker's prior vocabulary patterns (provided below) to resolve slang.
 - Never fabricate numbers. If quantity is unclear, null.`;
 
@@ -161,7 +177,8 @@ Deno.serve(async (req: Request) => {
 
       await supabase.from('frm_material_requests').insert({
         jobsite_id: worker.jobsite_id,
-        lot_id: lotId, // NULL if AI could not resolve a lot
+        lot_id: lotId, // NULL if no matching frm_lots row
+        lot_text_hint: lotNumber ? String(lotNumber) : null, // what AI extracted, even if unmatched
         phase_id: null, // SMS-sourced requests have no phase context
         material_name: order.material || null,
         quantity: order.quantity || null,
