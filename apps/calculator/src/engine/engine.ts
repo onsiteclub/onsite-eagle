@@ -1,27 +1,62 @@
 // src/engine/engine.ts
-// Engine de cálculo para medidas de construção (inches, feet, frações).
-// Phase 1: dimensional arithmetic. Multiplicar dois comprimentos vira área;
-// multiplicar área por comprimento vira volume. Escalares adaptam ao contexto
-// (ex: `5 1/2 + 3 * 2` = 11.5 inches — o 3 e 2 são dimensionless e somam como
-// comprimento por coerção). Somas/subtrações entre dimensões explícitas diferentes
-// dão erro.
+// Engine v2 — exact-arithmetic construction calculator.
 //
-// Pure module: no React, no Supabase, no network I/O, no logger side effects.
-// Callers that want telemetry wrap `calculate()` on their side.
+// Architecture
+// ============
+// Split of responsibility:
+//   1. Preprocess  — normalize unicode ops, strip thousand separators, accept PT
+//                    decimal comma, collapse dash-separated feet-inches notation
+//                    (2'-6" → 2' 6"), reject consecutive binary operators.
+//   2. Extract     — scan for construction-specific number tokens (feet-inches,
+//                    mixed numbers, bare fractions), replace each with a
+//                    placeholder variable __v{i}. The extracted Quantity (value
+//                    as Fraction + dimension) is stashed in a context map.
+//   3. Parse       — hand the placeholder-substituted expression to expr-eval's
+//                    parser. Expr-eval validates parens, unary, PEMDAS, catches
+//                    malformed numbers (1.2.3), trailing operators, unbalanced
+//                    parens — everything the legacy hand-rolled evaluator
+//                    silently accepted.
+//   4. Evaluate    — walk expr-eval's internal RPN (Expression.tokens) ourselves,
+//                    using fraction.js for exact rational arithmetic. Walking
+//                    the RPN instead of calling expr.evaluate() is how we sneak
+//                    Fraction math past expr-eval's number-native operators.
+//                    Dimensional coercion (length × length = area, etc.) is
+//                    applied at each IOP2 step.
+//   5. Build       — convert the final Fraction → decimal (only at the boundary,
+//                    for display), package with dimension-aware formatters.
+//
+// Domain rules codified here (each came from an adversarial test or directive):
+//   - 2'-6"  = 30 inches       (dash is notation, NOT subtraction)
+//   - -2' 6" = -30 inches      (leading minus applies to the whole quantity)
+//   - 3,5    = 3.5             (PT decimal comma)
+//   - 1,234  = 1234            (comma followed by exactly 3 digits = thousand sep)
+//   - 1.2.3  = Error           (malformed, not silent truncation to 1.2)
+//   - * 5    = Error           (leading binary operator)
+//   - 5 +    = Error           (trailing operator)
+//   - 5 ++ 3 = Error           (consecutive binary, even if expr-eval would accept)
+//   - 5 -- 3 = 8               (unary after binary is OK for `-`)
+//   - 0.1+0.2 = exactly 0.3    (Fraction backbone eliminates IEEE-754 drift)
+//   - Bare "N/D" requires N < D (proper fraction). "51/2" without a space is
+//     rejected — improper bare fractions must be written as mixed numbers.
+//
+// Pure module: no React, no Supabase, no network. Engine throws on invalid
+// input; `calculate()` wraps and returns an error result.
 
+import Fraction from 'fraction.js';
+import { Parser as ExprEvalParser } from 'expr-eval';
 import type { CalculationResult, DimensionType } from './types';
 
-// ============================================
-// TIPOS INTERNOS
-// ============================================
+// ============================================================================
+// INTERNAL TYPES
+// ============================================================================
 
-/** 0 = escalar puro, 1 = comprimento (in), 2 = área (sqin), 3 = volume (cuin). */
+/** Power-of-length exponent. 0 scalar, 1 length, 2 area, 3 volume. */
 type Dim = 0 | 1 | 2 | 3;
 
-/** Valor numérico acompanhado da dimensão que ele representa.
- *  Comprimentos são sempre em polegadas (inches), áreas em sqin, volumes em cuin. */
+/** A number with its dimension. Length values are stored in inches, area in
+ *  square inches, volume in cubic inches. */
 interface Quantity {
-  value: number;
+  value: Fraction;
   dim: Dim;
 }
 
@@ -29,109 +64,178 @@ function dimName(d: Dim): DimensionType {
   return (['scalar', 'length', 'area', 'volume'] as const)[d];
 }
 
-// ============================================
-// CONVERSORES (público — testes dependem)
-// ============================================
+// ============================================================================
+// PREPROCESSING
+// ============================================================================
 
-/**
- * Converte um valor (com ou sem fração/feet) para polegadas decimais.
- * Função pura sobre a string de entrada — NÃO carrega dim, só valor.
- * Exemplos: "5 1/2" → 5.5, "3'" → 36, "2' 6" → 30, "7" → 7
- */
-export function parseToInches(str: string): number {
-  let s = str.trim().replace(/"/g, '');
-  let totalInches = 0;
+/** Normalize unicode operators, handle dash-separated feet-inches, resolve PT
+ *  decimal comma and US thousand separators. */
+function preprocess(input: string): string {
+  let s = input.trim();
+  s = s.replace(/×/g, '*').replace(/÷/g, '/');
+  // Dash between feet marker and inches is notation, not subtraction.
+  // "2'-6" becomes "2' 6"; also "2' - 6\"" collapses to "2' 6\"".
+  s = s.replace(/(\d\s*)'\s*-\s*(\d)/g, "$1' $2");
+  // Thousand separators: digit comma exactly-3-digits, not followed by another digit.
+  s = s.replace(/(\d),(\d{3})(?!\d)/g, '$1$2');
+  // PT decimal comma: digit comma digit (after thousand stripping, remaining
+  // commas between digits must be decimal points).
+  s = s.replace(/(\d),(\d)/g, '$1.$2');
+  // Collapse internal whitespace.
+  s = s.replace(/[\t\n\r]+/g, ' ').replace(/ {2,}/g, ' ');
+  return s;
+}
 
+// Reject consecutive binary operators (double-plus, plus-star, star-slash,
+// slash-slash, plus-slash). We accept `-` after any binary op — it becomes a
+// unary minus, mathematically sound. We accept `+` after `-`/`*`/`/` as
+// unary-plus (no-op). Rejecting two "real binary" operators adjacent because
+// that's always a typo.
+//
+// (This comment is `//` line-style on purpose — a JSDoc block containing the
+// string `*` followed by `/` closes the comment early.)
+function rejectConsecutiveBinary(s: string): void {
+  // Matches any pair of operators where the SECOND is +, *, or / (not -).
+  // Examples caught: double-plus, plus-star, star-slash, slash-slash, plus-slash.
+  // Examples NOT caught (intentional — unary minus is legal after any binary):
+  // plus-minus, star-minus, slash-minus, minus-minus.
+  if (/[+\-*/]\s*[+*/]/.test(s)) {
+    throw new Error('Consecutive binary operators');
+  }
+}
+
+// ============================================================================
+// CONSTRUCTION TOKEN EXTRACTION
+// ============================================================================
+
+// Regex matching a construction-specific number token. Ordered longest-first:
+// feet+wholeInches+fraction, feet+fraction, feet+wholeInches, bare feet,
+// mixed number, bare fraction. Trailing inch marker always optional. Leading
+// minus is NOT captured (unary handled by expr-eval downstream).
+// Built via RegExp constructor so the apostrophe and quote characters can live
+// in a plain string instead of a regex literal.
+const APOS = "'";
+const QUOTE = '"';
+const CT_PATTERN =
+  '\\b\\d+(?:\\.\\d+)?\\s*' + APOS + '\\s*\\d+\\s+\\d+/\\d+\\s*' + QUOTE + '?' +
+  '|\\b\\d+(?:\\.\\d+)?\\s*' + APOS + '\\s*\\d+/\\d+\\s*' + QUOTE + '?' +
+  '|\\b\\d+(?:\\.\\d+)?\\s*' + APOS + '\\s*\\d+\\s*' + QUOTE + '?' +
+  '|\\b\\d+(?:\\.\\d+)?\\s*' + APOS +
+  '|\\b\\d+\\s+\\d+/\\d+\\s*' + QUOTE + '?' +
+  '|\\b\\d+/\\d+\\s*' + QUOTE + '?' +
+  // Bare-inches token: digit(s) followed by an inch quote, possibly with a
+  // space between (the PT parser emits "3 \"" for "três polegadas"). Without
+  // this branch the standalone inch quote would leak to expr-eval as garbage.
+  '|\\b\\d+(?:\\.\\d+)?\\s*' + QUOTE;
+const CONSTRUCTION_TOKEN = new RegExp(CT_PATTERN, 'g');
+
+/** Parse a single construction number literal into a Fraction. The token must
+ *  not include a leading sign (caller handles that via unary minus). */
+function parseConstructionToken(raw: string): Fraction {
+  // Strip inch quotes AND any whitespace introduced by the regex capturing
+  // spaces on either side of the marker (e.g. the token "3 \"" becomes "3").
+  let s = raw.trim().replace(/"/g, '').trim();
+
+  let totalInches = new Fraction(0);
+
+  // Feet-inches form.
   if (s.includes("'")) {
-    const parts = s.split("'");
-    const feet = parseFloat(parts[0]) || 0;
-    totalInches += feet * 12;
-    s = (parts[1] || '').trim();
+    const apo = s.indexOf("'");
+    const feetStr = s.slice(0, apo).trim();
+    const rest = s.slice(apo + 1).trim();
+
+    if (!/^\d+(?:\.\d+)?$/.test(feetStr)) {
+      throw new Error(`Malformed feet value: "${feetStr}"`);
+    }
+    totalInches = new Fraction(feetStr).mul(12);
+    s = rest;
   }
 
   if (!s) return totalInches;
 
-  const mixedMatch = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
-  if (mixedMatch) {
-    const whole = parseFloat(mixedMatch[1]);
-    const num = parseFloat(mixedMatch[2]);
-    const den = parseFloat(mixedMatch[3]);
-    return totalInches + whole + (num / den);
+  // Mixed number "W N/D"
+  const mixed = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixed) {
+    const [, whole, num, den] = mixed;
+    if (den === '0') throw new Error('Zero denominator in fraction');
+    return totalInches.add(new Fraction(whole)).add(new Fraction(+num, +den));
   }
 
-  const fracMatch = s.match(/^(\d+)\/(\d+)$/);
-  if (fracMatch) {
-    return totalInches + (parseFloat(fracMatch[1]) / parseFloat(fracMatch[2]));
+  // Bare fraction "N/D" — proper only (N < D) to avoid silently accepting
+  // "51/2" without a space (test #8 in adversarial). Improper bare fractions
+  // must be rewritten as mixed numbers "25 1/2".
+  const frac = s.match(/^(\d+)\/(\d+)$/);
+  if (frac) {
+    const num = +frac[1];
+    const den = +frac[2];
+    if (den === 0) throw new Error('Zero denominator in fraction');
+    if (num >= den) {
+      throw new Error(`Improper bare fraction "${num}/${den}" — use mixed form`);
+    }
+    return totalInches.add(new Fraction(num, den));
   }
 
-  return totalInches + (parseFloat(s) || 0);
+  // Plain decimal or integer — strict regex to catch `1.2.3` and `10..5`.
+  if (!/^\d+(?:\.\d+)?$/.test(s)) {
+    throw new Error(`Malformed number: "${s}"`);
+  }
+  return totalInches.add(new Fraction(s));
 }
 
-/**
- * Classifica a dimensão intrínseca de um token.
- * Marcadores `'` ou `"` => comprimento. Fração `n/m` dentro do token => comprimento.
- * Caso contrário escalar.
- */
-function tokenDim(token: string): Dim {
-  if (/['"]/.test(token)) return 1;
-  if (/\d+\/\d+/.test(token)) return 1;
+/** Classify a construction token's dimension. `'` or `"` ⇒ length; a fraction
+ *  on its own ⇒ length (imperial convention — `1/2` is half-inch, not 0.5). */
+function classifyTokenDim(raw: string): Dim {
+  if (/['"]/.test(raw)) return 1;
+  if (/\d+\/\d+/.test(raw)) return 1;
   return 0;
 }
 
-function parseTokenToQuantity(token: string): Quantity {
-  return { value: parseToInches(token), dim: tokenDim(token) };
-}
-
-// ============================================
-// ÁLGEBRA DE QUANTITY
-// ============================================
+// ============================================================================
+// QUANTITY ALGEBRA (Fraction-based, with dim tracking)
+// ============================================================================
 
 function mulQ(a: Quantity, b: Quantity): Quantity {
   const newDim = a.dim + b.dim;
-  if (newDim > 3) throw new Error('Dimensão acima de volume (dim > 3)');
-  return { value: a.value * b.value, dim: newDim as Dim };
+  if (newDim > 3) throw new Error('Dimension above volume (dim > 3)');
+  return { value: a.value.mul(b.value), dim: newDim as Dim };
 }
 
 function divQ(a: Quantity, b: Quantity): Quantity {
-  if (b.value === 0) return { value: NaN, dim: 0 };
+  if (b.value.equals(0)) throw new Error('Division by zero');
   const newDim = a.dim - b.dim;
-  if (newDim < 0) throw new Error('Divisão produz dimensão negativa');
-  return { value: a.value / b.value, dim: newDim as Dim };
+  if (newDim < 0) throw new Error('Division produces negative dimension');
+  return { value: a.value.div(b.value), dim: newDim as Dim };
 }
 
-/**
- * Para soma/subtração: dimensões iguais somam direto.
- * Se uma delas é escalar (dim 0), é promovida à dim da outra (coerção
- * contextual — um carpinteiro dizendo `5 1/2 + 3` entende que o 3 é polegadas).
- * Dimensões explícitas diferentes (ex: length + area) lançam erro.
- */
 function coerceForAddSub(a: Quantity, b: Quantity): [Quantity, Quantity] {
   if (a.dim === b.dim) return [a, b];
   if (a.dim === 0) return [{ value: a.value, dim: b.dim }, b];
   if (b.dim === 0) return [a, { value: b.value, dim: a.dim }];
-  throw new Error(
-    `Não posso somar/subtrair ${dimName(a.dim)} com ${dimName(b.dim)}`
-  );
+  throw new Error(`Cannot add/subtract ${dimName(a.dim)} with ${dimName(b.dim)}`);
 }
 
 function addQ(a: Quantity, b: Quantity): Quantity {
   const [l, r] = coerceForAddSub(a, b);
-  return { value: l.value + r.value, dim: l.dim };
+  return { value: l.value.add(r.value), dim: l.dim };
 }
 
 function subQ(a: Quantity, b: Quantity): Quantity {
   const [l, r] = coerceForAddSub(a, b);
-  return { value: l.value - r.value, dim: l.dim };
+  return { value: l.value.sub(r.value), dim: l.dim };
 }
 
-// ============================================
-// FORMATTERS
-// ============================================
+function negQ(a: Quantity): Quantity {
+  return { value: a.value.neg(), dim: a.dim };
+}
 
-/**
- * Formata polegadas decimais para formato de construção.
- * Exemplos: 30 → "2' 6\"", 36 → "3'", 11.5 → "11 1/2\"", 20 → "20".
- */
+// ============================================================================
+// FORMATTERS
+// ============================================================================
+// Formatters take `number` (decimal) because display output is ultimately a
+// string and floats round-trip fine through here. Exact math already happened
+// upstream in Fraction land.
+
+/** Imperial display: 30 → "2' 6\"", 11.5 → "11 1/2\"", 20 → "20". */
 export function formatInches(inches: number): string {
   if (!isFinite(inches)) return 'Error';
 
@@ -182,10 +286,7 @@ export function formatInches(inches: number): string {
   return (negative ? '-' : '') + result;
 }
 
-/**
- * Formata polegadas totais com fração (não decimal).
- * Exemplo: 24.875 → "24 7/8 In". Inteiro puro sem fração → "20".
- */
+/** Total-inches display with fraction: 24.875 → "24 7/8 In", 20 → "20". */
 export function formatTotalInches(inches: number): string {
   if (!isFinite(inches)) return 'Error';
 
@@ -214,134 +315,142 @@ export function formatTotalInches(inches: number): string {
   return (negative ? '-' : '') + adjustedWhole.toString();
 }
 
-/**
- * Formata número: inteiro sem decimais, quebrado com 2 casas decimais.
- */
-export function formatNumber(num: number): string {
+function formatNumber(num: number): string {
   if (!isFinite(num)) return 'Error';
   if (Number.isInteger(num)) return num.toString();
   return parseFloat(num.toFixed(2)).toString();
 }
 
-/** Área em polegadas quadradas → display primário em sqft + secundário em sqin. */
 function formatArea(sqin: number): { primary: string; secondary: string } {
   const sqft = sqin / 144;
-  return {
-    primary: `${formatNumber(sqft)} sq ft`,
-    secondary: `${formatNumber(sqin)} sq in`,
-  };
+  return { primary: `${formatNumber(sqft)} sq ft`, secondary: `${formatNumber(sqin)} sq in` };
 }
 
-/** Volume em polegadas cúbicas → display primário em cuft + secundário em cuin. */
 function formatVolume(cuin: number): { primary: string; secondary: string } {
   const cuft = cuin / 1728;
-  return {
-    primary: `${formatNumber(cuft)} cu ft`,
-    secondary: `${formatNumber(cuin)} cu in`,
-  };
+  return { primary: `${formatNumber(cuft)} cu ft`, secondary: `${formatNumber(cuin)} cu in` };
 }
 
-// ============================================
-// TOKENIZER (público — testes dependem)
-// ============================================
+// ============================================================================
+// PARSE TO INCHES (legacy-compatible public API)
+// ============================================================================
+// Returns a `number`, not a `Fraction`, because existing UI components
+// (StairsCalculator, TriangleCalculator, UnitConverter) import and consume
+// this as a decimal. Internally the work is exact.
 
-/**
- * Quebra expressão em tokens (números e operadores).
- * "5 1/2 + 3 1/4 - 2" → ["5 1/2", "+", "3 1/4", "-", "2"]
- */
-export function tokenize(expression: string): string[] {
-  const tokens: string[] = [];
-  let current = '';
-  const expr = expression.trim();
+export function parseToInches(str: string): number {
+  const input = str.trim();
+  if (!input) return 0;
 
-  for (let i = 0; i < expr.length; i++) {
-    const char = expr[i];
-    const nextChar = expr[i + 1] || '';
+  // Handle leading sign (unary minus applies to the whole quantity).
+  const sign = input.startsWith('-') ? -1 : 1;
+  const body = sign < 0 ? input.slice(1).trim() : input;
 
-    if ((char === '+' || char === '-' || char === '*' || char === '/' || char === '×' || char === '÷')
-        && current.trim() !== ''
-        && (expr[i - 1] === ' ' || nextChar === ' ' || nextChar === '' || i === expr.length - 1)) {
+  try {
+    const preprocessed = preprocess(body);
+    const f = parseConstructionToken(preprocessed);
+    return sign * f.valueOf();
+  } catch {
+    return 0;
+  }
+}
 
-      // Fração? Não é operador.
-      if (char === '/' && /\d$/.test(current.trim()) && /^\d/.test(nextChar)) {
-        current += char;
-        continue;
+// ============================================================================
+// EVALUATE — walk expr-eval's RPN applying Fraction operations
+// ============================================================================
+
+// Single parser instance; we disable the risky/unused operator families and
+// every transcendental function to reduce surface area. What remains: +, -,
+// *, /, parens, unary minus/plus.
+const parser = new ExprEvalParser({
+  operators: {
+    add: true,
+    subtract: true,
+    multiply: true,
+    divide: true,
+    power: false,
+    remainder: false,
+    factorial: false,
+    comparison: false,
+    logical: false,
+    conditional: false,
+    concatenate: false,
+    assignment: false,
+    fndef: false,
+    in: false,
+    // Disable transcendental functions so `Math.PI` or `sin(1)` don't evaluate
+    // (belt-and-suspenders — we don't pass them as context either).
+    sin: false, cos: false, tan: false,
+    asin: false, acos: false, atan: false,
+    sinh: false, cosh: false, tanh: false,
+    asinh: false, acosh: false, atanh: false,
+    sqrt: false, log: false, ln: false, lg: false, log10: false,
+    abs: false, ceil: false, floor: false, round: false, trunc: false,
+    exp: false, length: false, random: false, min: false, max: false,
+    cbrt: false, expm1: false, log1p: false, sign: false, log2: false,
+  },
+  allowMemberAccess: false,
+});
+
+/** Walks expr-eval's internal RPN (Expression.tokens) using Fraction operations
+ *  keyed by our placeholder context. This is how we get exact arithmetic —
+ *  expr-eval's own evaluator works in `number` and would leak IEEE-754 drift. */
+function evaluateRPN(tokens: Array<{ type: string; value: unknown }>, ctx: Map<string, Quantity>): Quantity {
+  const stack: Quantity[] = [];
+
+  for (const tok of tokens) {
+    switch (tok.type) {
+      case 'INUMBER': {
+        // Raw numeric literal that didn't need construction extraction.
+        // Starts as a scalar; dimensional coercion happens on operators.
+        stack.push({ value: new Fraction(tok.value as number | string), dim: 0 });
+        break;
       }
-
-      if (current.trim()) tokens.push(current.trim());
-      let op = char;
-      if (char === '×') op = '*';
-      if (char === '÷') op = '/';
-      tokens.push(op);
-      current = '';
-    } else {
-      current += char;
+      case 'IVAR': {
+        const name = tok.value as string;
+        const q = ctx.get(name);
+        if (!q) throw new Error(`Unknown variable: ${name}`);
+        stack.push(q);
+        break;
+      }
+      case 'IOP1': {
+        const a = stack.pop();
+        if (!a) throw new Error('Stack underflow at unary operator');
+        switch (tok.value) {
+          case '-': stack.push(negQ(a)); break;
+          case '+': stack.push(a); break;
+          default:  throw new Error(`Unsupported unary operator: ${tok.value}`);
+        }
+        break;
+      }
+      case 'IOP2': {
+        const b = stack.pop();
+        const a = stack.pop();
+        if (!a || !b) throw new Error('Stack underflow at binary operator');
+        switch (tok.value) {
+          case '+': stack.push(addQ(a, b)); break;
+          case '-': stack.push(subQ(a, b)); break;
+          case '*': stack.push(mulQ(a, b)); break;
+          case '/': stack.push(divQ(a, b)); break;
+          default:  throw new Error(`Unsupported binary operator: ${tok.value}`);
+        }
+        break;
+      }
+      default:
+        throw new Error(`Unsupported token type: ${tok.type}`);
     }
   }
 
-  if (current.trim()) tokens.push(current.trim());
-  return tokens;
+  if (stack.length !== 1) throw new Error('Eval stack imbalance');
+  return stack[0];
 }
 
-// ============================================
-// EVALUATOR (Quantity-aware)
-// ============================================
-
-/**
- * Avalia uma lista de tokens já tokenizada aplicando PEMDAS e retorna
- * o valor decimal resultante em polegadas (para compat com testes legados).
- * SEM `eval()`. Para acessar a dimensão resultante, use `evaluateQuantity`.
- */
-export function evaluateTokens(tokens: string[]): number {
-  return evaluateQuantity(tokens).value;
-}
-
-/** Mesmo algoritmo do evaluateTokens, mas retorna `Quantity` com dim tracking. */
-function evaluateQuantity(tokens: string[]): Quantity {
-  if (tokens.length === 0) return { value: 0, dim: 0 };
-  if (tokens.length === 1) return parseTokenToQuantity(tokens[0]);
-
-  const values: (Quantity | string)[] = tokens.map((t, i) =>
-    i % 2 === 0 ? parseTokenToQuantity(t) : t
-  );
-
-  // Passo 1: * e / (maior precedência)
-  let i = 1;
-  while (i < values.length) {
-    const op = values[i];
-    if (op === '*' || op === '/') {
-      const left = values[i - 1] as Quantity;
-      const right = values[i + 1] as Quantity;
-      const result = op === '*' ? mulQ(left, right) : divQ(left, right);
-      values.splice(i - 1, 3, result);
-    } else {
-      i += 2;
-    }
-  }
-
-  // Passo 2: + e -
-  i = 1;
-  while (i < values.length) {
-    const op = values[i];
-    if (op === '+' || op === '-') {
-      const left = values[i - 1] as Quantity;
-      const right = values[i + 1] as Quantity;
-      const result = op === '+' ? addQ(left, right) : subQ(left, right);
-      values.splice(i - 1, 3, result);
-    } else {
-      i += 2;
-    }
-  }
-
-  return values[0] as Quantity;
-}
-
-// ============================================
-// PORCENTAGEM
-// ============================================
+// ============================================================================
+// PERCENTAGE (regex fast path — same semantics as legacy)
+// ============================================================================
 
 function calculatePercentage(expr: string): CalculationResult | null {
-  // "100 + 10%" = 110
+  // "100 + 10%" = 110, "100 - 20%" = 80.
   const pctAddSub = expr.match(/^([\d.]+)\s*([+-])\s*([\d.]+)\s*%$/);
   if (pctAddSub) {
     const base = parseFloat(pctAddSub[1]);
@@ -352,7 +461,7 @@ function calculatePercentage(expr: string): CalculationResult | null {
     return buildScalarResult(value, expr);
   }
 
-  // "20% de 150" ou "150 * 20%"
+  // "20% of 150", "150 * 20%"
   const pctSimple =
     expr.match(/^([\d.]+)\s*%\s*(?:of|de|×|\*)?\s*([\d.]+)$/i) ||
     expr.match(/^([\d.]+)\s*(?:×|\*)\s*([\d.]+)\s*%$/);
@@ -366,12 +475,15 @@ function calculatePercentage(expr: string): CalculationResult | null {
     return buildScalarResult(value, expr);
   }
 
+  // Ambiguous / unsupported percent forms (e.g. "50% + 10%") fall through;
+  // caller proceeds to the regular pipeline where expr-eval handles unknown
+  // `%` as an error (we disabled the remainder operator).
   return null;
 }
 
-// ============================================
-// HELPERS PARA RESULTADO
-// ============================================
+// ============================================================================
+// RESULT BUILDERS (shape-compatible with legacy)
+// ============================================================================
 
 function buildScalarResult(value: number, expression: string): CalculationResult {
   return {
@@ -380,7 +492,6 @@ function buildScalarResult(value: number, expression: string): CalculationResult
     unitCanonical: 'number',
     displayPrimary: formatNumber(value),
     displaySecondary: '—',
-
     resultFeetInches: formatNumber(value),
     resultTotalInches: '—',
     resultDecimal: value,
@@ -396,7 +507,6 @@ function buildErrorResult(expression: string): CalculationResult {
     unitCanonical: 'number',
     displayPrimary: 'Error',
     displaySecondary: 'Error',
-
     resultFeetInches: 'Error',
     resultTotalInches: 'Error',
     resultDecimal: NaN,
@@ -406,54 +516,54 @@ function buildErrorResult(expression: string): CalculationResult {
 }
 
 function buildResultFromQuantity(q: Quantity, expression: string): CalculationResult {
-  if (!isFinite(q.value)) return buildErrorResult(expression);
+  const decimal = q.value.valueOf();
+  if (!isFinite(decimal)) return buildErrorResult(expression);
 
   switch (q.dim) {
     case 0:
-      return buildScalarResult(q.value, expression);
+      return buildScalarResult(decimal, expression);
     case 1: {
-      const primary = formatInches(q.value);
-      const secondary = formatTotalInches(q.value);
+      const primary = formatInches(decimal);
+      const secondary = formatTotalInches(decimal);
       return {
-        valueCanonical: q.value,
+        valueCanonical: decimal,
         dimension: 'length',
         unitCanonical: 'in',
         displayPrimary: primary,
         displaySecondary: secondary,
         resultFeetInches: primary,
         resultTotalInches: secondary,
-        resultDecimal: q.value,
+        resultDecimal: decimal,
         expression,
         isInchMode: true,
       };
     }
     case 2: {
-      const { primary, secondary } = formatArea(q.value);
+      const { primary, secondary } = formatArea(decimal);
       return {
-        valueCanonical: q.value,
+        valueCanonical: decimal,
         dimension: 'area',
         unitCanonical: 'sqin',
         displayPrimary: primary,
         displaySecondary: secondary,
-        // Legacy fields: area no formato feet/inches não faz sentido — reusa displayPrimary.
         resultFeetInches: primary,
         resultTotalInches: secondary,
-        resultDecimal: q.value,
+        resultDecimal: decimal,
         expression,
         isInchMode: false,
       };
     }
     case 3: {
-      const { primary, secondary } = formatVolume(q.value);
+      const { primary, secondary } = formatVolume(decimal);
       return {
-        valueCanonical: q.value,
+        valueCanonical: decimal,
         dimension: 'volume',
         unitCanonical: 'cuin',
         displayPrimary: primary,
         displaySecondary: secondary,
         resultFeetInches: primary,
         resultTotalInches: secondary,
-        resultDecimal: q.value,
+        resultDecimal: decimal,
         expression,
         isInchMode: false,
       };
@@ -461,32 +571,107 @@ function buildResultFromQuantity(q: Quantity, expression: string): CalculationRe
   }
 }
 
-// ============================================
-// FUNÇÃO PRINCIPAL
-// ============================================
+// ============================================================================
+// PUBLIC API
+// ============================================================================
 
 /**
- * Calcula uma expressão de construção ou matemática pura.
- * Aceita: "5 1/2 + 3 1/4 - 2 * 1/2", "2' 6 + 3'", "100 + 10%", "25' × 30'".
- * Retorna `null` para entrada vazia.
+ * Evaluate a construction-math expression. Accepts feet-inches (`2' 6"`,
+ * `2'-6"`, `-2' 6"`), mixed numbers (`5 1/2`), bare proper fractions (`3/4`),
+ * integers/decimals (with PT decimal comma and US thousand separators), and
+ * the usual `+ - * /` with parens and unary minus.
+ *
+ * Returns `null` for empty input. On syntax errors returns a
+ * `CalculationResult` with `displayPrimary === 'Error'` — matching legacy
+ * caller expectations.
  */
-export function calculate(expression: string): CalculationResult | null {
-  const expr = expression.trim();
+export function calculate(input: string): CalculationResult | null {
+  const expr = input.trim();
   if (!expr) return null;
 
   try {
+    // Percentage fast path — same regex-based handling as legacy because the
+    // semantics ("100 + 10%" = 110, not 100.1) don't compose cleanly as a
+    // generic operator inside Shunting-yard.
     if (expr.includes('%')) {
       const pct = calculatePercentage(expr);
       if (pct) return pct;
+      // "%"-bearing inputs that don't match the fast-path (e.g. "50% + 10%"
+      // or "10 % 3") fall through. expr-eval will reject the bare `%` because
+      // we disabled the remainder operator above, producing an Error result.
     }
 
-    const tokens = tokenize(expr);
-    if (tokens.length === 0) return buildErrorResult(expr);
+    let s = preprocess(expr);
+    rejectConsecutiveBinary(s);
 
-    const q = evaluateQuantity(tokens);
+    // Extract construction tokens, substitute with placeholder vars.
+    const ctx = new Map<string, Quantity>();
+    let i = 0;
+    s = s.replace(CONSTRUCTION_TOKEN, (match) => {
+      const raw = match.trim();
+      const value = parseConstructionToken(raw);
+      const dim = classifyTokenDim(raw);
+      const name = `__v${i++}`;
+      ctx.set(name, { value, dim });
+      return name;
+    });
+
+    // Hand the placeholder-substituted expression to expr-eval.
+    // Throws on malformed numbers (1.2.3), unbalanced parens, unknown tokens,
+    // leading/trailing operators — everything the legacy engine swallowed.
+    const parsed = parser.parse(s);
+
+    // Walk expr-eval's internal RPN ourselves so exact Fraction arithmetic
+    // travels all the way through. Expression.tokens is runtime-public even
+    // though not in the .d.ts.
+    const rpn = (parsed as unknown as { tokens: Array<{ type: string; value: unknown }> }).tokens;
+    const q = evaluateRPN(rpn, ctx);
+
     return buildResultFromQuantity(q, expr);
   } catch {
-    // Engine is pure — swallow and return error result. Callers decide how to log.
+    // Engine is pure — swallow and return an error result. Callers decide
+    // how (or whether) to log.
     return buildErrorResult(expr);
   }
+}
+
+// ============================================================================
+// LEGACY-COMPATIBLE HELPERS
+// ============================================================================
+// Kept for test compatibility (calculator.test.ts imports these). They round-trip
+// through `calculate()` so correctness tracks the real engine. Don't use in new
+// code — the rich `CalculationResult` from `calculate()` has strictly more info.
+
+/** @deprecated split-string tokenizer. Kept for test compat; prefer `calculate`. */
+export function tokenize(expression: string): string[] {
+  const s = preprocess(expression).trim();
+  if (!s) return [];
+
+  // Mirrors legacy behavior at a coarse level: splits on operators that are
+  // outside construction tokens. Tests only check alternating structure.
+  const out: string[] = [];
+  let buf = '';
+  const flush = () => { if (buf.trim()) { out.push(buf.trim()); buf = ''; } };
+
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    const next = s[i + 1] || '';
+    if ((c === '+' || c === '-' || c === '*' || c === '/') && buf.trim() !== '') {
+      // Fraction slash inside digits ≠ division operator.
+      if (c === '/' && /\d$/.test(buf.trim()) && /^\d/.test(next)) { buf += c; continue; }
+      flush();
+      out.push(c);
+      continue;
+    }
+    buf += c;
+  }
+  flush();
+  return out;
+}
+
+/** @deprecated evaluates a pre-tokenized expression. Re-joins and re-calculates. */
+export function evaluateTokens(tokens: string[]): number {
+  if (tokens.length === 0) return 0;
+  const r = calculate(tokens.join(' '));
+  return r?.resultDecimal ?? 0;
 }
