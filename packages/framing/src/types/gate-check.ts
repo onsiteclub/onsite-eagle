@@ -21,6 +21,10 @@ export interface FrmGateCheckItem {
   item_label: string
   result: GateCheckResult
   photo_url: string | null
+  photo_urls: string[]
+  max_photos: number
+  min_photos: number | null
+  photo_guidance: string | null
   notes: string | null
   deficiency_id: string | null
 }
@@ -32,4 +36,7 @@ export interface FrmGateCheckTemplate {
   item_label: string
   sort_order: number
   is_blocking: boolean
+  max_photos: number
+  min_photos: number | null
+  photo_guidance: string | null
 }

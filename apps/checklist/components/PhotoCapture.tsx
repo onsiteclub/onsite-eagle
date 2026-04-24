@@ -14,7 +14,8 @@ interface Props {
   existingUrl: string | null
   currentResult: GateCheckResult
   currentNotes: string | null
-  onPhotoUploaded: (url: string) => void
+  /** Receives the uploaded URL and (when available) the full canonical list. */
+  onPhotoUploaded: (url: string, photoUrls?: string[]) => void
   onPhotoRemoved: () => void
   disabled?: boolean
 }
@@ -49,7 +50,7 @@ export default function PhotoCapture({
       currentNotes,
     })
     setLocalUrl(result.displayUrl)
-    onPhotoUploaded(result.displayUrl)
+    onPhotoUploaded(result.displayUrl, result.photoUrls)
   }
 
   async function handleWebFile(e: React.ChangeEvent<HTMLInputElement>) {

@@ -60,6 +60,11 @@ function ChecklistContent() {
   const checked = items.filter(i => i.result !== 'pending').length
   const total = items.length
   const allChecked = checked === total && total > 0
+  const missingCleanupPhotos = items.some((i) => {
+    const min = i.minPhotos ?? 0
+    return min > 0 && (i.photoUrls?.length ?? 0) < min
+  })
+  const canSubmit = allChecked && !missingCleanupPhotos
 
   function patchItem(itemId: string, patch: Partial<GateCheckItemData>) {
     setGateCheck(prev => {
@@ -121,28 +126,32 @@ function ChecklistContent() {
     }
   }
 
-  function handlePhotoUploaded(itemId: string, url: string) {
-    // PhotoCapture já chamou addItemPhoto() que persistiu tudo.
-    // Aqui só refletimos no estado local — o result pode ter mudado pra 'fail'
-    // se estava 'pending'.
+  async function handlePhotosChanged(itemId: string, nextUrls: string[]) {
     const item = items.find(i => i.id === itemId)
     if (!item) return
-    const newResult: GateCheckResult = item.result === 'pending' ? 'fail' : item.result
-    patchItem(itemId, { photoUrl: url, result: newResult })
-  }
 
-  async function handlePhotoRemoved(itemId: string) {
-    const item = items.find(i => i.id === itemId)
-    if (!item || item.result === 'pending') return
-    startSaving(itemId)
-    try {
-      await removeItemPhoto(itemId, item.result, item.notes)
-      patchItem(itemId, { photoUrl: null })
-    } catch (err) {
-      console.error('Failed to remove photo:', err)
-    } finally {
-      stopSaving(itemId)
+    const prevUrls = item.photoUrls ?? []
+    const removed = prevUrls.find((u) => !nextUrls.includes(u))
+
+    if (removed) {
+      // Photo was removed: persist the updated list to Supabase.
+      startSaving(itemId)
+      try {
+        await removeItemPhoto(itemId, item.result === 'pending' ? 'fail' : item.result, item.notes, removed)
+      } catch (err) {
+        console.error('Failed to remove photo:', err)
+      } finally {
+        stopSaving(itemId)
+      }
     }
+
+    // addItemPhoto already persisted on add — just mirror state here.
+    const newResult: GateCheckResult = item.result === 'pending' ? 'fail' : item.result
+    patchItem(itemId, {
+      photoUrls: nextUrls,
+      photoUrl: nextUrls[0] ?? null,
+      result: newResult,
+    })
   }
 
   async function handleSubmit() {
@@ -200,21 +209,13 @@ function ChecklistContent() {
           <ChecklistItem
             key={item.id}
             index={idx}
-            item={{
-              id: item.id,
-              item_code: item.itemCode,
-              item_label: item.itemLabel,
-              result: item.result,
-              notes: item.notes,
-              photo_url: item.photoUrl,
-            }}
+            item={item}
             isBlocking={item.isBlocking}
             gateCheckId={gateCheck.id}
             saving={savingItems.has(item.id)}
             onResultChange={handleResultChange}
             onNotesChange={handleNotesChange}
-            onPhotoUploaded={handlePhotoUploaded}
-            onPhotoRemoved={handlePhotoRemoved}
+            onPhotosChanged={handlePhotosChanged}
           />
         ))}
       </div>
@@ -229,19 +230,21 @@ function ChecklistContent() {
         <div className="max-w-[480px] mx-auto">
           <button
             onClick={handleSubmit}
-            disabled={!allChecked || submitting}
+            disabled={!canSubmit || submitting}
             className={`
               w-full h-[52px] rounded-[14px] font-semibold text-[15px] transition-all
-              ${allChecked
+              ${canSubmit
                 ? 'bg-[#C58B1B] text-white hover:bg-[#A67516]'
                 : 'bg-[#F5F5F4] text-[#B0AFA9] cursor-not-allowed'}
             `}
           >
             {submitting
               ? 'Submitting...'
-              : allChecked
-                ? 'Submit Gate Check'
-                : `${total - checked} items remaining`}
+              : !allChecked
+                ? `${total - checked} items remaining`
+                : missingCleanupPhotos
+                  ? 'Missing cleanup photos'
+                  : 'Submit Gate Check'}
           </button>
         </div>
       </div>

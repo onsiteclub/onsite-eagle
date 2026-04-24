@@ -53,7 +53,11 @@ export interface GateCheckItemData {
   isBlocking: boolean
   result: GateCheckResult
   notes: string | null
-  photoUrl: string | null
+  photoUrl: string | null        // first photo, kept for back-compat + native
+  photoUrls: string[]            // canonical list (1 normally, up to 6 for cleanup)
+  maxPhotos: number
+  minPhotos: number | null
+  photoGuidance: string | null
 }
 
 export interface GateCheckData {
@@ -185,6 +189,8 @@ export interface AddItemPhotoInput {
 export interface AddItemPhotoResult {
   /** URL suitable for <img src>; may be file:// on native until sync. */
   displayUrl: string
+  /** Canonical list of all photos on this item after the append. */
+  photoUrls: string[]
 }
 
 /**
@@ -216,7 +222,7 @@ export async function addItemPhoto(input: AddItemPhotoInput): Promise<AddItemPho
     })
 
     void kickSync()
-    return { displayUrl: saved.displayUrl }
+    return { displayUrl: saved.displayUrl, photoUrls: [saved.displayUrl] }
   }
 
   const { STORAGE_BUCKET, STORAGE_PREFIX } = await import('@/lib/constants')
@@ -232,22 +238,40 @@ export async function addItemPhoto(input: AddItemPhotoInput): Promise<AddItemPho
   const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
   const publicUrl = data.publicUrl
 
-  await remoteUpdateGateCheckItem(
-    supabase,
-    input.itemId,
-    result,
-    publicUrl,
-    input.currentNotes ?? undefined,
-  )
+  // Read current item to append (respecting max_photos). Items with
+  // min_photos > 0 (cleanup) accumulate photos; single-photo items
+  // still use the same path — they just cap at max_photos = 1.
+  const { data: current } = await supabase
+    .from('frm_gate_check_items')
+    .select('photo_urls, max_photos')
+    .eq('id', input.itemId)
+    .single()
 
-  return { displayUrl: publicUrl }
+  const existing: string[] = Array.isArray(current?.photo_urls) ? current!.photo_urls : []
+  const cap = typeof current?.max_photos === 'number' && current.max_photos > 0 ? current.max_photos : 1
+  const nextUrls = [...existing, publicUrl].slice(-cap)
+
+  const { error: updErr } = await supabase
+    .from('frm_gate_check_items')
+    .update({
+      result,
+      notes: input.currentNotes ?? null,
+      photo_url: nextUrls[0] ?? null,
+      photo_urls: nextUrls,
+    })
+    .eq('id', input.itemId)
+
+  if (updErr) throw updErr
+
+  return { displayUrl: publicUrl, photoUrls: nextUrls }
 }
 
 export async function removeItemPhoto(
   itemId: string,
   result: GateCheckResult,
   notes: string | null,
-): Promise<void> {
+  urlToRemove?: string,
+): Promise<string[]> {
   if (useLocal()) {
     await localUpdateItemResult(itemId, {
       result,
@@ -255,11 +279,33 @@ export async function removeItemPhoto(
       photoUrl: null,
     })
     void kickSync()
-    return
+    return []
   }
 
   const supabase = createClient()
-  await remoteUpdateGateCheckItem(supabase, itemId, result, undefined, notes ?? undefined)
+
+  // Read current urls to remove the specific one (or all if no url given)
+  const { data: current } = await supabase
+    .from('frm_gate_check_items')
+    .select('photo_urls')
+    .eq('id', itemId)
+    .single()
+
+  const existing: string[] = Array.isArray(current?.photo_urls) ? current!.photo_urls : []
+  const nextUrls = urlToRemove ? existing.filter((u) => u !== urlToRemove) : []
+
+  const { error } = await supabase
+    .from('frm_gate_check_items')
+    .update({
+      result,
+      notes: notes ?? null,
+      photo_url: nextUrls[0] ?? null,
+      photo_urls: nextUrls,
+    })
+    .eq('id', itemId)
+
+  if (error) throw error
+  return nextUrls
 }
 
 export async function submitGateCheck(localOrRemoteId: string): Promise<void> {
@@ -388,6 +434,10 @@ function toData(
       result: i.result,
       notes: i.notes,
       photoUrl: i.photo_url,
+      photoUrls: i.photo_url ? [i.photo_url] : [],
+      maxPhotos: 1,
+      minPhotos: null,
+      photoGuidance: null,
     })),
   }
 }
@@ -413,15 +463,24 @@ function toDataFromRemote(
     lotId: gc.lot_id,
     transition: gc.transition,
     status: gc.status as GateCheckData['status'],
-    items: gc.items.map((i) => ({
-      id: i.id,
-      remoteId: i.id,
-      itemCode: i.item_code,
-      itemLabel: i.item_label,
-      isBlocking: false, // remote item row doesn't carry blocking; templates do
-      result: i.result,
-      notes: i.notes,
-      photoUrl: i.photo_url,
-    })),
+    items: gc.items.map((i) => {
+      const photoUrls = Array.isArray(i.photo_urls) && i.photo_urls.length > 0
+        ? i.photo_urls
+        : i.photo_url ? [i.photo_url] : []
+      return {
+        id: i.id,
+        remoteId: i.id,
+        itemCode: i.item_code,
+        itemLabel: i.item_label,
+        isBlocking: false, // remote item row doesn't carry blocking; templates do
+        result: i.result,
+        notes: i.notes,
+        photoUrl: photoUrls[0] ?? null,
+        photoUrls,
+        maxPhotos: i.max_photos ?? 1,
+        minPhotos: i.min_photos ?? null,
+        photoGuidance: i.photo_guidance ?? null,
+      }
+    }),
   }
 }

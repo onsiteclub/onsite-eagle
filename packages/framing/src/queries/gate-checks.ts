@@ -83,12 +83,18 @@ export async function startGateCheck(
 
   if (gcError) throw gcError
 
-  // 3. Create items from template
+  // 3. Create items from template — copy photo requirements so the
+  //    frontend can enforce min_photos (e.g. 6 cleanup photos) without
+  //    re-reading the template table.
   const items = templates.map(t => ({
     gate_check_id: (gateCheck as FrmGateCheck).id,
     item_code: t.item_code,
     item_label: t.item_label,
     result: 'pending' as const,
+    max_photos: t.max_photos,
+    min_photos: t.min_photos,
+    photo_guidance: t.photo_guidance,
+    photo_urls: [] as string[],
   }))
 
   const { data: checkItems, error: itemsError } = await supabase

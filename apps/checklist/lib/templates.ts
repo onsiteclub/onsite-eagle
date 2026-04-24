@@ -1,6 +1,14 @@
 /**
- * Hardcoded gate check templates (same as migration 021).
- * Used by self-service mode (offline) and as fallback.
+ * Gate check templates — SINGLE SOURCE OF TRUTH for the checklist app.
+ *
+ * These 13 + 14 + 14 items (with `house_clean` + 6 photos required at the
+ * end of every transition) are the ONE list used by every surface of the
+ * app — self-service (/self), authenticated (/app/check), and the Supabase
+ * seed (migration 030_checklist_single_source_of_truth.sql).
+ *
+ * If you change anything here, update migration 030 to match. The two
+ * files must stay identical. There is no "old list" or "alternative
+ * list" — that divergence was fixed in migration 030.
  */
 
 export interface TemplateItem {

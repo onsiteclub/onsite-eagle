@@ -1103,7 +1103,7 @@ Cenario 5: Self-service
 
 2. Store listing
    - Title: "OnSite Checklist - Construction QA"
-   - Short description: "Offline-first construction inspection checklists"
+   - Short description: "Offline-first construction inspection checklist"
    - Full description: (ver abaixo)
    - Screenshots: 3-5 por device
    - Feature graphic: 1024x500
