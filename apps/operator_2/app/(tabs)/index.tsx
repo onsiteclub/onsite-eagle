@@ -100,7 +100,11 @@ export default function RequestsScreen() {
   };
 
   const queueItems = useMemo(
-    () => requests.filter((r) => r.status !== 'delivered' && r.status !== 'cancelled'),
+    () => requests.filter(
+      (r) => r.status !== 'delivered'
+        && r.status !== 'cancelled'
+        && r.status !== 'awaiting_info',
+    ),
     [requests],
   );
   const deliveredItems = useMemo(

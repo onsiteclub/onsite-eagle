@@ -158,53 +158,107 @@ Deno.serve(async (req: Request) => {
       ? parsed.orders
       : [{ lot: null, material: null, quantity: null, confidence: 0, language: 'en', notes: 'parse_failed' }];
 
-    // --- Step 5: Insert requests ---
-    for (const order of orders) {
-      const lotNumber = order.lot;
-      const isAmbiguous = !lotNumber || !order.material || (order.confidence ?? 0) < 0.6;
+    // --- Step 4b: Continuation-merge.
+    // If worker is answering a prior "Which lot?" question, merge the incoming
+    // lot into the pending awaiting_info order instead of creating a new one.
+    let ackMessage: string | null = null;
+    const PENDING_WINDOW_MIN = 10;
 
-      // Resolve lot UUID from lot_number
-      let lotId: string | null = null;
-      if (lotNumber) {
-        const { data: lot } = await supabase
+    const isLotOnlyReply =
+      orders.length === 1 &&
+      !!orders[0].lot &&
+      !orders[0].material &&
+      !orders[0].quantity;
+
+    if (isLotOnlyReply) {
+      const sinceIso = new Date(Date.now() - PENDING_WINDOW_MIN * 60 * 1000).toISOString();
+      const { data: pending } = await supabase
+        .from('frm_material_requests')
+        .select('id, material_name, quantity, raw_message, confidence')
+        .eq('jobsite_id', worker.jobsite_id)
+        .eq('requested_by_name', worker.display_name || phone)
+        .eq('status', 'awaiting_info')
+        .gte('created_at', sinceIso)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (pending) {
+        const lotStr = String(orders[0].lot);
+        // Resolve lot UUID against this site's lots
+        const { data: matchedLot } = await supabase
           .from('frm_lots')
           .select('id')
           .eq('jobsite_id', worker.jobsite_id)
-          .eq('lot_number', String(lotNumber))
+          .eq('lot_number', lotStr)
           .maybeSingle();
-        lotId = lot?.id || null;
-      }
 
-      await supabase.from('frm_material_requests').insert({
-        jobsite_id: worker.jobsite_id,
-        lot_id: lotId, // NULL if no matching frm_lots row
-        lot_text_hint: lotNumber ? String(lotNumber) : null, // what AI extracted, even if unmatched
-        phase_id: null, // SMS-sourced requests have no phase context
-        material_name: order.material || null,
-        quantity: order.quantity || null,
-        notes: order.notes || null,
-        requested_by: null, // SMS worker has no core_profiles row
-        requested_by_name: worker.display_name || phone,
-        status: 'requested',
-        raw_message: body,
-        source: isAmbiguous ? 'ai_ambiguous' : 'ai_parsed',
-        confidence: order.confidence ?? null,
-        language_detected: order.language || null,
-      });
+        await supabase
+          .from('frm_material_requests')
+          .update({
+            lot_id: matchedLot?.id || null,
+            lot_text_hint: lotStr,
+            raw_message: `${pending.raw_message}\n${body}`,
+            status: 'requested',
+            source: 'ai_parsed',
+          })
+          .eq('id', pending.id);
 
-      // Update pattern if we got a clear match
-      if (order.material && order.confidence > 0.7) {
-        await upsertPattern(worker.id, worker.jobsite_id, body.toLowerCase().trim(), order.material);
+        ackMessage = `✓ Got it — LOT ${lotStr}, ${pending.material_name || 'material TBD'}${
+          pending.quantity ? ` x ${pending.quantity}` : ''
+        }`;
       }
     }
 
-    // --- Step 6: Send acknowledgment ---
-    const firstOrder = orders[0];
-    let ackMessage: string;
-    if (!firstOrder.lot) {
-      ackMessage = 'Which lot?';
-    } else {
-      ackMessage = `✓ Got it — LOT ${firstOrder.lot}, ${firstOrder.material || 'material TBD'}`;
+    // --- Step 5: Insert requests (only if no merge happened) ---
+    if (ackMessage === null) {
+      for (const order of orders) {
+        const lotNumber = order.lot;
+        const hasLot = !!lotNumber;
+        const isAmbiguous = !hasLot || !order.material || (order.confidence ?? 0) < 0.6;
+
+        // Resolve lot UUID from lot_number
+        let lotId: string | null = null;
+        if (lotNumber) {
+          const { data: lot } = await supabase
+            .from('frm_lots')
+            .select('id')
+            .eq('jobsite_id', worker.jobsite_id)
+            .eq('lot_number', String(lotNumber))
+            .maybeSingle();
+          lotId = lot?.id || null;
+        }
+
+        await supabase.from('frm_material_requests').insert({
+          jobsite_id: worker.jobsite_id,
+          lot_id: lotId,
+          lot_text_hint: lotNumber ? String(lotNumber) : null,
+          phase_id: null,
+          material_name: order.material || null,
+          quantity: order.quantity || null,
+          notes: order.notes || null,
+          requested_by: null,
+          requested_by_name: worker.display_name || phone,
+          // Hidden from the machinist's queue until the worker supplies the lot.
+          status: hasLot ? 'requested' : 'awaiting_info',
+          raw_message: body,
+          source: isAmbiguous ? 'ai_ambiguous' : 'ai_parsed',
+          confidence: order.confidence ?? null,
+          language_detected: order.language || null,
+        });
+
+        // Learn the worker's vocabulary on confident material matches
+        if (order.material && order.confidence > 0.7) {
+          await upsertPattern(worker.id, worker.jobsite_id, body.toLowerCase().trim(), order.material);
+        }
+      }
+
+      const firstOrder = orders[0];
+      if (!firstOrder.lot) {
+        ackMessage = 'Which lot?';
+      } else {
+        ackMessage = `✓ Got it — LOT ${firstOrder.lot}, ${firstOrder.material || 'material TBD'}`;
+      }
     }
 
     await logMessage(worker.jobsite_id, null, 'worker', worker.id, worker.display_name || phone, body);
