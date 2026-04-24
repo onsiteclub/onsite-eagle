@@ -19,7 +19,7 @@ export default async function LotDetailPage({ params }: Props) {
   if (!user) redirect('/')
 
   const lot = await getLot(supabase, lotId)
-  const statusCfg = LOT_STATUS_CONFIG[lot.status]
+  const statusCfg = LOT_STATUS_CONFIG[lot.status] ?? LOT_STATUS_CONFIG.pending
 
   const jobsiteResult = lot.jobsite_id
     ? await supabase.from('frm_jobsites').select('name').eq('id', lot.jobsite_id).single()

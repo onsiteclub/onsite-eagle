@@ -20,16 +20,22 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     const supabase = createClient()
     let cancelled = false
 
-    supabase.auth.getUser().then(({ data }) => {
+    const redirectToLogin = async () => {
+      await supabase.auth.signOut().catch(() => {})
+      if (!cancelled) router.replace(`/?redirect=${encodeURIComponent(pathname ?? '/app')}`)
+    }
+
+    supabase.auth.getUser().then(({ data, error }) => {
       if (cancelled) return
-      if (!data.user) {
-        router.replace(`/?redirect=${encodeURIComponent(pathname ?? '/app')}`)
+      if (error || !data.user) {
+        void redirectToLogin()
         return
       }
       setUser(data.user)
       setLoading(false)
-      // Kick template cache refresh in the background — safe no-op on web.
       void preflightTemplates()
+    }).catch(() => {
+      if (!cancelled) void redirectToLogin()
     })
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {

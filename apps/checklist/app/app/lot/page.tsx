@@ -104,7 +104,7 @@ function LotDetailContent({ userId }: { userId: string }) {
     return <div className="py-8 text-center text-[15px] text-[#888884]">Loading lot...</div>
   }
 
-  const statusCfg = LOT_STATUS_CONFIG[lot.status]
+  const statusCfg = LOT_STATUS_CONFIG[lot.status] ?? LOT_STATUS_CONFIG.pending
 
   return (
     <div className="space-y-4">

@@ -74,7 +74,7 @@ export default function LotSearchClient({ jobsites }: Props) {
       ) : (
         <div className="space-y-2">
           {filtered.map(lot => {
-            const statusCfg = LOT_STATUS_CONFIG[lot.status]
+            const statusCfg = LOT_STATUS_CONFIG[lot.status] ?? LOT_STATUS_CONFIG.pending
             return (
               <button
                 key={lot.id}
