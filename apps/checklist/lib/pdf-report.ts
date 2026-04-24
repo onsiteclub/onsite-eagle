@@ -186,20 +186,24 @@ export async function generateChecklistPDF(report: ReportInfo): Promise<Blob> {
 
     cy += headerHeight
 
-    // Photos in a row (inline thumbnails)
+    // Photos in a row (inline thumbnails). Size shrinks when needed so
+    // all photos fit in a single row — the cleanup item can have up to 6.
     if (item.photos.length > 0) {
-      const photoSize = 22
       const photoGap = 2
+      const count = item.photos.length
+      const availableWidth = margin + contentWidth - cardPadding - labelX
+      const sizeFromFit = (availableWidth - (count - 1) * photoGap) / count
+      const photoSize = Math.min(22, Math.max(12, sizeFromFit))
+
       // Photo count
       doc.setTextColor(...BRAND_COLORS.textSecondary)
       doc.setFontSize(6)
       doc.setFont('helvetica', 'normal')
-      doc.text(`${item.photos.length} photo${item.photos.length > 1 ? 's' : ''}`, labelX, cy + 2)
+      doc.text(`${count} photo${count > 1 ? 's' : ''}`, labelX, cy + 2)
       cy += 4
 
-      for (let i = 0; i < item.photos.length; i++) {
+      for (let i = 0; i < count; i++) {
         const photoX = labelX + i * (photoSize + photoGap)
-        if (photoX + photoSize > margin + contentWidth - cardPadding) break
         try {
           doc.addImage(item.photos[i], 'JPEG', photoX, cy, photoSize, photoSize)
         } catch {
