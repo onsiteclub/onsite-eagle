@@ -1,14 +1,22 @@
 /**
  * Requests Screen — Operator 2
  *
- * Raw worker message is the protagonist. AI parse + translation live behind
- * the ✨ icon in a modal — opt-in, never cluttering the machinist's default
- * view.
+ * Each card is a conversation thread (one per request):
+ * - H1: LOT number
+ * - Chat bubbles: worker (left, gray) · machinist (right, accent)
+ * - Intake bot exchange ("Which lot?" / "Got it") is hidden — only
+ *   human↔human + delivery notification appear
+ * - Reply bar expands when the machinist taps 💬; Send dispatches via
+ *   the send-to-worker edge function
+ * - Delivered goes through mark-delivered so the worker gets an SMS
+ *   confirmation (accountability)
+ * - Badge flags workers with multiple open requests
  */
 
 import { useEffect, useCallback, useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert, Modal, RefreshControl,
+  View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert,
+  Modal, RefreshControl, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '@onsite/tokens';
@@ -30,6 +38,14 @@ interface IncomingRequest {
   created_at: string;
   lot_text_hint: string | null;
   lot: { lot_number: string } | null;
+}
+
+interface ChatMessage {
+  id: string;
+  sender_type: string;
+  sender_name: string;
+  content: string;
+  created_at: string;
 }
 
 type Tab = 'queue' | 'delivered';
@@ -74,7 +90,6 @@ export default function RequestsScreen() {
 
   useEffect(() => {
     fetchRequests();
-
     const channel = supabase
       .channel('requests-realtime')
       .on('postgres_changes', {
@@ -83,18 +98,19 @@ export default function RequestsScreen() {
         table: 'frm_material_requests',
       }, () => fetchRequests())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [fetchRequests]);
 
   const handleDeliver = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('frm_material_requests')
-        .update({ status: 'delivered', delivered_at: new Date().toISOString() })
-        .eq('id', id);
+      const { error } = await supabase.functions.invoke('mark-delivered', {
+        body: { request_id: id },
+      });
       if (error) throw error;
+      // Realtime will refresh; fallback fetch:
+      fetchRequests();
     } catch (err) {
+      console.error('mark-delivered failed:', err);
       Alert.alert('Error', 'Failed to mark as delivered');
     }
   };
@@ -112,6 +128,17 @@ export default function RequestsScreen() {
     [requests],
   );
 
+  // Count open requests per worker for the "multiple open" badge
+  const openCountByPhone = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of queueItems) {
+      const key = r.worker_phone || r.worker_name || '';
+      if (!key) continue;
+      map.set(key, (map.get(key) || 0) + 1);
+    }
+    return map;
+  }, [queueItems]);
+
   const displayedItems = activeTab === 'queue' ? queueItems : deliveredItems;
 
   return (
@@ -125,9 +152,7 @@ export default function RequestsScreen() {
           style={[styles.tab, activeTab === 'queue' && styles.tabActive]}
           onPress={() => setActiveTab('queue')}
         >
-          <Text style={[styles.tabText, activeTab === 'queue' && styles.tabTextActive]}>
-            Queue
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'queue' && styles.tabTextActive]}>Queue</Text>
           {queueItems.length > 0 && (
             <View style={[styles.badge, activeTab === 'queue' && styles.badgeActive]}>
               <Text style={[styles.badgeText, activeTab === 'queue' && styles.badgeTextActive]}>
@@ -141,9 +166,7 @@ export default function RequestsScreen() {
           style={[styles.tab, activeTab === 'delivered' && styles.tabActive]}
           onPress={() => setActiveTab('delivered')}
         >
-          <Text style={[styles.tabText, activeTab === 'delivered' && styles.tabTextActive]}>
-            Delivered
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'delivered' && styles.tabTextActive]}>Delivered</Text>
           {deliveredItems.length > 0 && (
             <View style={[styles.badge, activeTab === 'delivered' && styles.badgeActive]}>
               <Text style={[styles.badgeText, activeTab === 'delivered' && styles.badgeTextActive]}>
@@ -185,14 +208,19 @@ export default function RequestsScreen() {
               </Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <RequestCard
-              request={item}
-              onDeliver={handleDeliver}
-              onOpenAI={() => setAiModalRequest(item)}
-              showDeliverButton={activeTab === 'queue'}
-            />
-          )}
+          renderItem={({ item }) => {
+            const workerKey = item.worker_phone || item.worker_name || '';
+            const totalOpen = openCountByPhone.get(workerKey) || 0;
+            return (
+              <RequestCard
+                request={item}
+                onDeliver={handleDeliver}
+                onOpenAI={() => setAiModalRequest(item)}
+                showDeliverButton={activeTab === 'queue'}
+                otherOpenCount={Math.max(totalOpen - 1, 0)}
+              />
+            );
+          }}
         />
       )}
 
@@ -209,33 +237,86 @@ function RequestCard({
   onDeliver,
   onOpenAI,
   showDeliverButton,
+  otherOpenCount,
 }: {
   request: IncomingRequest;
   onDeliver: (id: string) => void;
   onOpenAI: () => void;
   showDeliverButton: boolean;
+  otherOpenCount: number;
 }) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+
   const isDelivered = req.status === 'delivered';
-  const rawMessage = req.raw_message || '(empty message)';
   const flag = req.language_detected ? LANG_FLAGS[req.language_detected] : null;
   const timeLabel = new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  // Prefer the matched lot from frm_lots (verified); fall back to the AI's
-  // raw extraction (unverified); show "?" only if truly missing.
   const lotLabel = req.lot?.lot_number ?? req.lot_text_hint ?? '?';
   const lotUnmatched = !req.lot?.lot_number && !!req.lot_text_hint;
+  const workerLabel = req.worker_name || req.worker_phone || 'Unknown';
+
+  const fetchThread = useCallback(async () => {
+    // Only human↔human + delivery notification. Intake bot exchange is excluded.
+    const { data } = await supabase
+      .from('frm_messages')
+      .select('id, sender_type, sender_name, content, created_at')
+      .eq('request_id', req.id)
+      .in('sender_type', ['worker', 'machinist', 'system'])
+      .order('created_at', { ascending: true });
+    setMessages((data || []) as ChatMessage[]);
+  }, [req.id]);
+
+  useEffect(() => {
+    fetchThread();
+    const channel = supabase
+      .channel(`msgs-${req.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'frm_messages',
+        filter: `request_id=eq.${req.id}`,
+      }, () => fetchThread())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchThread, req.id]);
+
+  const handleSend = async () => {
+    const text = replyText.trim();
+    if (!text) return;
+    setSending(true);
+    try {
+      const { error } = await supabase.functions.invoke('send-to-worker', {
+        body: { request_id: req.id, text },
+      });
+      if (error) throw error;
+      setReplyText('');
+      setReplyOpen(false);
+      fetchThread();
+    } catch (err) {
+      console.error('send-to-worker failed:', err);
+      Alert.alert('Error', 'Could not send message');
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <View style={[styles.card, isDelivered && styles.cardDelivered]}>
-      {/* Header: meta info (worker · time · lang) */}
       <Text style={styles.metaText} numberOfLines={1}>
-        {req.worker_name || req.worker_phone || 'Unknown'}
+        {workerLabel}
         {'  ·  '}
         {timeLabel}
         {flag ? `  ·  ${flag}` : ''}
       </Text>
 
-      {/* H1: LOT number */}
+      {otherOpenCount > 0 ? (
+        <Text style={styles.multiOpenBadge}>
+          🔗 {workerLabel} has {otherOpenCount} more open
+        </Text>
+      ) : null}
+
       <View style={styles.lotRow}>
         <Text style={[styles.lotTitle, isDelivered && styles.textMuted]}>
           LOT {lotLabel}
@@ -245,23 +326,85 @@ function RequestCard({
         ) : null}
       </View>
 
-      {/* H2: raw message in a responsive bubble */}
-      <View style={styles.messageBubble}>
-        <Text style={[styles.messageText, isDelivered && styles.textMuted]}>
-          {rawMessage}
-        </Text>
+      {/* Chat thread */}
+      <View style={styles.thread}>
+        {messages.length === 0 ? (
+          <View style={styles.bubbleLeft}>
+            <Text style={styles.bubbleText}>{req.raw_message || '(empty)'}</Text>
+          </View>
+        ) : (
+          messages.map((m) => {
+            if (m.sender_type === 'worker') {
+              return (
+                <View key={m.id} style={styles.bubbleLeft}>
+                  <Text style={styles.bubbleText}>{m.content}</Text>
+                </View>
+              );
+            }
+            if (m.sender_type === 'machinist') {
+              return (
+                <View key={m.id} style={styles.bubbleRight}>
+                  <Text style={styles.bubbleTextRight}>{m.content}</Text>
+                </View>
+              );
+            }
+            // system (delivery notification)
+            return (
+              <View key={m.id} style={styles.bubbleSystem}>
+                <Text style={styles.bubbleSystemText}>{m.content}</Text>
+              </View>
+            );
+          })
+        )}
       </View>
 
-      {/* Actions: translate (AI) + delivered */}
+      {/* Reply input (only when Reply is tapped) */}
+      {replyOpen ? (
+        <View style={styles.replyRow}>
+          <TextInput
+            style={styles.replyInput}
+            value={replyText}
+            onChangeText={setReplyText}
+            placeholder="Type a message"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            maxLength={500}
+            editable={!sending}
+          />
+          <Pressable
+            style={[styles.sendBtn, (!replyText.trim() || sending) && styles.sendBtnDisabled]}
+            onPress={handleSend}
+            disabled={!replyText.trim() || sending}
+          >
+            {sending
+              ? <ActivityIndicator color={colors.background} size="small" />
+              : <Text style={styles.sendBtnText}>Send</Text>}
+          </Pressable>
+        </View>
+      ) : null}
+
+      {/* Action icons */}
       <View style={styles.actionsRow}>
-        <Pressable
-          onPress={onOpenAI}
-          style={styles.iconBtn}
-          hitSlop={8}
-          accessibilityLabel="AI helper"
-        >
-          <Text style={styles.iconBtnText}>✨</Text>
-        </Pressable>
+        <View style={styles.actionsLeft}>
+          <Pressable
+            onPress={onOpenAI}
+            style={styles.iconBtn}
+            hitSlop={8}
+            accessibilityLabel="AI helper"
+          >
+            <Text style={styles.iconBtnText}>✨</Text>
+          </Pressable>
+          {!isDelivered ? (
+            <Pressable
+              onPress={() => setReplyOpen((v) => !v)}
+              style={[styles.iconBtn, replyOpen && styles.iconBtnActive]}
+              hitSlop={8}
+              accessibilityLabel="Reply"
+            >
+              <Text style={styles.iconBtnText}>💬</Text>
+            </Pressable>
+          ) : null}
+        </View>
 
         {isDelivered && req.delivered_at ? (
           <Text style={styles.deliveredTime}>
@@ -270,12 +413,12 @@ function RequestCard({
           </Text>
         ) : showDeliverButton ? (
           <Pressable
-            style={styles.iconBtn}
+            style={[styles.iconBtn, styles.deliverIconBtn]}
             onPress={() => onDeliver(req.id)}
             hitSlop={8}
             accessibilityLabel="Mark delivered"
           >
-            <Text style={styles.iconBtnText}>✓</Text>
+            <Text style={styles.deliverIconText}>✓</Text>
           </Pressable>
         ) : null}
       </View>
@@ -294,7 +437,6 @@ function AIHelperModal({
   const [translating, setTranslating] = useState(false);
   const [translateError, setTranslateError] = useState<string | null>(null);
 
-  // Reset state when modal closes or switches to a different request
   useEffect(() => {
     setTranslation(null);
     setTranslating(false);
@@ -321,7 +463,7 @@ function AIHelperModal({
     }
   };
 
-  const lot = request.lot?.lot_number || '?';
+  const lot = request.lot?.lot_number || request.lot_text_hint || '?';
   const material = request.material_name || '?';
   const qty = request.quantity != null ? String(request.quantity) : '?';
   const confidencePct = request.confidence != null
@@ -406,9 +548,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.xs,
   },
-  title: {
-    ...typography.screenTitle,
-  },
+  title: { ...typography.screenTitle },
 
   tabBar: {
     flexDirection: 'row',
@@ -431,14 +571,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.text,
     borderColor: colors.text,
   },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  tabTextActive: {
-    color: colors.background,
-  },
+  tabText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  tabTextActive: { color: colors.background },
   badge: {
     backgroundColor: colors.border,
     borderRadius: 10,
@@ -448,17 +582,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
   },
-  badgeActive: {
-    backgroundColor: colors.background,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
-  badgeTextActive: {
-    color: colors.text,
-  },
+  badgeActive: { backgroundColor: colors.background },
+  badgeText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+  badgeTextActive: { color: colors.text },
 
   list: {
     paddingHorizontal: spacing.lg,
@@ -474,15 +600,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: spacing.xxl,
   },
-  emptyText: {
-    ...typography.cardTitle,
-    marginBottom: spacing.xs,
-  },
-  emptyHint: {
-    ...typography.meta,
-    textAlign: 'center',
-    paddingHorizontal: spacing.xl,
-  },
+  emptyText: { ...typography.cardTitle, marginBottom: spacing.xs },
+  emptyHint: { ...typography.meta, textAlign: 'center', paddingHorizontal: spacing.xl },
 
   card: {
     backgroundColor: colors.surface,
@@ -493,13 +612,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     marginBottom: spacing.sm,
   },
-  cardDelivered: {
-    opacity: 0.6,
-  },
+  cardDelivered: { opacity: 0.6 },
   metaText: {
     fontSize: 12,
     color: colors.textSecondary,
     marginBottom: spacing.xs,
+  },
+  multiOpenBadge: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    fontStyle: 'italic',
   },
   lotRow: {
     flexDirection: 'row',
@@ -520,28 +643,103 @@ const styles = StyleSheet.create({
     color: colors.warning,
     letterSpacing: 0.5,
   },
-  messageBubble: {
+  textMuted: { color: colors.textSecondary },
+
+  // Chat thread
+  thread: {
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  bubbleLeft: {
+    alignSelf: 'flex-start',
+    maxWidth: '85%',
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
+    borderBottomLeftRadius: 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    marginBottom: spacing.md,
-    alignSelf: 'stretch',
   },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 22,
+  bubbleRight: {
+    alignSelf: 'flex-end',
+    maxWidth: '85%',
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.md,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  bubbleSystem: {
+    alignSelf: 'center',
+    backgroundColor: 'transparent',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  bubbleText: {
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.text,
   },
-  textMuted: {
-    color: colors.textSecondary,
+  bubbleTextRight: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.background,
   },
+  bubbleSystemText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+
+  // Reply input
+  replyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  replyInput: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 120,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.background,
+    color: colors.text,
+    fontSize: 14,
+  },
+  sendBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.accent,
+    minWidth: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnDisabled: { opacity: 0.5 },
+  sendBtnText: {
+    color: colors.background,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Action row
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  actionsLeft: {
+    flexDirection: 'row',
     gap: spacing.sm,
   },
   iconBtn: {
@@ -554,15 +752,23 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.background,
   },
-  iconBtnText: {
+  iconBtnActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '22',
+  },
+  iconBtnText: { fontSize: 20, color: colors.text },
+  deliverIconBtn: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  deliverIconText: {
     fontSize: 20,
-    color: colors.text,
+    fontWeight: '800',
+    color: colors.background,
   },
-  deliveredTime: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
+  deliveredTime: { fontSize: 13, color: colors.textSecondary },
 
+  // AI modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -590,22 +796,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     marginTop: spacing.md,
   },
-  modalOriginal: {
-    fontSize: 16,
-    color: colors.text,
-    lineHeight: 22,
-  },
-  modalTranslation: {
-    fontSize: 16,
-    color: colors.text,
-    lineHeight: 22,
-    fontStyle: 'italic',
-  },
-  modalError: {
-    fontSize: 14,
-    color: colors.warning,
-    marginBottom: spacing.sm,
-  },
+  modalOriginal: { fontSize: 16, color: colors.text, lineHeight: 22 },
+  modalTranslation: { fontSize: 16, color: colors.text, lineHeight: 22, fontStyle: 'italic' },
+  modalError: { fontSize: 14, color: colors.warning, marginBottom: spacing.sm },
   modalBtn: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,
@@ -615,14 +808,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     backgroundColor: colors.background,
   },
-  modalBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  parseGrid: {
-    gap: spacing.xs,
-  },
+  modalBtnText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  parseGrid: { gap: spacing.xs },
   parseRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -630,10 +817,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  parseKey: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
+  parseKey: { fontSize: 14, color: colors.textSecondary },
   parseValue: {
     fontSize: 14,
     color: colors.text,
@@ -649,9 +833,5 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     backgroundColor: colors.text,
   },
-  modalCloseText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.background,
-  },
+  modalCloseText: { fontSize: 15, fontWeight: '600', color: colors.background },
 });

@@ -1,17 +1,26 @@
 /**
  * request-ingest — Edge Function
  *
- * Webhook endpoint for Twilio SMS (WhatsApp deferred).
- * Flow:
- *   1. Validate webhook signature
- *   2. Normalize inbound payload → { phone_e164, channel, body }
- *   3. Upsert frm_site_workers by phone (auto-materialize)
- *   4. Check machine status — if offline, send auto-reply, skip parsing
- *   5. Load frm_patterns for the worker
- *   6. Call OpenAI (gpt-4o) to parse the message
- *   7. Insert frm_material_requests with source='ai_parsed' or 'ai_ambiguous'
- *   8. Send acknowledgment auto-reply
- *   9. Log inbound + outbound in frm_messages
+ * Webhook endpoint for Twilio SMS. Decision tree:
+ *
+ * 1. Route by receiving number (multi-tenant).
+ * 2. Auto-materialize a default jobsite if the number has no site yet.
+ * 3. Upsert the worker for that jobsite.
+ * 4. If machinist sent a message to this worker in the last 15 min tagged
+ *    with a request_id → this worker SMS is a CLARIFICATION. Log it to
+ *    that thread, don't parse as a new order.
+ * 5. Expire stale awaiting_info orders (> 30 min old).
+ * 6. Check machine status → auto-reply if down.
+ * 7. Parse with OpenAI (gpt-4o).
+ * 8. Branch:
+ *      a. Empty-signal (no lot, no material, no qty) → reply with guidance,
+ *         don't create an order.
+ *      b. Lot-only reply + awaiting_info pending → MERGE into pending.
+ *      c. Normal insert loop: each parsed order becomes a row.
+ *         - status='requested' if has lot, else 'awaiting_info' (invisible
+ *           in the machinist's queue until worker supplies the lot).
+ * 9. Log the worker's raw message in frm_messages (linked to request_id).
+ * 10. Send ack SMS back to the worker.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.0';
@@ -27,8 +36,10 @@ const TWILIO_MESSAGING_SERVICE_SID = Deno.env.get('TWILIO_MESSAGING_SERVICE_SID'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// ---- OpenAI parser prompt ----
-// Output is always wrapped as { "orders": [...] } for JSON-mode compatibility.
+const CLARIFICATION_WINDOW_MIN = 15;
+const AWAITING_EXPIRY_MIN = 30;
+const PENDING_MERGE_WINDOW_MIN = 10;
+
 const SYSTEM_PROMPT = `You are a materials-order parser for a construction lumberyard.
 Input: one text message from a construction worker, in any language.
 Output: strict JSON in the shape { "orders": [ ... ] }. English only inside. No prose, no markdown.
@@ -70,7 +81,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Parse Twilio webhook (form-encoded)
+    // Parse Twilio webhook
     const formData = await req.text();
     const params = new URLSearchParams(formData);
     const raw: Record<string, string> = {};
@@ -86,7 +97,7 @@ Deno.serve(async (req: Request) => {
       return twimlResponse('Missing phone or body');
     }
 
-    // --- Step 0: Route by receiving number (multi-tenant) ---
+    // --- Step 1: Route by receiving number (multi-tenant) ---
     const { data: opNumber } = await supabase
       .from('frm_operator_numbers')
       .select('id, operator_id, site_id')
@@ -98,8 +109,7 @@ Deno.serve(async (req: Request) => {
       return twimlResponse('This number is not yet configured. Contact your supervisor.');
     }
 
-    // --- Step 0b: Auto-materialize a default jobsite if this number isn't linked yet.
-    // Test mode: operator can start receiving SMS without pre-configuring a site.
+    // --- Step 2: Auto-materialize default jobsite if needed ---
     let siteId: string | null = opNumber.site_id;
     if (!siteId) {
       const { data: newSite, error: siteErr } = await supabase
@@ -112,7 +122,6 @@ Deno.serve(async (req: Request) => {
         console.error('Auto-create jobsite failed:', siteErr);
         return twimlResponse('Setup error. Contact your supervisor.');
       }
-
       siteId = newSite.id;
       await supabase
         .from('frm_operator_numbers')
@@ -120,10 +129,56 @@ Deno.serve(async (req: Request) => {
         .eq('id', opNumber.id);
     }
 
-    // --- Step 1: Find or create worker for this site ---
+    // --- Step 3: Upsert worker ---
     const worker = await upsertWorker(phone, siteId);
 
-    // --- Step 2: Check machine status ---
+    // --- Step 4: Clarification detection ---
+    // If the machinist sent a message to this worker's jobsite within the
+    // last 15 min tagged with a request_id, this SMS is a clarification for
+    // that request — NOT a new order.
+    const clarificationSince = new Date(
+      Date.now() - CLARIFICATION_WINDOW_MIN * 60 * 1000,
+    ).toISOString();
+    const { data: recentMachinistMsg } = await supabase
+      .from('frm_messages')
+      .select('request_id')
+      .eq('jobsite_id', worker.jobsite_id)
+      .eq('sender_type', 'machinist')
+      .not('request_id', 'is', null)
+      .gte('created_at', clarificationSince)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentMachinistMsg?.request_id) {
+      await logMessage({
+        jobsiteId: worker.jobsite_id,
+        requestId: recentMachinistMsg.request_id,
+        senderType: 'worker',
+        senderId: worker.id,
+        senderName: worker.display_name || phone,
+        content: body,
+      });
+      const ack = '✓ Noted';
+      await sendSms(phone, ack, toNumber);
+      return twimlResponse(ack);
+    }
+
+    // --- Step 5: Expire stale awaiting_info ---
+    const expirySince = new Date(
+      Date.now() - AWAITING_EXPIRY_MIN * 60 * 1000,
+    ).toISOString();
+    await supabase
+      .from('frm_material_requests')
+      .update({
+        status: 'cancelled',
+        notes: 'Auto-cancelled: worker did not provide lot within 30 min',
+      })
+      .eq('jobsite_id', worker.jobsite_id)
+      .eq('status', 'awaiting_info')
+      .lt('created_at', expirySince);
+
+    // --- Step 6: Machine-down auto-reply ---
     const { data: jobsite } = await supabase
       .from('frm_jobsites')
       .select('id, machine_down, machine_down_reason')
@@ -133,15 +188,11 @@ Deno.serve(async (req: Request) => {
     if (jobsite?.machine_down) {
       const reason = jobsite.machine_down_reason || 'maintenance';
       const autoReply = `Machine is currently down (${reason}). Orders will resume shortly.`;
-
-      await logMessage(worker.jobsite_id, null, 'worker', worker.id, worker.display_name || phone, body);
-      await logMessage(worker.jobsite_id, null, 'system', null, 'Auto-reply', autoReply);
       await sendSms(phone, autoReply, toNumber);
-
       return twimlResponse(autoReply);
     }
 
-    // --- Step 3: Load worker patterns ---
+    // --- Step 7: Parse with OpenAI ---
     const { data: patterns } = await supabase
       .from('frm_patterns')
       .select('keyword, canonical_material, confidence')
@@ -149,43 +200,53 @@ Deno.serve(async (req: Request) => {
       .order('confidence', { ascending: false })
       .limit(20);
 
-    // --- Step 4: Call OpenAI (gpt-4o by default) ---
     const patternsJson = JSON.stringify(patterns || []);
     const userPrompt = `Worker history (most recent canonical mappings):\n${patternsJson}\n\nMessage:\n${body}`;
-
     const parsed = await callOpenAI(userPrompt);
     const orders = Array.isArray(parsed?.orders) && parsed.orders.length > 0
       ? parsed.orders
       : [{ lot: null, material: null, quantity: null, confidence: 0, language: 'en', notes: 'parse_failed' }];
 
-    // --- Step 4b: Continuation-merge.
-    // If worker is answering a prior "Which lot?" question, merge the incoming
-    // lot into the pending awaiting_info order instead of creating a new one.
-    let ackMessage: string | null = null;
-    const PENDING_WINDOW_MIN = 10;
+    // --- Step 8a: Empty-signal rejection ---
+    // Worker sent something with no lot, no material, no quantity (e.g.
+    // "oi tudo bem"). Don't create an order. Send guidance.
+    const firstOrder = orders[0];
+    if (
+      orders.length === 1 &&
+      !firstOrder.lot &&
+      !firstOrder.material &&
+      !firstOrder.quantity
+    ) {
+      const ack = "Please include a lot number and material (e.g. 'lot 15 10 2x6').";
+      await sendSms(phone, ack, toNumber);
+      return twimlResponse(ack);
+    }
 
+    // --- Step 8b: Continuation-merge (lot-only reply into awaiting_info) ---
+    let ackMessage: string | null = null;
     const isLotOnlyReply =
       orders.length === 1 &&
-      !!orders[0].lot &&
-      !orders[0].material &&
-      !orders[0].quantity;
+      !!firstOrder.lot &&
+      !firstOrder.material &&
+      !firstOrder.quantity;
 
     if (isLotOnlyReply) {
-      const sinceIso = new Date(Date.now() - PENDING_WINDOW_MIN * 60 * 1000).toISOString();
+      const mergeSince = new Date(
+        Date.now() - PENDING_MERGE_WINDOW_MIN * 60 * 1000,
+      ).toISOString();
       const { data: pending } = await supabase
         .from('frm_material_requests')
         .select('id, material_name, quantity, raw_message, confidence')
         .eq('jobsite_id', worker.jobsite_id)
-        .eq('requested_by_name', worker.display_name || phone)
+        .eq('worker_phone', phone)
         .eq('status', 'awaiting_info')
-        .gte('created_at', sinceIso)
+        .gte('created_at', mergeSince)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (pending) {
-        const lotStr = String(orders[0].lot);
-        // Resolve lot UUID against this site's lots
+        const lotStr = String(firstOrder.lot);
         const { data: matchedLot } = await supabase
           .from('frm_lots')
           .select('id')
@@ -204,20 +265,30 @@ Deno.serve(async (req: Request) => {
           })
           .eq('id', pending.id);
 
+        await logMessage({
+          jobsiteId: worker.jobsite_id,
+          requestId: pending.id,
+          senderType: 'worker',
+          senderId: worker.id,
+          senderName: worker.display_name || phone,
+          content: body,
+        });
+
         ackMessage = `✓ Got it — LOT ${lotStr}, ${pending.material_name || 'material TBD'}${
           pending.quantity ? ` x ${pending.quantity}` : ''
         }`;
       }
     }
 
-    // --- Step 5: Insert requests (only if no merge happened) ---
+    // --- Step 8c: Normal insert loop ---
     if (ackMessage === null) {
+      let firstInsertedId: string | null = null;
+
       for (const order of orders) {
         const lotNumber = order.lot;
         const hasLot = !!lotNumber;
         const isAmbiguous = !hasLot || !order.material || (order.confidence ?? 0) < 0.6;
 
-        // Resolve lot UUID from lot_number
         let lotId: string | null = null;
         if (lotNumber) {
           const { data: lot } = await supabase
@@ -229,31 +300,47 @@ Deno.serve(async (req: Request) => {
           lotId = lot?.id || null;
         }
 
-        await supabase.from('frm_material_requests').insert({
-          jobsite_id: worker.jobsite_id,
-          lot_id: lotId,
-          lot_text_hint: lotNumber ? String(lotNumber) : null,
-          phase_id: null,
-          material_name: order.material || null,
-          quantity: order.quantity || null,
-          notes: order.notes || null,
-          requested_by: null,
-          requested_by_name: worker.display_name || phone,
-          // Hidden from the machinist's queue until the worker supplies the lot.
-          status: hasLot ? 'requested' : 'awaiting_info',
-          raw_message: body,
-          source: isAmbiguous ? 'ai_ambiguous' : 'ai_parsed',
-          confidence: order.confidence ?? null,
-          language_detected: order.language || null,
-        });
+        const { data: inserted } = await supabase
+          .from('frm_material_requests')
+          .insert({
+            jobsite_id: worker.jobsite_id,
+            lot_id: lotId,
+            lot_text_hint: lotNumber ? String(lotNumber) : null,
+            phase_id: null,
+            material_name: order.material || null,
+            quantity: order.quantity || null,
+            notes: order.notes || null,
+            requested_by: null,
+            requested_by_name: worker.display_name || phone,
+            worker_phone: phone,
+            status: hasLot ? 'requested' : 'awaiting_info',
+            raw_message: body,
+            source: isAmbiguous ? 'ai_ambiguous' : 'ai_parsed',
+            confidence: order.confidence ?? null,
+            language_detected: order.language || null,
+          })
+          .select('id')
+          .single();
 
-        // Learn the worker's vocabulary on confident material matches
+        if (inserted && !firstInsertedId) firstInsertedId = inserted.id;
+
         if (order.material && order.confidence > 0.7) {
           await upsertPattern(worker.id, worker.jobsite_id, body.toLowerCase().trim(), order.material);
         }
       }
 
-      const firstOrder = orders[0];
+      // Log the worker's original message linked to the first inserted request
+      if (firstInsertedId) {
+        await logMessage({
+          jobsiteId: worker.jobsite_id,
+          requestId: firstInsertedId,
+          senderType: 'worker',
+          senderId: worker.id,
+          senderName: worker.display_name || phone,
+          content: body,
+        });
+      }
+
       if (!firstOrder.lot) {
         ackMessage = 'Which lot?';
       } else {
@@ -261,8 +348,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    await logMessage(worker.jobsite_id, null, 'worker', worker.id, worker.display_name || phone, body);
-    await logMessage(worker.jobsite_id, null, 'system', null, 'Auto-reply', ackMessage);
     await sendSms(phone, ackMessage, toNumber);
 
     // Update worker stats
@@ -270,7 +355,7 @@ Deno.serve(async (req: Request) => {
       .from('frm_site_workers')
       .update({
         last_active_at: new Date().toISOString(),
-        total_requests: (worker.total_requests || 0) + orders.length,
+        total_requests: (worker.total_requests || 0) + 1,
       })
       .eq('id', worker.id);
 
@@ -295,8 +380,6 @@ interface Worker {
 }
 
 async function upsertWorker(phone: string, siteId: string): Promise<Worker> {
-  // Find existing worker by phone at THIS site (multi-tenant: same phone may
-  // belong to different workers at different sites)
   const { data: existing } = await supabase
     .from('frm_site_workers')
     .select('id, worker_id, jobsite_id, display_name, total_requests')
@@ -307,9 +390,6 @@ async function upsertWorker(phone: string, siteId: string): Promise<Worker> {
 
   if (existing) return existing as Worker;
 
-  // Auto-materialize: create worker record scoped to the receiving site.
-  // worker_id is NULL because SMS workers are phone-identified, not tied to
-  // a core_profiles row. A real registration flow can fill it in later.
   const { data: newWorker, error } = await supabase
     .from('frm_site_workers')
     .insert({
@@ -327,21 +407,23 @@ async function upsertWorker(phone: string, siteId: string): Promise<Worker> {
   return newWorker as Worker;
 }
 
-async function logMessage(
-  jobsiteId: string,
-  lotId: string | null,
-  senderType: string,
-  senderId: string | null,
-  senderName: string,
-  content: string,
-) {
+async function logMessage(opts: {
+  jobsiteId: string;
+  requestId: string | null;
+  senderType: string;
+  senderId: string | null;
+  senderName: string;
+  content: string;
+  lotId?: string | null;
+}) {
   await supabase.from('frm_messages').insert({
-    jobsite_id: jobsiteId,
-    lot_id: lotId,
-    sender_type: senderType,
-    sender_id: senderId,
-    sender_name: senderName,
-    content,
+    jobsite_id: opts.jobsiteId,
+    lot_id: opts.lotId ?? null,
+    request_id: opts.requestId,
+    sender_type: opts.senderType,
+    sender_id: opts.senderId,
+    sender_name: opts.senderName,
+    content: opts.content,
   });
 }
 
@@ -416,11 +498,9 @@ async function sendSms(to: string, body: string, from?: string) {
     console.warn('Twilio not configured, skipping SMS send');
     return;
   }
-
-  // Priority: operator's own number (multi-tenant) > Messaging Service > fallback From
   const fromNumber = from || TWILIO_FROM_NUMBER;
   if (!fromNumber && !TWILIO_MESSAGING_SERVICE_SID) {
-    console.warn('No From number or Messaging Service configured, skipping SMS send');
+    console.warn('No From number or Messaging Service configured');
     return;
   }
 
@@ -428,11 +508,8 @@ async function sendSms(to: string, body: string, from?: string) {
   const credentials = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
 
   const params: Record<string, string> = { To: to, Body: body };
-  if (fromNumber) {
-    params.From = fromNumber;
-  } else if (TWILIO_MESSAGING_SERVICE_SID) {
-    params.MessagingServiceSid = TWILIO_MESSAGING_SERVICE_SID;
-  }
+  if (fromNumber) params.From = fromNumber;
+  else if (TWILIO_MESSAGING_SERVICE_SID) params.MessagingServiceSid = TWILIO_MESSAGING_SERVICE_SID;
 
   await fetch(url, {
     method: 'POST',
@@ -445,7 +522,6 @@ async function sendSms(to: string, body: string, from?: string) {
 }
 
 function twimlResponse(message: string) {
-  // Return TwiML for Twilio webhook
   const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(message)}</Message></Response>`;
   return new Response(twiml, {
     headers: { 'Content-Type': 'text/xml' },
