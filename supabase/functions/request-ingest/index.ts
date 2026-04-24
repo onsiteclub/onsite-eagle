@@ -133,35 +133,48 @@ Deno.serve(async (req: Request) => {
     const worker = await upsertWorker(phone, siteId);
 
     // --- Step 4: Clarification detection ---
-    // If the machinist sent a message to this worker's jobsite within the
-    // last 15 min tagged with a request_id, this SMS is a clarification for
-    // that request — NOT a new order.
+    // Scoped to THIS worker. Only fires when:
+    //   (a) the worker has an OPEN request (status requested or awaiting_info)
+    //   (b) the machinist replied to that open request in the last 15 min
+    // Once the machinist taps Delivered (or the request is cancelled),
+    // subsequent SMS from the same worker start a fresh order.
     const clarificationSince = new Date(
       Date.now() - CLARIFICATION_WINDOW_MIN * 60 * 1000,
     ).toISOString();
-    const { data: recentMachinistMsg } = await supabase
-      .from('frm_messages')
-      .select('request_id')
+
+    const { data: openRequest } = await supabase
+      .from('frm_material_requests')
+      .select('id')
       .eq('jobsite_id', worker.jobsite_id)
-      .eq('sender_type', 'machinist')
-      .not('request_id', 'is', null)
-      .gte('created_at', clarificationSince)
+      .eq('worker_phone', phone)
+      .in('status', ['requested', 'awaiting_info'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (recentMachinistMsg?.request_id) {
-      await logMessage({
-        jobsiteId: worker.jobsite_id,
-        requestId: recentMachinistMsg.request_id,
-        senderType: 'worker',
-        senderId: null,
-        senderName: worker.display_name || phone,
-        content: body,
-      });
-      const ack = '✓ Noted';
-      await sendSms(phone, ack, toNumber);
-      return twimlResponse(ack);
+    if (openRequest) {
+      const { data: recentMachinistReply } = await supabase
+        .from('frm_messages')
+        .select('id')
+        .eq('request_id', openRequest.id)
+        .eq('sender_type', 'machinist')
+        .gte('created_at', clarificationSince)
+        .limit(1)
+        .maybeSingle();
+
+      if (recentMachinistReply) {
+        await logMessage({
+          jobsiteId: worker.jobsite_id,
+          requestId: openRequest.id,
+          senderType: 'worker',
+          senderId: null,
+          senderName: worker.display_name || phone,
+          content: body,
+        });
+        const ack = '✓ Noted';
+        await sendSms(phone, ack, toNumber);
+        return twimlResponse(ack);
+      }
     }
 
     // --- Step 5: Expire stale awaiting_info ---
