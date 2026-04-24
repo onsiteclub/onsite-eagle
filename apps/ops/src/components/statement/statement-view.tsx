@@ -1,10 +1,12 @@
 'use client'
 
 import {
+  addAdvanceAction,
   markPaidToClientAction,
   reconcileInvoiceAction,
 } from '@/app/(dashboard)/statement/actions'
 import { SuccessModal } from '@/components/shared/success-modal'
+import { AdvanceModal } from './advance-modal'
 import { CashPayoutModal, type CashBreakdown } from './cash-payout-modal'
 import { LedgerRow } from './ledger-row'
 import { ReconcileModal } from './reconcile-modal'
@@ -42,6 +44,7 @@ export function StatementView({
   const [modal, setModal] = useState<
     | { kind: 'recon'; invoiceId: string; invoiceNumber: string; expected: number }
     | { kind: 'cash'; breakdown: CashBreakdown; invoiceId: string }
+    | { kind: 'advance' }
     | { kind: 'success'; message: string }
     | { kind: 'error'; message: string }
     | null
@@ -82,6 +85,19 @@ export function StatementView({
     })
   }
 
+  function saveAdvance(amount: number, description: string) {
+    startTransition(async () => {
+      const res = await addAdvanceAction(client.id, amount, description || null)
+      if (res.error) {
+        setModal({ kind: 'error', message: res.error })
+        return
+      }
+      setModal({ kind: 'success', message: 'Adiantamento registrado' })
+      setTimeout(() => setModal(null), 1200)
+      router.refresh()
+    })
+  }
+
   function markPaid() {
     if (modal?.kind !== 'cash') return
     const { invoiceId } = modal
@@ -109,15 +125,25 @@ export function StatementView({
           </div>
           <div className="font-mono text-[11px] text-ink-3 mt-1.5">{client.email}</div>
         </div>
-        <div
-          className={[
-            'font-black text-[36px] text-right',
-            balance < 0 ? 'text-red' : 'text-green',
-          ].join(' ')}
-          style={{ letterSpacing: '-0.03em', lineHeight: 1 }}
-        >
-          <span className="text-[14px] align-top mr-[3px] text-ink-3">$</span>
-          {formatCurrency(Math.abs(balance)).replace('$', '')}
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setModal({ kind: 'advance' })}
+            title="Registrar adiantamento em cash ao cliente"
+          >
+            + Adiantamento
+          </button>
+          <div
+            className={[
+              'font-black text-[36px] text-right',
+              balance < 0 ? 'text-red' : 'text-green',
+            ].join(' ')}
+            style={{ letterSpacing: '-0.03em', lineHeight: 1 }}
+          >
+            <span className="text-[14px] align-top mr-[3px] text-ink-3">$</span>
+            {formatCurrency(Math.abs(balance)).replace('$', '')}
+          </div>
         </div>
       </div>
 
@@ -166,6 +192,13 @@ export function StatementView({
         breakdown={modal?.kind === 'cash' ? modal.breakdown : null}
         onClose={() => setModal(null)}
         onConfirm={markPaid}
+      />
+      <AdvanceModal
+        open={modal?.kind === 'advance'}
+        clientName={client.display_name}
+        pending={isPending}
+        onClose={() => setModal(null)}
+        onConfirm={saveAdvance}
       />
       <SuccessModal
         open={modal?.kind === 'success'}

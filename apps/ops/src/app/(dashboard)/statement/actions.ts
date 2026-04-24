@@ -7,6 +7,63 @@ import { revalidatePath } from 'next/cache'
 export type StatementActionState = { error: string | null }
 
 /**
+ * Registra um adiantamento em cash entregue ao cliente antes do GC pagar.
+ * amount é positivo (convenção do modelo: compensa dívida do operador com o
+ * cliente; markPaidToClient posteriormente desconta via settled_by_invoice_id).
+ */
+export async function addAdvanceAction(
+  clientId: string,
+  amount: number,
+  description: string | null,
+): Promise<StatementActionState> {
+  const operator = await requireOperator()
+  const supabase = await createClient()
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { error: 'Valor do adiantamento precisa ser positivo.' }
+  }
+  const rounded = Math.round(amount * 100) / 100
+
+  // Validate client belongs to operator
+  const { data: client } = await supabase
+    .from('ops_clients')
+    .select('id')
+    .eq('id', clientId)
+    .eq('operator_id', operator.id)
+    .maybeSingle()
+  if (!client) return { error: 'Cliente não encontrado.' }
+
+  // Running balance from latest entry
+  const { data: lastEntry } = await supabase
+    .from('ops_ledger_entries')
+    .select('balance_after')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const running = lastEntry ? Number(lastEntry.balance_after) : 0
+  const balanceAfter = Math.round((running + rounded) * 100) / 100
+
+  const { error } = await supabase.from('ops_ledger_entries').insert({
+    operator_id: operator.id,
+    client_id: clientId,
+    entry_type: 'advance_paid',
+    amount: rounded,
+    balance_after: balanceAfter,
+    description: description?.trim() || 'Adiantamento em cash',
+    entry_date: new Date().toISOString().split('T')[0],
+    created_by: operator.user_id,
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/statement`)
+  revalidatePath(`/clients`)
+  return { error: null }
+}
+
+/**
  * Marca invoice como paid_by_gc + salva amount_received + flag de divergência.
  * Chamado pelo ReconcileModal.
  */
