@@ -3,17 +3,23 @@
 import { HelperVoice } from '@/components/shared/helper-voice'
 import { formatCurrencyShort } from '@/lib/format'
 import type { NewSender } from '@/types'
+import { SourceBadge } from './source-badge'
+import type { InvoiceSource } from './inbox-view'
 
 export function NewSenderCard({
   sender,
   pdfUrl,
+  source,
+  onViewPdf,
   onReject,
-  onAdd,
+  onDecide,
 }: {
   sender: NewSender
   pdfUrl?: string | null
+  source: InvoiceSource
+  onViewPdf?: () => void
   onReject: () => void
-  onAdd: () => void
+  onDecide: () => void
 }) {
   const detailText = [
     `${sender.invoiceNumber}.pdf`,
@@ -29,6 +35,7 @@ export function NewSenderCard({
         <div className="font-black text-[14px] uppercase tracking-[-0.01em] flex items-center gap-2">
           <span className="text-[16px]">📬</span>
           Novo remetente
+          <SourceBadge source={source} />
         </div>
         <div className="font-mono text-[11px] text-ink-3">{sender.receivedAgo}</div>
       </div>
@@ -37,7 +44,15 @@ export function NewSenderCard({
         <div className="font-mono text-[12px] text-ink-2 mt-1">{sender.fromEmail}</div>
       </div>
       <div className="mt-3 px-3 py-2.5 bg-paper border border-line flex justify-between items-center font-mono text-[12px]">
-        {pdfUrl ? (
+        {onViewPdf ? (
+          <button
+            type="button"
+            onClick={onViewPdf}
+            className="underline text-ink hover:text-yellow truncate pr-3 bg-transparent border-0 text-left cursor-pointer"
+          >
+            {detailText}
+          </button>
+        ) : pdfUrl ? (
           <a
             href={pdfUrl}
             target="_blank"
@@ -57,7 +72,7 @@ export function NewSenderCard({
         <button type="button" className="btn btn-ghost" onClick={onReject}>
           Recusar
         </button>
-        <button type="button" className="btn btn-primary" onClick={onAdd}>
+        <button type="button" className="btn btn-primary" onClick={onDecide}>
           Adicionar cliente
         </button>
       </div>

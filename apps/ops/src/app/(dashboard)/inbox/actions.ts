@@ -96,6 +96,111 @@ export async function addClientAction(
   return { error: null }
 }
 
+export async function linkInvoiceToClientAction(
+  invoiceId: string,
+  clientId: string,
+): Promise<InboxActionState> {
+  const operator = await requireOperator()
+  const supabase = await createClient()
+
+  // Verify both belong to this operator (defense in depth; RLS enforces it too)
+  const { data: invoice, error: invErr } = await supabase
+    .from('ops_invoices')
+    .select('id, amount_gross, invoice_number, status')
+    .eq('id', invoiceId)
+    .eq('operator_id', operator.id)
+    .single()
+  if (invErr || !invoice) return { error: 'Invoice não encontrada.' }
+  if (invoice.status !== 'new_sender') {
+    return { error: 'Invoice já foi processada.' }
+  }
+
+  const { data: client, error: clientErr } = await supabase
+    .from('ops_clients')
+    .select('id')
+    .eq('id', clientId)
+    .eq('operator_id', operator.id)
+    .single()
+  if (clientErr || !client) return { error: 'Cliente não encontrado.' }
+
+  // Attach invoice to client + approve
+  await supabase
+    .from('ops_invoices')
+    .update({
+      client_id: client.id,
+      status: 'approved',
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', invoiceId)
+
+  // Compute running balance from last entry for this client
+  const { data: lastEntry } = await supabase
+    .from('ops_ledger_entries')
+    .select('balance_after')
+    .eq('client_id', client.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const prevBalance = lastEntry?.balance_after ?? 0
+  const balanceAfter = Number(prevBalance) - Number(invoice.amount_gross)
+
+  await supabase.from('ops_ledger_entries').insert({
+    operator_id: operator.id,
+    client_id: client.id,
+    entry_type: 'invoice_received',
+    amount: -invoice.amount_gross,
+    balance_after: balanceAfter,
+    invoice_id: invoice.id,
+    description: `Invoice ${invoice.invoice_number ?? invoice.id.slice(0, 8)}`,
+    entry_date: new Date().toISOString().split('T')[0],
+    created_by: operator.user_id,
+  })
+
+  revalidatePath('/inbox')
+  revalidatePath('/clients')
+  revalidatePath(`/statement`)
+  return { error: null }
+}
+
+export async function unrejectInvoiceAction(
+  invoiceId: string,
+): Promise<InboxActionState> {
+  const operator = await requireOperator()
+  const supabase = await createClient()
+
+  // Move invoice back to new_sender so operator can re-approve it.
+  const { error } = await supabase
+    .from('ops_invoices')
+    .update({ status: 'new_sender' })
+    .eq('id', invoiceId)
+    .eq('operator_id', operator.id)
+    .eq('status', 'rejected')
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/inbox')
+  return { error: null }
+}
+
+export async function resolveUnprocessedAction(
+  unprocessedId: string,
+): Promise<InboxActionState> {
+  const operator = await requireOperator()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('ops_inbox_unprocessed')
+    .update({ resolved_at: new Date().toISOString() })
+    .eq('id', unprocessedId)
+    .eq('operator_id', operator.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/inbox')
+  return { error: null }
+}
+
 export async function rejectSenderAction(
   invoiceId: string,
   blockEmail: boolean,

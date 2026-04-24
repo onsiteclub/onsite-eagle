@@ -1,5 +1,7 @@
 import { formatCurrencyShort } from '@/lib/format'
 import type { InboxRow as InboxRowType } from '@/types'
+import { SourceBadge } from './source-badge'
+import type { InvoiceSource } from './inbox-view'
 
 const statusClass: Record<InboxRowType['status'], string> = {
   pending: 'bg-yellow-soft text-ink border border-yellow',
@@ -10,10 +12,14 @@ const statusClass: Record<InboxRowType['status'], string> = {
 export function InboxRow({
   row,
   pdfUrl,
+  source,
+  onViewPdf,
   onClick,
 }: {
   row: InboxRowType
   pdfUrl?: string | null
+  source?: InvoiceSource
+  onViewPdf?: () => void
   onClick?: () => void
 }) {
   return (
@@ -28,7 +34,10 @@ export function InboxRow({
         <span className="text-ink-3">{row.timeLabel}</span>
       </div>
       <div>
-        <div className="font-bold text-[14px]">{row.fromName}</div>
+        <div className="font-bold text-[14px] flex items-center gap-2">
+          {row.fromName}
+          {source && <SourceBadge source={source} />}
+        </div>
         <div className="font-mono text-[11px] text-ink-3 mt-0.5">{row.fromEmail}</div>
         <div className="font-mono text-[12px] text-ink-2 mt-[3px]">{row.subject}</div>
       </div>
@@ -40,7 +49,19 @@ export function InboxRow({
       >
         {row.amount === null ? '—' : formatCurrencyShort(row.amount)}
       </div>
-      {pdfUrl ? (
+      {onViewPdf ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onViewPdf()
+          }}
+          title="Abrir PDF"
+          className="font-mono text-[11px] text-ink-2 hover:text-ink underline bg-transparent border-0 cursor-pointer"
+        >
+          PDF
+        </button>
+      ) : pdfUrl ? (
         <a
           href={pdfUrl}
           target="_blank"
