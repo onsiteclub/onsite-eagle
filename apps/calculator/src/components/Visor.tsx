@@ -56,7 +56,7 @@ export default function Visor({ result, onCopied }: VisorProps) {
   if (!result) {
     return (
       <div className="visor visor--empty">
-        <div className="visor-label">Pronto</div>
+        <div className="visor-label">Ready</div>
         <div className="visor-result">0</div>
       </div>
     );
@@ -67,7 +67,7 @@ export default function Visor({ result, onCopied }: VisorProps) {
     return (
       <div className="visor visor-error">
         {result.expression && <div className="visor-expr">{result.expression}</div>}
-        <div className="visor-result">Erro</div>
+        <div className="visor-result">Error</div>
         {result.errorMessage && (
           <div className="visor-error-msg">{result.errorMessage}</div>
         )}
@@ -85,7 +85,7 @@ export default function Visor({ result, onCopied }: VisorProps) {
       onPointerUp={cancelPress}
       onPointerLeave={cancelPress}
       onPointerCancel={cancelPress}
-      title="Mantenha pressionado para copiar"
+      title="Long-press to copy"
     >
       {result.expression && (
         <div className="visor-expr">{result.expression}</div>
@@ -113,10 +113,10 @@ export default function Visor({ result, onCopied }: VisorProps) {
       )}
 
       {result.exactForm && (
-        <div className="visor-hint">≈ · exato: {result.exactForm}</div>
+        <div className="visor-hint">≈ · exact: {result.exactForm}</div>
       )}
       {result.isApproximate && !result.exactForm && (
-        <div className="visor-hint">≈ valor aproximado</div>
+        <div className="visor-hint">≈ approximate</div>
       )}
     </div>
   );

@@ -214,7 +214,7 @@ describe('parseExpression — error paths', () => {
   it('empty input → ok: false', () => {
     const r = parseExpression('');
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toMatch(/vazia/i);
+    if (!r.ok) expect(r.reason).toMatch(/empty/i);
   });
 
   it('whitespace-only → ok: false', () => {
@@ -225,7 +225,7 @@ describe('parseExpression — error paths', () => {
     const longInput = 'a'.repeat(300);
     const r = parseExpression(longInput);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toMatch(/muito longa/i);
+    if (!r.ok) expect(r.reason).toMatch(/too long/i);
   });
 
   it('no digits, no parseable words → ok: false with suggestion', () => {

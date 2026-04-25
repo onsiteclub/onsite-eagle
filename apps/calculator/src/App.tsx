@@ -20,11 +20,11 @@ import './styles/App.css';
 // Step 2 — friendly label shown in the auto-switch toast so the user
 // understands WHY the tab jumped. Keeps tabs as a UX affordance (visible
 // what's possible) without making them control behavior.
-const TAB_LABEL_PT: Record<TabType, string> = {
-  calculator: 'Calculadora',
-  stairs: 'Escada',
-  triangle: 'Triângulo',
-  converter: 'Conversor',
+const TAB_LABEL: Record<TabType, string> = {
+  calculator: 'Calculator',
+  stairs: 'Stairs',
+  triangle: 'Triangle',
+  converter: 'Converter',
 };
 
 export default function App() {
@@ -90,7 +90,7 @@ function AppContent() {
     (tab: TabType, intent?: RoutedIntent) => {
       setActiveTab(tab);
       setRoutedIntent(intent ?? null);
-      setRouteToast(`Abrindo ${TAB_LABEL_PT[tab]}…`);
+      setRouteToast(`Opening ${TAB_LABEL[tab]}…`);
     },
     [],
   );
@@ -107,7 +107,7 @@ function AppContent() {
   const handleAltInterpretation = useCallback((tab: TabType) => {
     setActiveTab(tab);
     setRoutedIntent(null);
-    setRouteToast(`Abrindo ${TAB_LABEL_PT[tab]}…`);
+    setRouteToast(`Opening ${TAB_LABEL[tab]}…`);
   }, []);
 
   return (

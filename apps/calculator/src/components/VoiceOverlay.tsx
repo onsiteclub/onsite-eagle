@@ -23,7 +23,7 @@ export default function VoiceOverlay({ state, transcript, language = 'pt', onSto
   if (state === 'idle') return null;
 
   const isRecording = state === 'recording';
-  const headerLabel = isRecording ? `ouvindo em ${language}` : `processando em ${language}`;
+  const headerLabel = isRecording ? `listening in ${language}` : `processing in ${language}`;
 
   return (
     <div
@@ -50,7 +50,7 @@ export default function VoiceOverlay({ state, transcript, language = 'pt', onSto
             transcript
           ) : (
             <span className="voice-overlay__transcript--waiting">
-              {isRecording ? 'Fale uma medida ou expressão…' : 'Traduzindo para matemática…'}
+              {isRecording ? 'Speak a measurement or expression…' : 'Translating to math…'}
             </span>
           )}
         </p>
@@ -67,8 +67,8 @@ export default function VoiceOverlay({ state, transcript, language = 'pt', onSto
       <div className="voice-overlay__footer">
         <p className="voice-overlay__hint">
           {isRecording
-            ? 'toque no botão para calcular'
-            : 'aguarde — o engine tá interpretando'}
+            ? 'tap the button to compute'
+            : 'one moment — the engine is interpreting'}
         </p>
         <button
           type="button"
@@ -77,7 +77,7 @@ export default function VoiceOverlay({ state, transcript, language = 'pt', onSto
           disabled={!isRecording}
         >
           <span className="voice-overlay__cta-dot" aria-hidden="true" />
-          {isRecording ? 'Toque para calcular' : 'Processando…'}
+          {isRecording ? 'Tap to compute' : 'Processing…'}
         </button>
       </div>
     </div>

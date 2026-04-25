@@ -239,10 +239,10 @@ describe('Vol 8 — erros', () => {
     expect(r.primary.value).toBe('');
   });
 
-  it('8.2 parêntese não fechado: (2 + 3 → "unbalanced_paren"', () => {
+  it('8.2 unclosed parenthesis: (2 + 3 → "unbalanced_paren"', () => {
     const r = err('(2 + 3');
     expect(r.errorKind).toBe('unbalanced_paren');
-    expect(r.errorMessage).toMatch(/parênt/i);
+    expect(r.errorMessage).toMatch(/paren/i);
   });
 
   it('8.3 número malformado: 1.2.3 → "malformed_number"', () => {

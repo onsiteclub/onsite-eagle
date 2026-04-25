@@ -78,9 +78,9 @@ export function calculateStairs(input: StairsInput): StairsResult {
       compliance: [{
         field: 'rise',
         kind: 'error',
-        label: 'Altura total inválida',
+        label: 'Invalid total rise',
         measuredValue: `${totalRise}`,
-        rule: 'A altura total do vão precisa ser maior que zero.',
+        rule: 'Total floor-to-floor rise must be greater than zero.',
       }],
     };
   }
@@ -141,17 +141,17 @@ function checkCompliance(out: StairsOutput): ComplianceCheck[] {
     checks.push({
       field: 'rise',
       kind: 'error',
-      label: 'Altura do espelho',
+      label: 'Riser height',
       measuredValue: `${riseMm.toFixed(0)}mm (${out.riserHeight.toFixed(2)} in)`,
-      rule: rules.rise.message_pt,
+      rule: rules.rise.message_en,
     });
   } else {
     checks.push({
       field: 'rise',
       kind: 'ok',
-      label: 'Altura do espelho',
+      label: 'Riser height',
       measuredValue: `${riseMm.toFixed(0)}mm (${out.riserHeight.toFixed(2)} in)`,
-      rule: `OK — dentro de ${rules.rise.min_mm}-${rules.rise.max_mm}mm`,
+      rule: `OK — within ${rules.rise.min_mm}–${rules.rise.max_mm}mm`,
     });
   }
 
@@ -165,26 +165,26 @@ function checkCompliance(out: StairsOutput): ComplianceCheck[] {
     checks.push({
       field: 'run',
       kind: 'error',
-      label: 'Profundidade do piso',
+      label: 'Tread depth',
       measuredValue: `${runMm.toFixed(0)}mm (${out.tread.toFixed(2)} in)`,
-      rule: rules.run.message_pt,
+      rule: rules.run.message_en,
     });
   } else if (runMm > rules.run.max_mm) {
     // Above max is "warn" — uncomfortable but not an egress failure.
     checks.push({
       field: 'run',
       kind: 'warn',
-      label: 'Profundidade do piso',
+      label: 'Tread depth',
       measuredValue: `${runMm.toFixed(0)}mm (${out.tread.toFixed(2)} in)`,
-      rule: `Acima do máximo OBC (${rules.run.max_mm}mm). Não é inseguro, mas pode ficar incômodo.`,
+      rule: `Above OBC max (${rules.run.max_mm}mm). Not unsafe, but may feel awkward.`,
     });
   } else {
     checks.push({
       field: 'run',
       kind: 'ok',
-      label: 'Profundidade do piso',
+      label: 'Tread depth',
       measuredValue: `${runMm.toFixed(0)}mm (${out.tread.toFixed(2)} in)`,
-      rule: `OK — mín ${rules.run.min_mm}mm`,
+      rule: `OK — min ${rules.run.min_mm}mm`,
     });
   }
 
@@ -198,17 +198,17 @@ function checkCompliance(out: StairsOutput): ComplianceCheck[] {
     checks.push({
       field: 'nosing',
       kind: 'error',
-      label: 'Saliência (nosing)',
+      label: 'Nosing projection',
       measuredValue: `${nosingMm.toFixed(0)}mm (${out.nosing.toFixed(2)} in)`,
-      rule: rules.nosing.message_pt,
+      rule: rules.nosing.message_en,
     });
   } else {
     checks.push({
       field: 'nosing',
       kind: 'ok',
-      label: 'Saliência (nosing)',
+      label: 'Nosing projection',
       measuredValue: `${nosingMm.toFixed(0)}mm (${out.nosing.toFixed(2)} in)`,
-      rule: `OK — máx ${rules.nosing.max_mm}mm`,
+      rule: `OK — max ${rules.nosing.max_mm}mm`,
     });
   }
 
@@ -216,9 +216,9 @@ function checkCompliance(out: StairsOutput): ComplianceCheck[] {
   checks.push({
     field: 'headroom',
     kind: 'warn',
-    label: 'Pé-direito',
+    label: 'Headroom',
     measuredValue: 'não medido',
-    rule: `Verifique no local: mínimo ${rules.headroom.min_mm}mm (${rules.headroom.min_in.toFixed(0)} in) OBC 2024.`,
+    rule: `Verify on site: minimum ${rules.headroom.min_mm}mm (${rules.headroom.min_in.toFixed(0)} in) per OBC 2024.`,
   });
 
   return checks;

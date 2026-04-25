@@ -54,11 +54,11 @@ export function HistoryModal({ history, isOpen, onClose, onEntryClick, onClearAl
     <div className="history-modal-overlay" onClick={onClose}>
       <div className="history-modal" onClick={(e) => e.stopPropagation()}>
         <div className="history-modal-header">
-          <h2>Histórico</h2>
+          <h2>History</h2>
           <div className="history-modal-header__tools">
             {onClearAll && history.length > 0 && (
               <button className="history-clear-btn" onClick={onClearAll} type="button">
-                Limpar tudo
+                Clear all
               </button>
             )}
             <button className="history-close-btn" onClick={onClose} type="button">✕</button>
@@ -68,7 +68,7 @@ export function HistoryModal({ history, isOpen, onClose, onEntryClick, onClearAl
         <div className="history-modal-content">
           {history.length === 0 ? (
             <div className="history-empty">
-              Nenhum cálculo ainda
+              No calculations yet
             </div>
           ) : (
             history.map((entry) => {

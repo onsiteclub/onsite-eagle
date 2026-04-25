@@ -204,24 +204,24 @@ export default function ConversationalCalculator({
           setExpression('');
         } else {
           setToast({
-            message: result?.errorMessage ?? 'Não consegui calcular.',
+            message: result?.errorMessage ?? 'Could not calculate.',
             type: 'info',
           });
         }
         onVoiceUsed?.();
       } else if (data.error) {
         logger.voice.apiCall(duration, false, { status: response.status, apiError: data.error });
-        setToast({ message: 'Não entendi. Tente de novo.', type: 'info' });
+        setToast({ message: 'Could not understand. Try again.', type: 'info' });
       }
     } catch (error) {
       clearTimeout(timeoutId);
       const duration = Date.now() - startTime;
       if (error instanceof DOMException && error.name === 'AbortError') {
         logger.voice.error('Voice API timeout after 20s', { duration_ms: duration });
-        setToast({ message: 'Tempo esgotado. Tente novamente.', type: 'error' });
+        setToast({ message: 'Timed out. Please try again.', type: 'error' });
       } else {
         logger.voice.error('API request failed', { error: String(error), duration_ms: duration });
-        setToast({ message: 'Falha no reconhecimento de voz.', type: 'error' });
+        setToast({ message: 'Voice recognition failed.', type: 'error' });
       }
     } finally {
       setVoiceState('idle');
@@ -238,8 +238,8 @@ export default function ConversationalCalculator({
       const isDenied = /denied|permission/i.test(String(error));
       setToast({
         message: isDenied
-          ? 'Microfone negado. Verifique permissões do dispositivo.'
-          : 'Não consegui começar a gravar.',
+          ? 'Microphone denied. Check device permissions.'
+          : 'Could not start recording.',
         type: 'error',
       });
     },
@@ -344,19 +344,19 @@ export default function ConversationalCalculator({
 
   const handleClearHistory = useCallback(() => {
     if (history.length === 0) return;
-    if (!window.confirm(`Apagar ${history.length} cálculo(s) do histórico?`)) return;
+    if (!window.confirm(`Clear ${history.length} calculation(s) from history?`)) return;
     void clearHistory();
   }, [history.length, clearHistory]);
 
   const voiceButtonText = !isOnline
     ? 'Offline'
     : voiceState === 'recording'
-    ? 'Toque para parar'
+    ? 'Tap to stop'
     : voiceState === 'processing'
-    ? 'Processando…'
+    ? 'Processing…'
     : hasVoiceAccess
-    ? 'Toque para falar'
-    : 'Voz — fazer login';
+    ? 'Tap to speak'
+    : 'Voice — sign in';
 
   const voiceButtonClass = [
     'voice-btn',
@@ -374,13 +374,13 @@ export default function ConversationalCalculator({
         <section className="conv-focus">
           <Visor
             result={lastResult}
-            onCopied={() => setToast({ message: 'Resultado copiado.', type: 'success' })}
+            onCopied={() => setToast({ message: 'Result copied.', type: 'success' })}
           />
 
           {/* Live transcription preview — only while voice pipeline is active. */}
           {voiceState !== 'idle' && pendingTranscription && pendingTranscription !== '…' && (
             <p className="conv-transcript-preview">
-              {voiceState === 'recording' ? 'Você:' : 'Entendi:'} “{pendingTranscription}”
+              {voiceState === 'recording' ? 'You:' : 'Heard:'} “{pendingTranscription}”
             </p>
           )}
 
@@ -393,7 +393,7 @@ export default function ConversationalCalculator({
                   type="text"
                   className="expression-text expression-text--input"
                   value={expression}
-                  placeholder='5 1/2 + 3 1/4  ·  dez pés mais três polegadas'
+                  placeholder='5 1/2 + 3 1/4  ·  ten feet plus three inches'
                   onChange={(e) => setExpression(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -401,7 +401,7 @@ export default function ConversationalCalculator({
                       handleCommit();
                     }
                   }}
-                  aria-label="Expressão"
+                  aria-label="Expression"
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
@@ -415,7 +415,7 @@ export default function ConversationalCalculator({
         {/* =================================================================
             CONTROLS — fraction pad + keypad + voice button.
             ================================================================= */}
-        <aside className="conv-controls" aria-label="Teclado">
+        <aside className="conv-controls" aria-label="Keypad">
           <div className="fraction-container">
             <div className="fraction-pad">
               {FRACTION_PAD.flat().map((frac, i) => (

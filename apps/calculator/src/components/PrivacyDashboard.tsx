@@ -18,13 +18,13 @@ type ConsentRow = { type: ConsentType; label: string; description: string };
 const MANAGED_CONSENTS: ConsentRow[] = [
   {
     type: 'microphone_usage',
-    label: 'Microfone',
-    description: 'Permite que o app grave áudio para a função de voz. Desativar bloqueia o microfone.',
+    label: 'Microphone',
+    description: 'Lets the app record audio for voice input. Turning this off blocks the microphone.',
   },
   {
     type: 'voice_training',
-    label: 'Melhorar reconhecimento de voz',
-    description: 'Armazena transcrições (texto, não áudio) para treinar melhor reconhecimento. Opcional.',
+    label: 'Improve voice recognition',
+    description: 'Stores transcripts (text, not audio) to improve recognition. Optional.',
   },
 ];
 
@@ -63,8 +63,8 @@ export default function PrivacyDashboard({ onClose }: PrivacyDashboardProps) {
   const handleDelete = useCallback(async () => {
     const total = (counts?.voice_logs ?? 0) + (counts?.calculations ?? 0) + (counts?.errors ?? 0) + (counts?.events ?? 0);
     const confirmText = total > 0
-      ? `Apagar ${total} registro(s) do servidor? Esta ação não pode ser desfeita.`
-      : 'Não encontramos dados seus no servidor, mas podemos limpar por segurança. Continuar?';
+      ? `Delete ${total} record(s) from the server? This cannot be undone.`
+      : 'No server-side data found. We can still clear local cache for safety. Continue?';
     if (!window.confirm(confirmText)) return;
 
     setIsDeleting(true);
@@ -74,8 +74,8 @@ export default function PrivacyDashboard({ onClose }: PrivacyDashboardProps) {
       const deletedTotal = Object.values(result.deleted).reduce((a, b) => (a ?? 0) + (b ?? 0), 0) ?? 0;
       setDeletionSummary(
         result.partialFailure
-          ? `${deletedTotal} registro(s) apagados, mas algumas tabelas falharam. Tente novamente.`
-          : `${deletedTotal} registro(s) apagados do servidor.`
+          ? `${deletedTotal} record(s) deleted, but some tables failed. Please retry.`
+          : `${deletedTotal} record(s) deleted from server.`
       );
       // Refresh counts (should be zeros now).
       const refreshed = await fetchPrivacyCounts();
@@ -84,7 +84,7 @@ export default function PrivacyDashboard({ onClose }: PrivacyDashboardProps) {
       setDeviceId(await getOrCreateDeviceId());
     } catch (err) {
       logger.history.error('Deletion failed', { error: String(err) });
-      setDeletionSummary('Falha ao apagar. Tente novamente ou email privacy@onsiteclub.ca.');
+      setDeletionSummary('Deletion failed. Please retry or email privacy@onsiteclub.ca.');
     } finally {
       setIsDeleting(false);
     }
@@ -94,8 +94,8 @@ export default function PrivacyDashboard({ onClose }: PrivacyDashboardProps) {
     <div className="privacy-dashboard-overlay" onClick={onClose}>
       <div className="privacy-dashboard" onClick={(e) => e.stopPropagation()}>
         <header className="privacy-dashboard__header">
-          <h2 className="privacy-dashboard__title">Privacidade</h2>
-          <button className="privacy-dashboard__close" onClick={onClose} aria-label="Fechar">
+          <h2 className="privacy-dashboard__title">Privacy</h2>
+          <button className="privacy-dashboard__close" onClick={onClose} aria-label="Close">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -106,9 +106,9 @@ export default function PrivacyDashboard({ onClose }: PrivacyDashboardProps) {
         <div className="privacy-dashboard__body">
           {/* Section 1 — consents */}
           <section className="privacy-section">
-            <h3 className="privacy-section__title">Consentimentos</h3>
+            <h3 className="privacy-section__title">Consents</h3>
             <p className="privacy-section__sub">
-              Desativar um consentimento tem efeito imediato. Consentimentos passados ficam registrados para fins legais.
+              Turning a consent off takes effect immediately. Past consents stay on file for legal purposes.
             </p>
 
             {MANAGED_CONSENTS.map(({ type, label, description }) => {
@@ -135,27 +135,27 @@ export default function PrivacyDashboard({ onClose }: PrivacyDashboardProps) {
 
           {/* Section 2 — data footprint */}
           <section className="privacy-section">
-            <h3 className="privacy-section__title">Seus dados no servidor</h3>
+            <h3 className="privacy-section__title">Your data on our server</h3>
             <p className="privacy-section__sub">
-              Identificador anônimo deste dispositivo: <code className="privacy-code">{deviceId.slice(0, 13)}…</code>
+              Anonymous identifier for this device: <code className="privacy-code">{deviceId.slice(0, 13)}…</code>
             </p>
             {isLoadingCounts ? (
-              <p className="privacy-counts__loading">Carregando…</p>
+              <p className="privacy-counts__loading">Loading…</p>
             ) : (
               <ul className="privacy-counts">
-                <li><span>Gravações de voz</span><strong>{counts?.voice_logs ?? 0}</strong></li>
-                <li><span>Cálculos salvos</span><strong>{counts?.calculations ?? 0}</strong></li>
-                <li><span>Eventos</span><strong>{counts?.events ?? 0}</strong></li>
-                <li><span>Erros registrados</span><strong>{counts?.errors ?? 0}</strong></li>
+                <li><span>Voice recordings</span><strong>{counts?.voice_logs ?? 0}</strong></li>
+                <li><span>Saved calculations</span><strong>{counts?.calculations ?? 0}</strong></li>
+                <li><span>Events</span><strong>{counts?.events ?? 0}</strong></li>
+                <li><span>Errors logged</span><strong>{counts?.errors ?? 0}</strong></li>
               </ul>
             )}
           </section>
 
           {/* Section 3 — delete */}
           <section className="privacy-section">
-            <h3 className="privacy-section__title">Apagar meus dados</h3>
+            <h3 className="privacy-section__title">Delete my data</h3>
             <p className="privacy-section__sub">
-              Apaga todos os registros associados a este dispositivo e à sua conta. Deleção é imediata no servidor. O histórico local também é limpo.
+              Removes every record tied to this device and your account. Server deletion is immediate. Local history is wiped too.
             </p>
             <button
               type="button"
@@ -163,7 +163,7 @@ export default function PrivacyDashboard({ onClose }: PrivacyDashboardProps) {
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? 'Apagando…' : 'Apagar tudo'}
+              {isDeleting ? 'Deleting…' : 'Delete all'}
             </button>
             {deletionSummary && (
               <p className="privacy-deletion-summary">{deletionSummary}</p>
@@ -171,7 +171,7 @@ export default function PrivacyDashboard({ onClose }: PrivacyDashboardProps) {
           </section>
 
           <p className="privacy-dashboard__footer">
-            Mais dúvidas? <a href="mailto:privacy@onsiteclub.ca">privacy@onsiteclub.ca</a>
+            Questions? <a href="mailto:privacy@onsiteclub.ca">privacy@onsiteclub.ca</a>
           </p>
         </div>
       </div>

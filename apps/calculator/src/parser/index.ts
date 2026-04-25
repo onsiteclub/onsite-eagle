@@ -206,12 +206,12 @@ function looksLikeGarbage(s: string): boolean {
  */
 export function parseExpression(input: string): ParseResult {
   if (!input || !input.trim()) {
-    return { ok: false, reason: 'Entrada vazia.' };
+    return { ok: false, reason: 'Empty input.' };
   }
   if (input.length > MAX_INPUT_LENGTH) {
     return {
       ok: false,
-      reason: `Entrada muito longa (máximo ${MAX_INPUT_LENGTH} caracteres).`,
+      reason: `Input too long (max ${MAX_INPUT_LENGTH} characters).`,
     };
   }
 
@@ -247,15 +247,15 @@ export function parseExpression(input: string): ParseResult {
   if (!hasDigit(s)) {
     return {
       ok: false,
-      reason: 'Não encontrei nenhum número.',
-      suggestion: 'Tente incluir um número — ex: "10 pés mais 3 polegadas".',
+      reason: 'No number found.',
+      suggestion: 'Try including a number — e.g. "ten feet plus three inches".',
     };
   }
   if (looksLikeGarbage(s)) {
     return {
       ok: false,
-      reason: `Não entendi "${input}".`,
-      suggestion: 'Tente algo como "10 pés mais 3 polegadas" ou "20% de 150".',
+      reason: `Could not understand "${input}".`,
+      suggestion: 'Try something like "ten feet plus three inches" or "20% of 150".',
     };
   }
 

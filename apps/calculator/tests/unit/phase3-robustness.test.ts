@@ -123,14 +123,14 @@ describe('F18+F19 - No alert()/confirm() in source', () => {
   });
 
   it('shows toast when microphone denied', () => {
-    // Phase 3.2 migrated copy to Portuguese — this checks the denial branch still raises a toast.
-    expect(calculatorSrc).toContain('Microfone negado');
+    // Copy is now in English — denial branch still raises a toast.
+    expect(calculatorSrc).toContain('Microphone denied');
     expect(calculatorSrc).toContain('setToast');
   });
 
   it('shows toast when voice API fails', () => {
     const lines = calculatorSrc.split('\n');
-    const failLine = lines.find(l => l.includes('Falha no reconhecimento'));
+    const failLine = lines.find(l => l.includes('Voice recognition failed'));
     expect(failLine).toBeDefined();
     expect(failLine).toContain('setToast');
   });

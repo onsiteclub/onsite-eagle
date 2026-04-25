@@ -55,10 +55,10 @@ const StairsIcon = () => (
 
 export default function TabNavigation({ activeTab, onTabChange, isOnline, appVersion }: TabNavigationProps) {
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'calculator', label: 'Cálculo',  icon: <CalculatorIcon /> },
-    { id: 'stairs',     label: 'Escada',   icon: <StairsIcon /> },
-    { id: 'triangle',   label: 'Esquadro', icon: <TriangleIcon /> },
-    { id: 'converter',  label: 'Conversão',icon: <ConverterIcon /> },
+    { id: 'calculator', label: 'Calculator', icon: <CalculatorIcon /> },
+    { id: 'stairs',     label: 'Stairs',     icon: <StairsIcon /> },
+    { id: 'triangle',   label: 'Triangle',   icon: <TriangleIcon /> },
+    { id: 'converter',  label: 'Converter',  icon: <ConverterIcon /> },
   ];
 
   return (

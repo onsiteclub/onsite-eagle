@@ -73,10 +73,10 @@ interface LocaleFormat {
   decimal: string;
 }
 
-/** Detect device locale at module load. Defaults to PT-BR (project's primary
- *  market) when navigator is unavailable (SSR / native shell warmup). */
+/** Detect device locale at module load. Defaults to en-US (English-language
+ *  app) when navigator is unavailable (SSR / native shell warmup). */
 function detectLocale(): LocaleFormat {
-  let lang = 'pt-BR';
+  let lang = 'en-US';
   try {
     if (typeof navigator !== 'undefined' && navigator.language) {
       lang = navigator.language;
@@ -120,7 +120,7 @@ function preprocess(input: string): string {
 // Reject double binary operators. Unary minus after binary is fine.
 function rejectConsecutiveBinary(s: string): void {
   if (/[+\-*/]\s*[+*/]/.test(s)) {
-    throw new EngineError('duplicate_operators', 'operadores duplicados');
+    throw new EngineError('duplicate_operators', 'duplicate operators');
   }
 }
 
@@ -203,7 +203,7 @@ function parseConstructionToken(raw: string): Fraction {
     const feetStr = s.slice(0, apo).trim();
     const rest = s.slice(apo + 1).trim();
     if (!/^\d+(?:\.\d+)?$/.test(feetStr)) {
-      throw new EngineError('malformed_number', `número inválido: ${feetStr}`);
+      throw new EngineError('malformed_number', `malformed number: ${feetStr}`);
     }
     totalInches = new Fraction(feetStr).mul(12);
     s = rest;
@@ -218,7 +218,7 @@ function parseConstructionToken(raw: string): Fraction {
   const mixed = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
   if (mixed) {
     const [, whole, num, den] = mixed;
-    if (den === '0') throw new EngineError('malformed_number', 'denominador zero');
+    if (den === '0') throw new EngineError('malformed_number', 'zero denominator');
     const v = totalInches.add(new Fraction(whole)).add(new Fraction(+num, +den));
     return applyImperialMul(applyMetricMul(v));
   }
@@ -227,14 +227,14 @@ function parseConstructionToken(raw: string): Fraction {
   if (frac) {
     const num = +frac[1];
     const den = +frac[2];
-    if (den === 0) throw new EngineError('malformed_number', 'denominador zero');
+    if (den === 0) throw new EngineError('malformed_number', 'zero denominator');
     // Improper bare fractions are accepted (mathematically valid: 3/2 = 1.5).
     // The visor formatter renders them as a mixed number when |v| ≥ 1.
     return applyImperialMul(applyMetricMul(totalInches.add(new Fraction(num, den))));
   }
 
   if (!/^\d+(?:\.\d+)?$/.test(s)) {
-    throw new EngineError('malformed_number', `número inválido: ${s}`);
+    throw new EngineError('malformed_number', `malformed number: ${s}`);
   }
   return applyImperialMul(applyMetricMul(totalInches.add(new Fraction(s))));
 }
@@ -245,16 +245,16 @@ function parseConstructionToken(raw: string): Fraction {
 
 function mulQ(a: Quantity, b: Quantity): Quantity {
   const newDim = a.dim + b.dim;
-  if (newDim > 3) throw new EngineError('dimension_mismatch', 'dimensão acima de volume');
+  if (newDim > 3) throw new EngineError('dimension_mismatch', 'dimension above volume');
   const system = mergeSystem(a.system, b.system);
   const originalUnit = mergeUnitForMul(a.originalUnit, b.originalUnit, newDim as Dim);
   return { value: a.value.mul(b.value), dim: newDim as Dim, originalUnit, system };
 }
 
 function divQ(a: Quantity, b: Quantity): Quantity {
-  if (b.value.equals(0)) throw new EngineError('division_by_zero', 'divisão por zero');
+  if (b.value.equals(0)) throw new EngineError('division_by_zero', 'division by zero');
   const newDim = a.dim - b.dim;
-  if (newDim < 0) throw new EngineError('dimension_mismatch', 'divisão produz dimensão negativa');
+  if (newDim < 0) throw new EngineError('dimension_mismatch', 'division produces negative dimension');
   const system = mergeSystem(a.system, b.system);
   return { value: a.value.div(b.value), dim: newDim as Dim, originalUnit: a.originalUnit, system };
 }
@@ -263,7 +263,7 @@ function coerceForAddSub(a: Quantity, b: Quantity): [Quantity, Quantity] {
   if (a.dim === b.dim) return [a, b];
   if (a.dim === 0) return [{ ...a, dim: b.dim, originalUnit: b.originalUnit, system: b.system }, b];
   if (b.dim === 0) return [a, { ...b, dim: a.dim, originalUnit: a.originalUnit, system: a.system }];
-  throw new EngineError('dimension_mismatch', `não posso somar ${dimName(a.dim)} com ${dimName(b.dim)}`);
+  throw new EngineError('dimension_mismatch', `cannot add ${dimName(a.dim)} with ${dimName(b.dim)}`);
 }
 
 function addQ(a: Quantity, b: Quantity): Quantity {
@@ -331,7 +331,7 @@ function mergeUnitForMul(a: OriginalUnit, b: OriginalUnit, newDim: Dim): Origina
 // ============================================================================
 
 function formatLocaleDecimal(num: number, maxFractionDigits: number): string {
-  if (!isFinite(num)) return 'Erro';
+  if (!isFinite(num)) return 'Error';
   const negative = num < 0;
   const abs = Math.abs(num);
   // Round to the requested precision, then split.
@@ -398,7 +398,7 @@ function reduceFraction(numerator: number, denominator: number): { n: number; d:
  *  - |v| ≥ 12" → "5' 0\"" (always both parts; zero inches explicit)
  *  - Snap to 1/16"; flag isApproximate when rounding altered. */
 function formatImperialLength(decimalInches: number): { display: string; isApproximate: boolean } {
-  if (!isFinite(decimalInches)) return { display: 'Erro', isApproximate: false };
+  if (!isFinite(decimalInches)) return { display: 'Error', isApproximate: false };
 
   const negative = decimalInches < 0;
   const absDec = Math.abs(decimalInches);
@@ -443,7 +443,7 @@ function formatImperialLength(decimalInches: number): { display: string; isAppro
 /** Format an inches value as metric length per Vol 4.
  *  Uses originalUnit hint to preserve user's input scale where possible. */
 function formatMetricLength(decimalInches: number, original: OriginalUnit): { display: string; isApproximate: boolean } {
-  if (!isFinite(decimalInches)) return { display: 'Erro', isApproximate: false };
+  if (!isFinite(decimalInches)) return { display: 'Error', isApproximate: false };
   const negative = decimalInches < 0;
   const abs = Math.abs(decimalInches);
   // Convert inches → millimeters as the smallest-grained common base.
@@ -627,22 +627,22 @@ function evaluateRPN(tokens: Array<{ type: string; value: unknown }>, ctx: Map<s
       case 'IVAR': {
         const name = tok.value as string;
         const q = ctx.get(name);
-        if (!q) throw new EngineError('unknown_token', `variável desconhecida: ${name}`);
+        if (!q) throw new EngineError('unknown_token', `unknown variable: ${name}`);
         stack.push(q);
         break;
       }
       case 'IOP1': {
         const a = stack.pop();
-        if (!a) throw new EngineError('incomplete', 'expressão incompleta');
+        if (!a) throw new EngineError('incomplete', 'incomplete expression');
         if (tok.value === '-') stack.push(negQ(a));
         else if (tok.value === '+') stack.push(a);
-        else throw new EngineError('unknown_token', `operador unário desconhecido: ${tok.value}`);
+        else throw new EngineError('unknown_token', `unknown unary operator: ${tok.value}`);
         break;
       }
       case 'IOP2': {
         const b = stack.pop();
         const a = stack.pop();
-        if (!a || !b) throw new EngineError('incomplete', 'expressão incompleta');
+        if (!a || !b) throw new EngineError('incomplete', 'incomplete expression');
         // Track mixedSystems: any binary op between length operands of
         // distinct systems trips the flag.
         if (a.system && b.system && a.system !== b.system && a.dim >= 1 && b.dim >= 1) {
@@ -653,16 +653,16 @@ function evaluateRPN(tokens: Array<{ type: string; value: unknown }>, ctx: Map<s
           case '-': stack.push(subQ(a, b)); break;
           case '*': stack.push(mulQ(a, b)); break;
           case '/': stack.push(divQ(a, b)); break;
-          default: throw new EngineError('unknown_token', `operador binário desconhecido: ${tok.value}`);
+          default: throw new EngineError('unknown_token', `unknown binary operator: ${tok.value}`);
         }
         break;
       }
       default:
-        throw new EngineError('unknown_token', `token desconhecido: ${tok.type}`);
+        throw new EngineError('unknown_token', `unknown token: ${tok.type}`);
     }
   }
 
-  if (stack.length !== 1) throw new EngineError('incomplete', 'expressão incompleta');
+  if (stack.length !== 1) throw new EngineError('incomplete', 'incomplete expression');
   return { q: stack[0], mixedFlag };
 }
 
@@ -742,7 +742,7 @@ function buildErrorResult(expression: string, kind: EngineErrorKind, message: st
 
 function buildResultFromQuantity(q: Quantity, expression: string, mixedSystems: boolean): CalculationResult {
   const decimal = q.value.valueOf();
-  if (!isFinite(decimal)) return buildErrorResult(expression, 'unknown', 'cálculo inválido');
+  if (!isFinite(decimal)) return buildErrorResult(expression, 'unknown', 'invalid calculation');
 
   // Scalar — Volumes 1 & 2.
   if (q.dim === 0) {
@@ -908,11 +908,11 @@ export function calculate(input: string): CalculationResult | null {
 
     // Detect leading operator before expr-eval throws a generic syntax error.
     if (/^\s*[*/]/.test(s)) {
-      throw new EngineError('leading_operator', 'expressão começa com operador binário');
+      throw new EngineError('leading_operator', 'expression starts with a binary operator');
     }
     // Detect trailing operator likewise.
     if (/[+\-*/]\s*$/.test(s)) {
-      throw new EngineError('incomplete', 'expressão incompleta');
+      throw new EngineError('incomplete', 'incomplete expression');
     }
 
     const ctx = new Map<string, Quantity>();
@@ -936,16 +936,16 @@ export function calculate(input: string): CalculationResult | null {
           // Likely paren mismatch; check counts.
           const opens = (s.match(/\(/g) || []).length;
           const closes = (s.match(/\)/g) || []).length;
-          if (opens !== closes) throw new EngineError('unbalanced_paren', 'parêntese não fechado');
+          if (opens !== closes) throw new EngineError('unbalanced_paren', 'unclosed parenthesis');
         } else if (/\(/.test(s) && !/\)/.test(s)) {
-          throw new EngineError('unbalanced_paren', 'parêntese não fechado');
+          throw new EngineError('unbalanced_paren', 'unclosed parenthesis');
         }
         if (/\.\d+\./.test(input)) {
           throw new EngineError('malformed_number', `número inválido: ${input.match(/\d+\.\d+\.\d+/)?.[0] ?? input}`);
         }
-        throw new EngineError('incomplete', 'expressão incompleta');
+        throw new EngineError('incomplete', 'incomplete expression');
       }
-      throw new EngineError('unknown', msg || 'erro desconhecido');
+      throw new EngineError('unknown', msg || 'unknown error');
     }
 
     const rpn = (parsed as unknown as { tokens: Array<{ type: string; value: unknown }> }).tokens;
@@ -955,7 +955,7 @@ export function calculate(input: string): CalculationResult | null {
     if (e instanceof EngineError) {
       return buildErrorResult(armed, e.kind, e.message, e.position);
     }
-    return buildErrorResult(armed, 'unknown', 'erro desconhecido');
+    return buildErrorResult(armed, 'unknown', 'unknown error');
   }
 }
 
@@ -988,7 +988,7 @@ export function formatInches(inches: number): string {
 
 /** Total-inches form ("24 7/8 In") — used by Stairs panel. */
 export function formatTotalInches(inches: number): string {
-  if (!isFinite(inches)) return 'Erro';
+  if (!isFinite(inches)) return 'Error';
   const negative = inches < 0;
   const abs = Math.abs(inches);
   const snap = snapInchesToSixteenths(abs);

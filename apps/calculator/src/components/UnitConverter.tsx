@@ -267,16 +267,16 @@ export default function UnitConverter({
   return (
     <div className="unit-converter tab-desktop-3col">
       {/* Desktop-only left-column info panel. Hidden on mobile via CSS. */}
-      <aside className="tab-info" aria-label="Referência de unidades">
-        <h3>Conversor</h3>
-        <p>Digite um valor, escolha as unidades de origem e destino.</p>
-        <h4>Unidades suportadas</h4>
+      <aside className="tab-info" aria-label="Unit reference">
+        <h3>Converter</h3>
+        <p>Enter a value, then pick the source and target units.</p>
+        <h4>Supported units</h4>
         <ul>
           <li><strong>in / ft / yd</strong><span className="tab-info__muted"> — imperial</span></li>
-          <li><strong>mm / cm / m</strong><span className="tab-info__muted"> — métrico</span></li>
+          <li><strong>mm / cm / m</strong><span className="tab-info__muted"> — metric</span></li>
         </ul>
         <p className="tab-info__muted">
-          A unidade de origem aceita frações (ex: <code>5 1/2</code>) e feet ({"'"}).
+          Source accepts fractions (e.g. <code>5 1/2</code>) and feet ({"'"}).
         </p>
       </aside>
 

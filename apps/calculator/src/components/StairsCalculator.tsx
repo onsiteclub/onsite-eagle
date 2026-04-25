@@ -75,7 +75,7 @@ export default function StairsCalculator({
   return (
     <div className="stairs-panel tab-desktop-3col">
       <section className="stairs-panel__inputs">
-        <Row label="Altura total (piso a piso)" hint="Ex: 9', 108&quot;, 2740mm">
+        <Row label="Total rise (floor to floor)" hint="e.g. 9', 108&quot;, 2740mm">
           <input
             type="text"
             value={totalRiseInput}
@@ -85,7 +85,7 @@ export default function StairsCalculator({
             spellCheck={false}
           />
         </Row>
-        <Row label="Altura do espelho (riser)" hint="Alvo 7&quot;, OBC 4.92-7.87&quot;">
+        <Row label="Riser height" hint="Target 7&quot;, OBC 4.92–7.87&quot;">
           <input
             type="text"
             value={riserHeightInput}
@@ -95,7 +95,7 @@ export default function StairsCalculator({
             spellCheck={false}
           />
         </Row>
-        <Row label="Profundidade do piso (tread)" hint="Mínimo 10&quot; (255mm)">
+        <Row label="Tread depth" hint="Min 10&quot; (255mm)">
           <input
             type="text"
             value={treadInput}
@@ -105,7 +105,7 @@ export default function StairsCalculator({
             spellCheck={false}
           />
         </Row>
-        <Row label="Saliência (nosing)" hint="Máximo 1&quot; (25mm)">
+        <Row label="Nosing projection" hint="Max 1&quot; (25mm)">
           <input
             type="text"
             value={nosingInput}
@@ -118,13 +118,13 @@ export default function StairsCalculator({
       </section>
 
       <section className="stairs-panel__output">
-        <h3 className="stairs-panel__section-title">Cálculo</h3>
+        <h3 className="stairs-panel__section-title">Output</h3>
         <ul className="stairs-output">
-          <li><span>Degraus</span><strong>{result.output.stepCount || '—'}</strong></li>
-          <li><span>Altura espelho</span><strong>{formatInches(result.output.riserHeight)}</strong></li>
-          <li><span>Run total</span><strong>{formatInches(result.output.totalRun)}</strong></li>
+          <li><span>Steps</span><strong>{result.output.stepCount || '—'}</strong></li>
+          <li><span>Riser height</span><strong>{formatInches(result.output.riserHeight)}</strong></li>
+          <li><span>Total run</span><strong>{formatInches(result.output.totalRun)}</strong></li>
           <li><span>Stringer</span><strong>{formatInches(result.output.stringerLength)}</strong></li>
-          <li><span>Ângulo</span><strong>{result.output.angle.toFixed(1)}°</strong></li>
+          <li><span>Angle</span><strong>{result.output.angle.toFixed(1)}°</strong></li>
         </ul>
       </section>
 
@@ -132,9 +132,9 @@ export default function StairsCalculator({
         <h3 className="stairs-panel__section-title">
           OBC 2024
           {result.valid ? (
-            <span className="stairs-compliance-badge stairs-compliance-badge--ok">Conforme</span>
+            <span className="stairs-compliance-badge stairs-compliance-badge--ok">Compliant</span>
           ) : (
-            <span className="stairs-compliance-badge stairs-compliance-badge--error">Não conforme</span>
+            <span className="stairs-compliance-badge stairs-compliance-badge--error">Non-compliant</span>
           )}
         </h3>
         <ul className="stairs-compliance">

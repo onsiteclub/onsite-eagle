@@ -68,7 +68,7 @@ export function useCalculator(): UseCalculatorReturn {
   const compute = useCallback((saveOptions?: SaveOptions) => {
     const result = calculate(expression);
     if (result) {
-      setDisplayValue(result.primary.value || (result.isError ? 'Erro' : ''));
+      setDisplayValue(result.primary.value || (result.isError ? 'Error' : ''));
       setLastResult(result);
       setJustCalculated(true);
 
@@ -149,7 +149,7 @@ export function useCalculator(): UseCalculatorReturn {
     setExpression(finalExpression);
     const result = calculate(finalExpression);
     if (result) {
-      setDisplayValue(result.primary.value || (result.isError ? 'Erro' : ''));
+      setDisplayValue(result.primary.value || (result.isError ? 'Error' : ''));
       setLastResult(result);
       setJustCalculated(true);
 
@@ -178,7 +178,7 @@ export function useCalculator(): UseCalculatorReturn {
 
   const loadResult = useCallback((result: CalculationResult) => {
     setExpression(result.expression);
-    setDisplayValue(result.primary.value || (result.isError ? 'Erro' : ''));
+    setDisplayValue(result.primary.value || (result.isError ? 'Error' : ''));
     setLastResult(result);
     setJustCalculated(true);
     logger.calculator.compute(!result.isError, {

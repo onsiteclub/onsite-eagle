@@ -3095,19 +3095,6 @@
 .conv-controls .voice-btn { flex-shrink: 0; }
 .conv-controls .keypad { flex: 1 1 auto; min-height: 0; }
 
-/* TEMP DEPLOY-CHECK MARKER — paints the equals key red. If you load the
-   site on mobile and the "=" is red, the CSS bundle is fresh. If it's still
-   the dark charcoal of the original design, the browser/CDN is serving a
-   stale build and the layout fixes haven't taken effect. Remove this rule
-   once we've confirmed the deploy. */
-.key.equals {
-  background: #E11D48 !important;
-  color: #FFFFFF !important;
-  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.2),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3),
-              0 1px 0 #C71540 !important;
-}
-
 /* ---- Desktop layout (≥1024px): 3-col grid ---- */
 
 @media (min-width: 1024px) {

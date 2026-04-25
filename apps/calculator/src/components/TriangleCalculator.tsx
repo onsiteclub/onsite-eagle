@@ -200,19 +200,19 @@ export default function TriangleCalculator({
   return (
     <div className="easy-square tab-desktop-3col">
       {/* Desktop-only left-column info panel. Hidden on mobile via CSS. */}
-      <aside className="tab-info" aria-label="Esquadro — instruções">
-        <h3>Esquadro</h3>
+      <aside className="tab-info" aria-label="Triangle — instructions">
+        <h3>Triangle</h3>
         <p>
-          Toque em um dos três lados para editar; o terceiro se calcula via Pitágoras.
+          Tap one of the three sides to edit; the third side is computed via Pythagoras.
         </p>
-        <h4>Regras</h4>
+        <h4>Sides</h4>
         <ul>
-          <li><strong>A</strong> — base (inferior)</li>
-          <li><strong>B</strong> — altura (direita)</li>
-          <li><strong>C</strong> — hipotenusa (diagonal)</li>
+          <li><strong>A</strong> — base (bottom)</li>
+          <li><strong>B</strong> — height (right)</li>
+          <li><strong>C</strong> — hypotenuse (diagonal)</li>
         </ul>
         <p className="tab-info__muted">
-          Presets 3-4-5 e 6-8-10 validam esquadro na prática. Tap na preset pra testar.
+          The 3-4-5 and 6-8-10 presets are practical squareness checks — tap one to test.
         </p>
       </aside>
 
