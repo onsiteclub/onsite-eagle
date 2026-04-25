@@ -37,6 +37,17 @@
   background: var(--color-surface-canvas);
 }
 
+/* The tab content wrapper sits between header and tab-navigation. Without
+   `flex: 1; min-height: 0` here, the calculator's main view bleeds past the
+   bottom of the viewport and pushes tab-navigation off screen. */
+.tab-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* Header — EMERGE. Sits on canvas, slightly lighter than the bottom of card. */
 .header {
   flex-shrink: 0;
@@ -467,11 +478,12 @@
   color: var(--color-text-strong);
   border: none;
   border-radius: var(--radius-sm);
-  /* Mobile-first: ≥44px tap target (Apple HIG min). Desktop overrides below. */
-  padding: 14px 4px;
-  min-height: 48px;
+  /* Mobile-first: ≥44px tap target (Apple HIG min) but tight enough that the
+     2 fraction rows + 5 keypad rows + voice + composer all fit. */
+  padding: 10px 4px;
+  min-height: 44px;
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -517,11 +529,13 @@
   border: none;
   border-radius: var(--radius-key);
   font-family: var(--font-mono);
-  /* Mobile-first sizing — comfortable thumb tap on phone. The desktop @768
-     override below tunes proportions for cursor input. */
-  font-size: 1.6rem;
-  min-height: 60px;
-  padding: 14px 0;
+  /* Mobile-first sizing — comfortable thumb tap, but small enough that all
+     5 keypad rows + fraction pad + voice button fit above the tab nav on a
+     standard phone (~700–800px viewport height). The desktop @768 override
+     below tunes proportions for cursor input. */
+  font-size: 1.5rem;
+  min-height: 52px;
+  padding: 10px 0;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -573,13 +587,14 @@
    ============================================ */
 .conv-main {
   flex: 1;
+  min-height: 0;        /* required so flex children can shrink; default is auto */
   display: flex;
   flex-direction: column;
   padding: 8px;
   gap: 8px;
   overflow: hidden;
-  max-height: calc(100vh - 50px);
-  max-height: calc(100dvh - 50px);
+  /* No artificial max-height — `.tab-content` (which now declares flex: 1) caps
+     this naturally between header and tab-navigation. */
 }
 
 /* Toolbar — export/clear. Appears above the scrollable history when non-empty. */
@@ -3043,7 +3058,21 @@
   min-width: 0;
 }
 
-/* Controls block — keypad+frac+voice wrapper. Mobile: just a card below composer. */
+/* Focus column — Visor + composer. Sized to absorb whatever vertical space
+   the controls block doesn't claim. min-height: 0 lets the Visor shrink on
+   short viewports instead of pushing the controls (and tab-nav) off-screen. */
+.conv-focus {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* Controls block — keypad+frac+voice wrapper. Mobile: card below composer.
+   flex-shrink: 0 keeps the keys at their declared size; the Visor in
+   .conv-focus absorbs the variation. */
 .conv-controls {
   flex-shrink: 0;
   background: var(--gradient-card);
@@ -4090,6 +4119,11 @@
   text-align: right;
   color: var(--color-text-primary);
   min-height: 132px;
+  /* Inside .conv-focus (flex column, min-height: 0), let the Visor expand
+     to fill the slot the composer doesn't take, while still respecting its
+     min-height as the floor. */
+  flex: 1;
+  overflow: hidden;
 }
 
 .visor--empty .visor-result {
