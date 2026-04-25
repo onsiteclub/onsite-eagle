@@ -643,11 +643,14 @@ workflows:
     max_build_duration: 90
     instance_type: mac_mini_m2
 
-    # Reuses the existing "OnSite Calculator" App Store Connect integration —
-    # the API key is team-wide so the same .p8 grants App Manager access to
-    # every app under the developer team, including ca.onsiteclub.operator2.
+    # Uses the dedicated "OnSite Operator 2" App Store Connect integration
+    # (configured in Codemagic UI → Teams → Integrations). The .p8 is the
+    # one downloaded from App Store Connect for the team key MS9YHUWK8G;
+    # since the key is team-wide, it grants App Manager access to all
+    # apps in the developer team — but each Codemagic project needs its
+    # own integration entry to access them.
     integrations:
-      app_store_connect: OnSite Calculator
+      app_store_connect: OnSite Operator 2
 
     environment:
       ios_signing:
