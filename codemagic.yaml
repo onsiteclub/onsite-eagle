@@ -643,14 +643,11 @@ workflows:
     max_build_duration: 90
     instance_type: mac_mini_m2
 
-    # Uses the dedicated "OnSite Operator 2" App Store Connect integration
-    # (configured in Codemagic UI → Teams → Integrations). The .p8 is the
-    # one downloaded from App Store Connect for the team key MS9YHUWK8G;
-    # since the key is team-wide, it grants App Manager access to all
-    # apps in the developer team — but each Codemagic project needs its
-    # own integration entry to access them.
+    # Reuses the team-level "OnSite Calculator" Developer Portal integration
+    # (the .p8 with key ID MS9YHUWK8G is App-Manager + team-wide, so it grants
+    # access to every app in the developer team including operator_2).
     integrations:
-      app_store_connect: OnSite Operator 2
+      app_store_connect: OnSite Calculator
 
     environment:
       ios_signing:
