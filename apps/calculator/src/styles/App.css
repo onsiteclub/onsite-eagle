@@ -335,13 +335,13 @@
    to amber voice-active gradient; processing swaps to dark keycap with pulse. */
 .voice-btn {
   width: 100%;
-  /* Mobile-first comfortable tap. Desktop tightens via .voice-btn at @768. */
-  min-height: 56px;
+  /* Mobile: ≥48px tap target (Apple HIG); voice is critical, never below. */
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 14px 18px;
+  padding: 12px 18px;
   background: var(--gradient-key-rest);
   box-shadow: var(--shadow-key);
   color: var(--color-text-strong);
@@ -478,10 +478,9 @@
   color: var(--color-text-strong);
   border: none;
   border-radius: var(--radius-sm);
-  /* Mobile-first: ≥44px tap target (Apple HIG min) but tight enough that the
-     2 fraction rows + 5 keypad rows + voice + composer all fit. */
-  padding: 10px 4px;
-  min-height: 44px;
+  /* Mobile: padding only, no min-height — fits via flex distribution within
+     conv-controls. Still gives a fingerprint-sized target. */
+  padding: 9px 4px;
   font-family: var(--font-mono);
   font-size: 0.95rem;
   font-weight: 500;
@@ -529,13 +528,14 @@
   border: none;
   border-radius: var(--radius-key);
   font-family: var(--font-mono);
-  /* Mobile-first sizing — comfortable thumb tap, but small enough that all
-     5 keypad rows + fraction pad + voice button fit above the tab nav on a
-     standard phone (~700–800px viewport height). The desktop @768 override
-     below tunes proportions for cursor input. */
-  font-size: 1.5rem;
-  min-height: 52px;
-  padding: 10px 0;
+  /* Mobile-first: NO min-height. The keypad-row + keypad both have `flex: 1`,
+     so individual keys distribute the leftover vertical space the rest of
+     conv-controls doesn't claim. Padding gives a comfortable visual size at
+     rest; on tall phones keys end up bigger, on short phones smaller, but
+     voice button + tab nav stay visible. Desktop @768 override re-imposes
+     a 20px padding for cursor input. */
+  font-size: 1.4rem;
+  padding: 8px 0;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -3071,10 +3071,13 @@
 }
 
 /* Controls block — keypad+frac+voice wrapper. Mobile: card below composer.
-   flex-shrink: 0 keeps the keys at their declared size; the Visor in
-   .conv-focus absorbs the variation. */
+   On phones the controls own the bulk of the vertical real estate; the
+   Visor (in .conv-focus) takes whatever's left after composer. The keypad
+   inside has flex: 1 so individual keys grow/shrink; the fraction pad and
+   voice button are flex-shrink: 0 so they keep a consistent visual size. */
 .conv-controls {
-  flex-shrink: 0;
+  flex: 1 1 auto;       /* take available space, but allow shrinking */
+  min-height: 0;        /* required so flex children can shrink */
   background: var(--gradient-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
@@ -3082,7 +3085,15 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow: hidden;
 }
+
+/* Children of .conv-controls — preserve fraction pad and voice button at
+   their natural size, give the keypad the remaining height to distribute
+   among its 5 rows. */
+.conv-controls .fraction-container { flex-shrink: 0; }
+.conv-controls .voice-btn { flex-shrink: 0; }
+.conv-controls .keypad { flex: 1 1 auto; min-height: 0; }
 
 /* ---- Desktop layout (≥1024px): 3-col grid ---- */
 
