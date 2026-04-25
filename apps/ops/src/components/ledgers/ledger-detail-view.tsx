@@ -1,9 +1,11 @@
 'use client'
 
 import {
+  addAdvanceAction,
   markPaidToClientAction,
   reconcileInvoiceAction,
 } from '@/app/(dashboard)/statement/actions'
+import { AdvanceModal } from '@/components/statement/advance-modal'
 import { CashPayoutModal, type CashBreakdown } from '@/components/statement/cash-payout-modal'
 import { ReconcileModal } from '@/components/statement/reconcile-modal'
 import { SuccessModal } from '@/components/shared/success-modal'
@@ -98,6 +100,7 @@ export function LedgerDetailView({ data }: { data: LedgerDetailData }) {
   const [modal, setModal] = useState<
     | { kind: 'recon'; invoiceId: string; invoiceNumber: string; expected: number }
     | { kind: 'cash'; breakdown: CashBreakdown; invoiceId: string }
+    | { kind: 'advance' }
     | { kind: 'success'; message: string }
     | { kind: 'error'; message: string }
     | null
@@ -130,6 +133,19 @@ export function LedgerDetailView({ data }: { data: LedgerDetailData }) {
           advance: data.pendingAdvancesTotal,
         },
       })
+      router.refresh()
+    })
+  }
+
+  function saveAdvance(amount: number, description: string) {
+    startTransition(async () => {
+      const res = await addAdvanceAction(data.person.id, amount, description || null)
+      if (res.error) {
+        setModal({ kind: 'error', message: res.error })
+        return
+      }
+      setModal({ kind: 'success', message: 'Advance recorded' })
+      setTimeout(() => setModal(null), 1400)
       router.refresh()
     })
   }
@@ -215,18 +231,18 @@ export function LedgerDetailView({ data }: { data: LedgerDetailData }) {
         </button>
         <button
           className="btn"
-          disabled
-          title="Coming in a follow-up — standalone advance is Phase 9"
+          onClick={() => setModal({ kind: 'advance' })}
+          title="Record a cash advance to this client before GC pays"
         >
           + Record advance
         </button>
-        <button
+        <a
           className="btn ghost"
-          disabled
-          title="Coming in Settings · Phase 8"
+          href={`/clients/${data.person.id}/edit`}
+          style={{ textDecoration: 'none' }}
         >
           Edit person
-        </button>
+        </a>
       </div>
 
       <div className="ledger-table-head">
@@ -340,6 +356,13 @@ export function LedgerDetailView({ data }: { data: LedgerDetailData }) {
         breakdown={modal?.kind === 'cash' ? modal.breakdown : null}
         onClose={() => setModal(null)}
         onConfirm={markPaid}
+      />
+      <AdvanceModal
+        open={modal?.kind === 'advance'}
+        clientName={data.person.displayName}
+        pending={isPending}
+        onClose={() => setModal(null)}
+        onConfirm={saveAdvance}
       />
       <SuccessModal
         open={modal?.kind === 'success'}
