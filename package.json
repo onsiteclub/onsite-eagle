@@ -20,7 +20,8 @@
     "dev:analytics": "turbo dev --filter=@onsite/analytics",
     "dev:operator": "turbo dev --filter=@onsite/operator",
     "dev:architecture": "turbo dev --filter=@onsite/architecture",
-    "dev:checklist": "turbo dev --filter=@onsite/checklist-app",
+    "dev:checklist": "turbo dev --filter=@onsite/checklist",
+    "dev:checklist-app": "turbo dev --filter=@onsite/checklist-app",
     "dev:requests": "turbo dev --filter=@onsite/requests",
     "clean": "turbo clean && rm -rf node_modules",
     "android": "expo run:android",
@@ -33,6 +34,11 @@
     "metro-transform-worker": "0.81.0",
     "prettier": "^3.4.0",
     "turbo": "^2.3.0"
+  },
+  "overrides": {
+    "@onsite/operator-2": {
+      "expo-modules-core": "2.1.4"
+    }
   },
   "packageManager": "npm@10.0.0",
   "engines": {
