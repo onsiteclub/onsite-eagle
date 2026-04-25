@@ -9,7 +9,9 @@
 #
 # Code signing groups (Codemagic UI → Code signing):
 #   onsite_calculator_keystore → .keystore file + passwords for ca.onsiteclub.calculator
+#   onsite_checklist_keystore  → .keystore file + passwords for ca.onsiteclub.checklist
 #   App Store Connect integration named "OnSite Calculator" (linked to ca.onsiteclub.calculator)
+#   App Store Connect integration named "OnSite Checklist"  (linked to ca.onsiteclub.checklist)
 
 workflows:
 
@@ -291,6 +293,306 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
 
   # =============================================================================
+  # CHECKLIST-APP — Android Google Play Release (AAB + APK)
+  # Triggers on push to main or on `checklist-v*` tags.
+  # =============================================================================
+  checklist-app-android-release:
+    name: Checklist · Android Release
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      android_signing:
+        - onsite_checklist_keystore
+      groups:
+        - supabase_credentials
+        - google_play_credentials
+      vars:
+        PACKAGE_NAME: "ca.onsiteclub.checklist"
+      node: 20
+      java: 17
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      tag_patterns:
+        - pattern: 'checklist-v*'
+          include: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Write .env.local for Vite
+        script: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error:: Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in supabase_credentials group"
+            exit 1
+          fi
+          cd apps/checklist-app
+          printf 'VITE_SUPABASE_URL=%s\n' "$VITE_SUPABASE_URL" >  .env.local
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$VITE_SUPABASE_ANON_KEY" >> .env.local
+
+      - name: Build web bundle
+        script: |
+          cd apps/checklist-app
+          npm run build
+
+      - name: Sync Capacitor Android
+        script: |
+          cd apps/checklist-app
+          npx cap sync android
+
+      # Gradle picks up the release signingConfig automatically once
+      # CM_KEYSTORE_PATH + CM_KEYSTORE_PASSWORD + CM_KEY_PASSWORD are set
+      # by the android_signing group above.
+      - name: Build Android AAB (release)
+        script: |
+          cd apps/checklist-app/android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+
+      - name: Build Android APK (release)
+        script: |
+          cd apps/checklist-app/android
+          ./gradlew assembleRelease
+
+    artifacts:
+      - apps/checklist-app/android/app/build/outputs/bundle/release/*.aab
+      - apps/checklist-app/android/app/build/outputs/apk/release/*.apk
+      - apps/checklist-app/android/app/build/outputs/mapping/release/mapping.txt
+
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+
+  # =============================================================================
+  # CHECKLIST-APP — Android Debug (on PR to any branch)
+  # =============================================================================
+  checklist-app-android-debug:
+    name: Checklist · Android Debug (PR)
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      groups:
+        - supabase_credentials
+      vars:
+        PACKAGE_NAME: "ca.onsiteclub.checklist"
+      node: 20
+      java: 17
+
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Write .env.local for Vite
+        script: |
+          cd apps/checklist-app
+          # Debug builds tolerate missing creds — sync just won't work,
+          # but the offline UI still loads for layout testing.
+          printf 'VITE_SUPABASE_URL=%s\n' "${VITE_SUPABASE_URL:-https://placeholder.supabase.co}" >  .env.local
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "${VITE_SUPABASE_ANON_KEY:-placeholder-anon-key-for-debug-build}" >> .env.local
+
+      - name: Build web bundle
+        script: |
+          cd apps/checklist-app
+          npm run build
+
+      - name: Sync Capacitor Android
+        script: |
+          cd apps/checklist-app
+          npx cap sync android
+
+      - name: Build Android APK (debug)
+        script: |
+          cd apps/checklist-app/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+    artifacts:
+      - apps/checklist-app/android/app/build/outputs/apk/debug/*.apk
+
+  # =============================================================================
+  # CHECKLIST-APP — iOS TestFlight (push to main or checklist-v* tag)
+  # =============================================================================
+  checklist-app-ios-testflight:
+    name: Checklist · iOS TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    integrations:
+      app_store_connect: OnSite Checklist
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: ca.onsiteclub.checklist
+      groups:
+        - supabase_credentials
+      vars:
+        XCODE_WORKSPACE: "apps/checklist-app/ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 20
+      xcode: latest
+      cocoapods: default
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      tag_patterns:
+        - pattern: 'checklist-v*'
+          include: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Write .env.local for Vite
+        script: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error:: Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in supabase_credentials group"
+            exit 1
+          fi
+          cd apps/checklist-app
+          printf 'VITE_SUPABASE_URL=%s\n' "$VITE_SUPABASE_URL" >  .env.local
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$VITE_SUPABASE_ANON_KEY" >> .env.local
+
+      - name: Build web bundle
+        script: |
+          cd apps/checklist-app
+          npm run build
+
+      - name: Sync Capacitor iOS
+        script: |
+          cd apps/checklist-app
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        script: |
+          cd apps/checklist-app/ios/App
+          pod install
+
+      - name: Set up iOS code signing
+        script: |
+          xcode-project use-profiles
+
+      # Auto-increment CFBundleVersion based on the latest TestFlight build + 2
+      # so we always stay ahead of pending reviews. APP_STORE_APP_ID is injected
+      # by the App Store Connect integration.
+      - name: Increment build number
+        script: |
+          cd apps/checklist-app/ios/App
+          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" || echo 0)
+          NEW_BUILD=$((LATEST_BUILD + 2))
+          echo "Latest TestFlight build: $LATEST_BUILD → New build: $NEW_BUILD"
+          agvtool new-version -all $NEW_BUILD
+
+      - name: Build iOS app (Release)
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --config Release
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+
+  # =============================================================================
+  # CHECKLIST-APP — iOS Debug (on PR)
+  # =============================================================================
+  checklist-app-ios-debug:
+    name: Checklist · iOS Debug (PR)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      groups:
+        - supabase_credentials
+      vars:
+        XCODE_WORKSPACE: "apps/checklist-app/ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 20
+      xcode: latest
+      cocoapods: default
+
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm ci
+
+      - name: Write .env.local for Vite
+        script: |
+          cd apps/checklist-app
+          printf 'VITE_SUPABASE_URL=%s\n' "${VITE_SUPABASE_URL:-https://placeholder.supabase.co}" >  .env.local
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "${VITE_SUPABASE_ANON_KEY:-placeholder-anon-key-for-debug-build}" >> .env.local
+
+      - name: Build web bundle
+        script: |
+          cd apps/checklist-app
+          npm run build
+
+      - name: Sync Capacitor iOS
+        script: |
+          cd apps/checklist-app
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        script: |
+          cd apps/checklist-app/ios/App
+          pod install
+
+      - name: Build iOS (Debug, Simulator)
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --config Debug \
+            --archive-flags="-destination 'generic/platform=iOS Simulator'"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+  # =============================================================================
   # TIMEKEEPER — iOS Build (EAS). Manual trigger only.
   # =============================================================================
   ios-build:
@@ -340,6 +642,12 @@ workflows:
     name: Operator 2 · iOS Release
     max_build_duration: 90
     instance_type: mac_mini_m2
+
+    # Reuses the existing "OnSite Calculator" App Store Connect integration —
+    # the API key is team-wide so the same .p8 grants App Manager access to
+    # every app under the developer team, including ca.onsiteclub.operator2.
+    integrations:
+      app_store_connect: OnSite Calculator
 
     environment:
       ios_signing:
