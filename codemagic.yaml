@@ -671,6 +671,15 @@ workflows:
         script: |
           npm ci
 
+      - name: Hydrate operator_2 local node_modules
+        script: |
+          # Forces a per-app node_modules to coexist with the hoisted root one,
+          # so the iOS Podfile's `../node_modules/...` paths resolve. Pure
+          # workspace hoisting breaks ExpoModulesCore podspec resolution on
+          # Codemagic's mac runners.
+          cd apps/operator_2
+          npm install --no-save --legacy-peer-deps
+
       - name: Write .env for Expo bundler
         script: |
           if [ -z "$EXPO_PUBLIC_SUPABASE_URL" ] || [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
@@ -689,7 +698,9 @@ workflows:
       - name: CocoaPods install
         script: |
           cd apps/operator_2/ios
-          pod install
+          # --repo-update refreshes the trunk CDN spec cache so newly published
+          # podspecs (e.g. ReactAppDependencyProvider for RN 0.76) resolve.
+          pod install --repo-update
 
       - name: Set up provisioning profiles
         script: |
